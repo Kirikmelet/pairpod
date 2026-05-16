@@ -1,46 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
-
-type Todo = {
-  id: number | string;
-  name: string;
-};
-
 type TodosAppProps = {
   variant?: "page" | "popup";
   onOpenApp?: () => void;
 };
 
 export function TodosApp({ variant = "page", onOpenApp }: TodosAppProps) {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [status, setStatus] = useState("Loading todos...");
-  const [isError, setIsError] = useState(false);
-
-  const loadTodos = useCallback(async () => {
-    setStatus("Loading todos...");
-    setIsError(false);
-
-    const supabase = createClient();
-    const { data, error } = await supabase.from("todos").select("id, name");
-
-    if (error) {
-      setTodos([]);
-      setStatus(error.message);
-      setIsError(true);
-      return;
-    }
-
-    setTodos((data ?? []) as Todo[]);
-    setStatus(`${data?.length ?? 0} todo(s)`);
-  }, []);
-
-  useEffect(() => {
-    void loadTodos();
-  }, [loadTodos]);
-
   const isPopup = variant === "popup";
+  const status = "The old todos demo has been disabled.";
 
   return (
     <section className="app-panel">
@@ -50,26 +17,18 @@ export function TodosApp({ variant = "page", onOpenApp }: TodosAppProps) {
           <h1 className={`app-title ${isPopup ? "app-title--sm" : ""}`}>
             Uncommon Hacks
           </h1>
-          <p className={`status-note ${isError ? "status-note--error" : ""}`}>
-            {status}
-          </p>
+          <p className="status-note">{status}</p>
         </header>
 
         <ul className="app-list">
-          {todos.length === 0 ? (
-            <li className="app-list__item app-list__item--empty">No todos yet.</li>
-          ) : (
-            todos.map((todo) => (
-              <li className="app-list__item" key={todo.id}>
-                {todo.name}
-              </li>
-            ))
-          )}
+          <li className="app-list__item app-list__item--empty">
+            Connect this panel to the new backend API routes.
+          </li>
         </ul>
 
         <div className={onOpenApp ? "app-actions app-actions--inline" : "app-actions"}>
-          <button type="button" onClick={() => void loadTodos()} className="btn-secondary">
-            Reload
+          <button type="button" disabled className="btn-secondary">
+            Demo disabled
           </button>
           {onOpenApp ? (
             <button type="button" onClick={onOpenApp} className="btn-primary">

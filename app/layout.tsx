@@ -1,20 +1,8 @@
 import type { Metadata } from "next";
-import { Fredoka, Nunito } from "next/font/google";
 import "./globals.css";
-
-const nunito = Nunito({
-  variable: "--font-nunito",
-  subsets: ["latin"],
-});
-
-const fredoka = Fredoka({
-  variable: "--font-fredoka",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
   title: "Uncommon Hacks",
-  description: "Uncommon Hacks",
+  description: "Social-impact browser extension and web app",
 };
 
 export default function RootLayout({
@@ -23,10 +11,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${nunito.variable} ${fredoka.variable}`}
-    >
+    <html lang="en">
       <body>{children}</body>
     </html>
   );
