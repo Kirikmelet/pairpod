@@ -9,7 +9,16 @@ import {
   usePageBundle,
 } from "@/lib/client/page-api";
 
-export function ChatPage() {
+type ChatPageProps = {
+  currentUsername?: string;
+};
+
+type Member = {
+  name: string;
+  status: "Online" | "Away";
+};
+
+export function ChatPage({ currentUsername }: ChatPageProps) {
   const { bundle, commentsBySection, loading, error, refresh, buildScopedHref } =
     usePageBundle();
   const [message, setMessage] = useState("");
@@ -22,29 +31,61 @@ export function ChatPage() {
   );
 
   const discussionPosts = useMemo(
-    () => (bundle?.posts ?? []).filter((post) => post.type !== "chat").slice(-3).reverse(),
+    () =>
+      (bundle?.posts ?? [])
+        .filter((post) => post.type !== "chat")
+        .slice(-3)
+        .reverse(),
     [bundle?.posts],
   );
 
-  const authors = useMemo(() => {
-    const values = new Map<string, { name: string; status: "Online" | "Away" }>();
+  const authors = useMemo<Member[]>(() => {
+    const values = new Map<string, Member>();
+
+    if (currentUsername?.trim()) {
+      values.set(currentUsername, {
+        name: currentUsername,
+        status: "Online",
+      });
+    }
 
     for (const post of bundle?.posts ?? []) {
-      const name = getDisplayName(post.user_id);
-      values.set(name, { name, status: post.type === "chat" ? "Online" : "Away" });
+      const fallbackName = getDisplayName(post.user_id);
+      const name =
+        currentUsername?.trim() && fallbackName === "Anonymous"
+          ? currentUsername
+          : fallbackName;
+
+      if (!values.has(name)) {
+        values.set(name, {
+          name,
+          status: post.type === "chat" ? "Online" : "Away",
+        });
+      }
     }
 
     for (const comment of bundle?.comments ?? []) {
-      const name = getDisplayName(comment.user_id);
-      values.set(name, { name, status: "Away" });
+      const fallbackName = getDisplayName(comment.user_id);
+      const name =
+        currentUsername?.trim() && fallbackName === "Anonymous"
+          ? currentUsername
+          : fallbackName;
+
+      if (!values.has(name)) {
+        values.set(name, {
+          name,
+          status: "Away",
+        });
+      }
     }
 
     return [...values.values()].slice(0, 8);
-  }, [bundle?.comments, bundle?.posts]);
+  }, [bundle?.comments, bundle?.posts, currentUsername]);
 
-  const recentCommentActivity = useMemo(() => {
-    return (bundle?.comments ?? []).slice(-4).reverse();
-  }, [bundle?.comments]);
+  const recentCommentActivity = useMemo(
+    () => (bundle?.comments ?? []).slice(-4).reverse(),
+    [bundle?.comments],
+  );
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -138,7 +179,10 @@ export function ChatPage() {
               <p>*** You have joined #chat</p>
               <p>*** Topic: Shared discussion for {getChatTitle(bundle)}</p>
               <p>
-                *** {loading ? "Loading…" : `${chatPosts.length} messages and ${bundle?.comments.length ?? 0} comments`}
+                ***{" "}
+                {loading
+                  ? "Loading..."
+                  : `${chatPosts.length} messages and ${bundle?.comments.length ?? 0} comments`}
               </p>
             </div>
 
@@ -239,8 +283,16 @@ export function ChatPage() {
                 </p>
               </div>
             </section>
-            <RailPanel title="Recent Posts" action={buildScopedHref("/posts")} items={discussionPosts} />
-            <CommentPanel title="Recent Activity" action={buildScopedHref("/posts")} items={recentCommentActivity} />
+            <RailPanel
+              title="Recent Posts"
+              action={buildScopedHref("/posts")}
+              items={discussionPosts}
+            />
+            <CommentPanel
+              title="Recent Activity"
+              action={buildScopedHref("/posts")}
+              items={recentCommentActivity}
+            />
           </aside>
         </div>
       </section>
@@ -279,15 +331,13 @@ function RailPanel({
 }: {
   title: string;
   action: string;
-  items: ReturnType<typeof usePageBundle>["bundle"] extends infer _
-    ? Array<{
-        id: string;
-        header: string | null;
-        content: string;
-        created_at: string;
-        type: string;
-      }>
-    : never;
+  items: Array<{
+    id: string;
+    header: string | null;
+    content: string;
+    created_at: string;
+    type: string;
+  }>;
 }) {
   return (
     <section className="chat-rail-panel">
@@ -356,11 +406,32 @@ function CommentPanel({
 function PodGlyph() {
   return (
     <svg className="xp-title-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <ellipse cx="8" cy="9.5" rx="6" ry="5.5" fill="#6ebe44" stroke="#3d8e22" strokeWidth="0.8" />
+      <ellipse
+        cx="8"
+        cy="9.5"
+        rx="6"
+        ry="5.5"
+        fill="#6ebe44"
+        stroke="#3d8e22"
+        strokeWidth="0.8"
+      />
       <circle cx="6.4" cy="9" r="1.4" fill="#1a2a44" />
       <circle cx="9.6" cy="9" r="1.4" fill="#1a2a44" />
-      <path d="M6 12c1.2 1 2.8 1 4 0" stroke="#2d5018" strokeWidth="1" strokeLinecap="round" />
-      <line x1="8" y1="4" x2="8" y2="1.5" stroke="#3a7820" strokeWidth="1.5" strokeLinecap="round" />
+      <path
+        d="M6 12c1.2 1 2.8 1 4 0"
+        stroke="#2d5018"
+        strokeWidth="1"
+        strokeLinecap="round"
+      />
+      <line
+        x1="8"
+        y1="4"
+        x2="8"
+        y2="1.5"
+        stroke="#3a7820"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
       <circle cx="6.5" cy="1.5" r="1.5" fill="#8cd960" />
     </svg>
   );

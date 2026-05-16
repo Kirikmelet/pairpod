@@ -14,9 +14,11 @@ const staticExportExcludedRoutes = [
 
 function run(command, args, env) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const executable = process.platform === "win32" && command === "npm" ? "npm.cmd" : command;
+    const child = spawn(executable, args, {
       cwd: root,
       env: { ...process.env, ...env },
+      shell: process.platform === "win32",
       stdio: "inherit",
     });
 

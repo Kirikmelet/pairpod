@@ -270,22 +270,31 @@ export type Database = {
       }
       users: {
         Row: {
+          auth_user_id: string | null
           configurations: Json
           created_at: string
+          email: string | null
           id: string
           url: string | null
+          username: string | null
         }
         Insert: {
+          auth_user_id?: string | null
           configurations?: Json
           created_at?: string
+          email?: string | null
           id?: string
           url?: string | null
+          username?: string | null
         }
         Update: {
+          auth_user_id?: string | null
           configurations?: Json
           created_at?: string
+          email?: string | null
           id?: string
           url?: string | null
+          username?: string | null
         }
         Relationships: []
       }
