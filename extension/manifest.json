@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Uncommon Hacks",
-  "short_name": "Uncommon Hacks",
+  "name": "PeerPod",
+  "short_name": "PeerPod",
   "version": "0.1.0",
   "description": "Browser extension shell for the Uncommon Hacks Next.js app.",
   "icons": {
@@ -10,7 +10,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Uncommon Hacks",
+    "default_title": "PeerPod",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
