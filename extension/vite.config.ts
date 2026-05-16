@@ -94,11 +94,13 @@ function loadEnvLocal(projectRoot: string): Record<string, string> {
 
 function requireSupabaseEnv(envValues: Record<string, string>) {
   const url = envValues.NEXT_PUBLIC_SUPABASE_URL;
-  const key = envValues.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const key =
+    envValues.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    envValues.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !key) {
     throw new Error(
-      ".env.local must define NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+      ".env.local must define NEXT_PUBLIC_SUPABASE_URL and either NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY.",
     );
   }
 

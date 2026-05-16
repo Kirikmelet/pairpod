@@ -67,7 +67,11 @@ const recent: Activity[] = [
   { title: "pixelboy pushed a commit", meta: "2h ago" },
 ];
 
-export function ChatPage() {
+type ChatPageProps = {
+  currentUsername?: string;
+};
+
+export function ChatPage({ currentUsername }: ChatPageProps) {
   return (
     <main className="chat-shell">
       <section className="chat-window xp-window" aria-labelledby="chat-title">
@@ -93,6 +97,17 @@ export function ChatPage() {
           <aside className="chat-members" aria-label="Room members">
             <PanelHeader title="Members (124)" />
             <div className="chat-members__list">
+              {currentUsername ? (
+                <article className="chat-member">
+                  <span className="chat-avatar chat-avatar--4">
+                    {currentUsername.charAt(0).toUpperCase()}
+                  </span>
+                  <div>
+                    <h2>{currentUsername}</h2>
+                    <p>Online</p>
+                  </div>
+                </article>
+              ) : null}
               {members.map((member) => (
                 <article className="chat-member" key={member.name}>
                   <span className={`chat-avatar chat-avatar--${member.tone}`}>{member.name.charAt(0).toUpperCase()}</span>

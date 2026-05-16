@@ -18,6 +18,9 @@ drop table if exists users;
 
 create table if not exists users (
   id uuid primary key default gen_random_uuid(),
+  auth_user_id uuid unique,
+  username text unique,
+  email text,
   url text,
   configurations jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
@@ -90,3 +93,5 @@ create index if not exists idx_events_room_id on events(room_id);
 create index if not exists idx_events_post_id on events(post_id);
 create index if not exists idx_events_comment_id on events(comment_id);
 create index if not exists idx_events_event_type on events(event_type);
+create index if not exists idx_users_auth_user_id on users(auth_user_id);
+create index if not exists idx_users_username on users(username);

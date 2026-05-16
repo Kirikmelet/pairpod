@@ -33,7 +33,7 @@ createRoot(rootElement).render(
   <HomePage
     variant="popup"
     onOpenApp={() => {
-      const appUrl = runtime.runtime.getURL("app/index.html");
+      const appUrl = runtime.runtime.getURL("app/chat/index.html");
       runtime.tabs.create({ url: appUrl });
     }}
   />,
