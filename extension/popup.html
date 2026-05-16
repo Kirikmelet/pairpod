@@ -4,66 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Uncommon Hacks</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-        font-family:
-          system-ui,
-          -apple-system,
-          sans-serif;
-      }
-
-      body {
-        margin: 0;
-        min-width: 240px;
-        padding: 16px;
-        background: #fafafa;
-        color: #111;
-      }
-
-      @media (prefers-color-scheme: dark) {
-        body {
-          background: #111;
-          color: #fafafa;
-        }
-      }
-
-      h1 {
-        margin: 0 0 8px;
-        font-size: 16px;
-      }
-
-      p {
-        margin: 0 0 12px;
-        font-size: 13px;
-        line-height: 1.4;
-        opacity: 0.8;
-      }
-
-      button {
-        width: 100%;
-        border: 0;
-        border-radius: 999px;
-        padding: 10px 14px;
-        font: inherit;
-        font-weight: 600;
-        cursor: pointer;
-        background: #111;
-        color: #fafafa;
-      }
-
-      @media (prefers-color-scheme: dark) {
-        button {
-          background: #fafafa;
-          color: #111;
-        }
-      }
-    </style>
+    <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <h1>Uncommon Hacks</h1>
-    <p>Open the exported app inside the extension.</p>
-    <button id="open-app" type="button">Open app</button>
+    <div id="root"></div>
     <script src="popup.js"></script>
   </body>
 </html>

@@ -27,6 +27,7 @@ function run(command, args, env) {
   });
 }
 
+await run("node", ["scripts/bundle-extension-popup.mjs"]);
 await run("npm", ["run", "build"], { BUILD_EXTENSION: "1" });
 await rm(appDir, { recursive: true, force: true });
 await mkdir(appDir, { recursive: true });
