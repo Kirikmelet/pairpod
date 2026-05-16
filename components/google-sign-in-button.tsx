@@ -8,6 +8,17 @@ type GoogleSignInButtonProps = {
   className?: string;
 };
 
+type ExtensionRuntimeApi = {
+  tabs?: {
+    create(input: { url: string }): void;
+  };
+};
+
+const globalWithExtensionApis = globalThis as typeof globalThis & {
+  browser?: ExtensionRuntimeApi;
+  chrome?: ExtensionRuntimeApi;
+};
+
 export function GoogleSignInButton({
   variant = "page",
   disabled = false,
@@ -17,7 +28,8 @@ export function GoogleSignInButton({
   const loginUrl = `${siteUrl}${GOOGLE_LOGIN_PATH}`;
 
   const handlePopupClick = () => {
-    const runtime = globalThis.browser ?? globalThis.chrome;
+    const runtime =
+      globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
     if (runtime?.tabs?.create) {
       runtime.tabs.create({ url: loginUrl });
       return;

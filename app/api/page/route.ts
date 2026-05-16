@@ -1,13 +1,16 @@
-import type { NextRequest } from 'next/server'
-
-import { jsonError, jsonSuccess } from '@/lib/server/http'
+import { NextResponse } from 'next/server'
 import { findOrCreateDefaultRoom, findOrCreatePage, getPageBundle } from '@/lib/server/pages'
 
-export async function GET(request: NextRequest): Promise<Response> {
-  const url = request.nextUrl.searchParams.get('url')
+export async function GET(request: Request): Promise<Response> {
+  const { searchParams } = new URL(request.url)
+  const url = searchParams.get('url')
+  const title = searchParams.get('title')
 
   if (!url) {
-    return jsonError('Missing required query parameter: url', 400)
+    return NextResponse.json(
+      { ok: false, error: 'Missing required query parameter: url' },
+      { status: 400 }
+    )
   }
 
   try {
@@ -15,9 +18,21 @@ export async function GET(request: NextRequest): Promise<Response> {
     const room = await findOrCreateDefaultRoom(page.id)
     const bundle = await getPageBundle(page.id, room.id)
 
-    return jsonSuccess(bundle)
+    return NextResponse.json(
+      {
+        ok: true,
+        data: bundle,
+      },
+      { status: 200 }
+    )
   } catch (error) {
+    console.error('GET /api/page failed', {
+      error,
+      url,
+      title,
+    })
+
     const message = error instanceof Error ? error.message : 'Failed to load page data'
-    return jsonError(message, 500)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }
