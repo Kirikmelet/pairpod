@@ -1116,6 +1116,45 @@ body {
   font-weight: var(--fw-semibold);
 }
 
+.home-chat-module {
+  min-height: 420px;
+  display: grid;
+}
+
+.home-chat-module__panel {
+  min-height: 420px;
+  grid-template-rows: auto auto minmax(220px, 1fr) auto;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.home-chat-module__transcript {
+  min-height: 220px;
+  max-height: 44vh;
+}
+
+.home-chat-module .chat-topic,
+.home-chat-module .chat-transcript {
+  font-size: var(--fs-md);
+}
+
+.home-chat-module .chat-message {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+.home-chat-module .chat-composer {
+  grid-template-columns: minmax(0, 1fr) 82px;
+}
+
+.home-chat-module .chat-composer textarea {
+  min-height: 78px;
+  font-size: var(--fs-md);
+}
+
+.home-chat-module .chat-composer button {
+  font-size: var(--fs-md);
+}
+
 .status-note {
   color: var(--text-mid);
   font-size: var(--fs-sm);
