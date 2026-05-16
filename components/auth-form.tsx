@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { FormEvent } from "react";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { createClient } from "@/utils/supabase/client";
 
@@ -23,7 +24,7 @@ export function AuthForm({
 
   const isPopup = variant === "popup";
 
-  const handleEmailAuth = async (event: React.FormEvent) => {
+  const handleEmailAuth = async (event: FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
     setStatus(null);
@@ -59,101 +60,111 @@ export function AuthForm({
     onSuccess?.();
   };
 
-  const inputClass =
-    "w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:border-zinc-600";
-  const buttonClass =
-    "rounded-full px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50";
+  const statusKind =
+    status?.includes("confirm") || status?.includes("created") ? "success" : "error";
 
   return (
-    <div
-      className={
-        isPopup
-          ? "flex w-full flex-col gap-3"
-          : "flex w-full max-w-lg flex-col gap-6 rounded-3xl bg-white p-8 shadow-sm dark:bg-zinc-950"
-      }
-    >
-      <header className="flex flex-col gap-1">
-        <h1
-          className={
-            isPopup
-              ? "text-base font-semibold"
-              : "text-3xl font-semibold tracking-tight text-black dark:text-zinc-50"
-          }
-        >
-          {mode === "signin" ? "Sign in" : "Create account"}
-        </h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          {mode === "signin"
-            ? "Welcome back to Uncommon Hacks"
-            : "Create an account to get started"}
+    <div className="app-stack">
+      <header className="brand">
+        <div className="brand-row">
+          <PodLogo />
+          <div className="brand-name">
+            <span className="peer">Uncommon</span>{" "}
+            <span className="pod">Hacks</span>
+          </div>
+        </div>
+        <p className="brand-tagline">
+          {mode === "signin" ? "welcome back to your pod" : "start a fresh pod"}
         </p>
       </header>
+
+      <div className="tabs" role="tablist" aria-label="Authentication mode">
+        <button
+          type="button"
+          className={`tab ${mode === "signin" ? "active" : ""}`}
+          onClick={() => {
+            setMode("signin");
+            setStatus(null);
+          }}
+        >
+          Sign In
+        </button>
+        <button
+          type="button"
+          className={`tab ${mode === "signup" ? "active" : ""}`}
+          onClick={() => {
+            setMode("signup");
+            setStatus(null);
+          }}
+        >
+          Register
+        </button>
+      </div>
 
       <GoogleSignInButton variant={variant} disabled={isLoading} />
 
       {isPopup ? (
-        <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="status-note text-center">
           Sign in opens in a new tab. Reload the extension when finished.
         </p>
       ) : null}
 
-      <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-zinc-400">
-        <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-        or use email
-        <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+      <div className="divider">
+        <span>or use email</span>
       </div>
 
-      <form className="grid gap-3" onSubmit={(e) => void handleEmailAuth(e)}>
-        <label className="grid gap-1.5 text-sm">
-          <span className="text-zinc-600 dark:text-zinc-400">Email</span>
-          <input
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={inputClass}
-          />
+      <form className="app-stack" onSubmit={(event) => void handleEmailAuth(event)}>
+        <label className="form-group">
+          <span className="form-label">Email Address</span>
+          <span className="input-wrap">
+            <input
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="form-input"
+              placeholder="you@example.com"
+            />
+            <EmailIcon />
+          </span>
         </label>
-        <label className="grid gap-1.5 text-sm">
-          <span className="text-zinc-600 dark:text-zinc-400">Password</span>
-          <input
-            type="password"
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={inputClass}
-          />
+
+        <label className="form-group">
+          <span className="form-label">Password</span>
+          <span className="input-wrap">
+            <input
+              type="password"
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              required
+              minLength={6}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="form-input"
+              placeholder="Password"
+            />
+            <LockIcon />
+          </span>
         </label>
 
         {status ? (
-          <p
-            className={`text-sm ${status.includes("confirm") || status.includes("created") ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-          >
-            {status}
-          </p>
+          <p className={`status-note status-note--${statusKind}`}>{status}</p>
         ) : null}
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className={`${buttonClass} bg-foreground font-semibold text-background hover:opacity-90`}
-        >
+        <button type="submit" disabled={isLoading} className="btn-primary">
           {isLoading
-            ? "Please wait…"
+            ? "Please wait..."
             : mode === "signin"
               ? "Sign in with email"
               : "Create account with email"}
         </button>
       </form>
 
-      <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+      <p className="status-note text-center">
         {mode === "signin" ? "No account yet?" : "Already have an account?"}{" "}
         <button
           type="button"
-          className="font-medium text-foreground underline-offset-2 hover:underline"
+          className="text-button"
           onClick={() => {
             setMode(mode === "signin" ? "signup" : "signin");
             setStatus(null);
@@ -163,5 +174,40 @@ export function AuthForm({
         </button>
       </p>
     </div>
+  );
+}
+
+function PodLogo() {
+  return (
+    <svg className="logo-pod" viewBox="0 0 38 44" fill="none" aria-hidden="true">
+      <path d="M19 6 Q15 1 11 0 Q14 4 14 8" stroke="#3a7820" strokeWidth="1.5" fill="#4a9e2a" strokeLinecap="round" />
+      <path d="M19 6 Q23 0 28 0 Q24 4 24 9" stroke="#3a7820" strokeWidth="1.5" fill="#6ebe44" strokeLinecap="round" />
+      <line x1="19" y1="10" x2="19" y2="6" stroke="#3a7820" strokeWidth="2" strokeLinecap="round" />
+      <ellipse cx="19" cy="27" rx="16" ry="16" fill="#6ebe44" stroke="#3d8e22" strokeWidth="1.2" />
+      <ellipse cx="17" cy="23" rx="10" ry="11" fill="white" opacity="0.25" />
+      <circle cx="14" cy="25" r="3.5" fill="white" stroke="#3d8e22" strokeWidth="0.6" />
+      <circle cx="24" cy="25" r="3.5" fill="white" stroke="#3d8e22" strokeWidth="0.6" />
+      <circle cx="14.8" cy="25.5" r="1.8" fill="#1a2a44" />
+      <circle cx="24.8" cy="25.5" r="1.8" fill="#1a2a44" />
+      <path d="M15 32 Q19 36 23 32" stroke="#2d5018" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
+
+function EmailIcon() {
+  return (
+    <svg className="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 7l9 5 9-5" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg className="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 018 0v4" />
+    </svg>
   );
 }

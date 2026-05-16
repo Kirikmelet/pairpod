@@ -25,8 +25,7 @@ export function GoogleSignInButton({
     window.open(loginUrl, "_blank", "noopener,noreferrer");
   };
 
-  const baseClass =
-    "flex w-full items-center justify-center gap-3 rounded-full border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900";
+  const baseClass = "btn-social";
 
   if (variant === "popup") {
     return (

@@ -5,8 +5,10 @@ export default function Page() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-full items-center justify-center text-sm text-zinc-500">
-          Loading…
+        <div className="app-scene">
+          <div className="app-scene__content">
+            <p className="status-note">Loading...</p>
+          </div>
         </div>
       }
     >
