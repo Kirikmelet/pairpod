@@ -1,79 +1,86 @@
-type Member = {
-  name: string;
-  status: "Online" | "Away";
-  tone: number;
-};
+"use client";
 
-type Message = {
-  time: string;
-  author: string;
-  tone: "purple" | "pink" | "green" | "blue" | "bot" | "brown";
-  lines: string[];
-  badge?: string;
-  callout?: string;
-  replies?: string;
-};
-
-type Activity = {
-  title: string;
-  meta: string;
-  count?: string;
-};
-
-const members: Member[] = [
-  { name: "pixelboy", status: "Online", tone: 1 },
-  { name: "luna_dev", status: "Online", tone: 2 },
-  { name: "rootkit", status: "Online", tone: 3 },
-  { name: "starry_nova", status: "Online", tone: 4 },
-  { name: "debugger99", status: "Away", tone: 5 },
-  { name: "octo_lover", status: "Online", tone: 6 },
-  { name: "code_newbie", status: "Away", tone: 7 },
-  { name: "dev_jay", status: "Online", tone: 8 },
-];
-
-const messages: Message[] = [
-  { time: "10:22", author: "pixelboy", tone: "purple", lines: ["just pushed a new commit!"] },
-  { time: "10:23", author: "luna_dev", tone: "pink", lines: ["looks clean! love the animations"] },
-  { time: "10:24", author: "rootkit", tone: "green", lines: ["anyone down to review my PR?", "github.com/rootkit/project/pull/42"] },
-  { time: "10:24", author: "starry_nova", tone: "blue", lines: ["on it! give me 5 mins"] },
-  {
-    time: "10:25",
-    author: "AI Buddy",
-    tone: "bot",
-    badge: "BOT",
-    lines: ["Need help with Git? Try /git <question>", "Example: /git how do I squash commits?"],
-  },
-  {
-    time: "10:25",
-    author: "debugger99",
-    tone: "brown",
-    lines: ["having an issue with auth... anyone", "seen this before?"],
-    callout: "Error: bad credentials",
-    replies: "3 replies - View thread",
-  },
-  { time: "10:26", author: "pixelboy", tone: "purple", lines: ["hmm check your token permissions"] },
-];
-
-const posts: Activity[] = [
-  { title: "How do I stay consistent?", meta: "coder_newbie", count: "24" },
-  { title: "Best VS Code extensions?", meta: "dev_jay", count: "18" },
-  { title: "Git workflow tips", meta: "octo_lover", count: "32" },
-];
-
-const recent: Activity[] = [
-  { title: "luna_dev joined the room", meta: "2m ago" },
-  { title: "rootkit shared a post", meta: "15m ago" },
-  { title: "starry_nova commented", meta: "1h ago" },
-  { title: "pixelboy pushed a commit", meta: "2h ago" },
-];
+import { FormEvent, useMemo, useState } from "react";
+import {
+  formatTimestamp,
+  getDisplayName,
+  postJson,
+  splitContentLines,
+  usePageBundle,
+} from "@/lib/client/page-api";
 
 export function ChatPage() {
+  const { bundle, commentsBySection, loading, error, refresh, buildScopedHref } =
+    usePageBundle();
+  const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const chatPosts = useMemo(
+    () => (bundle?.posts ?? []).filter((post) => post.type === "chat"),
+    [bundle?.posts],
+  );
+
+  const discussionPosts = useMemo(
+    () => (bundle?.posts ?? []).filter((post) => post.type !== "chat").slice(-3).reverse(),
+    [bundle?.posts],
+  );
+
+  const authors = useMemo(() => {
+    const values = new Map<string, { name: string; status: "Online" | "Away" }>();
+
+    for (const post of bundle?.posts ?? []) {
+      const name = getDisplayName(post.user_id);
+      values.set(name, { name, status: post.type === "chat" ? "Online" : "Away" });
+    }
+
+    for (const comment of bundle?.comments ?? []) {
+      const name = getDisplayName(comment.user_id);
+      values.set(name, { name, status: "Away" });
+    }
+
+    return [...values.values()].slice(0, 8);
+  }, [bundle?.comments, bundle?.posts]);
+
+  const recentCommentActivity = useMemo(() => {
+    return (bundle?.comments ?? []).slice(-4).reverse();
+  }, [bundle?.comments]);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!bundle || !message.trim()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      await postJson("/api/chat", {
+        roomId: bundle.room.id,
+        pageId: bundle.page.id,
+        message: message.trim(),
+      });
+      setMessage("");
+      await refresh();
+    } catch (sendError) {
+      setSubmitError(
+        sendError instanceof Error ? sendError.message : "Failed to send message",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <main className="chat-shell">
       <section className="chat-window xp-window" aria-labelledby="chat-title">
         <div className="xp-title-bar chat-titlebar">
           <PodGlyph />
-          <span className="xp-title-text" id="chat-title">3WChat - github.com</span>
+          <span className="xp-title-text" id="chat-title">
+            3WChat - {getChatTitle(bundle)}
+          </span>
           <div className="xp-title-controls" aria-hidden="true">
             <span className="xp-title-btn xp-title-btn--min">_</span>
             <span className="xp-title-btn xp-title-btn--max">[]</span>
@@ -82,31 +89,46 @@ export function ChatPage() {
         </div>
 
         <nav className="chat-menu" aria-label="Chat menu">
-          <a href="#">Room</a>
-          <a href="#">Edit</a>
-          <a href="#">View</a>
-          <a href="#">Actions</a>
-          <a href="#">Help</a>
+          <a href={buildScopedHref("/")}>Room</a>
+          <a href={buildScopedHref("/posts")}>Posts</a>
+          <a href={buildScopedHref("/chat")}>Chat</a>
+          <a href={buildScopedHref("/posts")}>Questions</a>
+          <a href={buildScopedHref("/")}>Help</a>
         </nav>
 
         <div className="chat-layout">
           <aside className="chat-members" aria-label="Room members">
-            <PanelHeader title="Members (124)" />
+            <PanelHeader title={`Members (${authors.length || 1})`} />
             <div className="chat-members__list">
-              {members.map((member) => (
-                <article className="chat-member" key={member.name}>
-                  <span className={`chat-avatar chat-avatar--${member.tone}`}>{member.name.charAt(0).toUpperCase()}</span>
+              {authors.length > 0 ? (
+                authors.map((member, index) => (
+                  <article className="chat-member" key={member.name}>
+                    <span className={`chat-avatar chat-avatar--${(index % 8) + 1}`}>
+                      {member.name.charAt(0).toUpperCase()}
+                    </span>
+                    <div>
+                      <h2>{member.name}</h2>
+                      <p>{member.status}</p>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <article className="chat-member">
+                  <span className="chat-avatar chat-avatar--1">A</span>
                   <div>
-                    <h2>{member.name}</h2>
-                    <p>{member.status}</p>
+                    <h2>Anonymous</h2>
+                    <p>No messages yet</p>
                   </div>
                 </article>
-              ))}
-              <a className="chat-more" href="#">+ 115 more</a>
+              )}
             </div>
             <div className="chat-member-actions">
-              <button type="button" className="chat-side-button"><span className="chat-side-icon">+</span>Invite Someone</button>
-              <button type="button" className="chat-side-button"><span className="chat-side-icon">[]</span>Leave Room</button>
+              <a href={buildScopedHref("/posts")} className="chat-side-button">
+                <span className="chat-side-icon">+</span>Open Posts
+              </a>
+              <a href={buildScopedHref("/")} className="chat-side-button">
+                <span className="chat-side-icon">[]</span>Back to Pod
+              </a>
             </div>
           </aside>
 
@@ -114,38 +136,88 @@ export function ChatPage() {
             <PanelHeader title="# chat" />
             <div className="chat-topic">
               <p>*** You have joined #chat</p>
-              <p>*** Topic: Welcome to github.com! Code, collaborate, build.</p>
-              <p>*** 124 users in this room</p>
+              <p>*** Topic: Shared discussion for {getChatTitle(bundle)}</p>
+              <p>
+                *** {loading ? "Loading…" : `${chatPosts.length} messages and ${bundle?.comments.length ?? 0} comments`}
+              </p>
             </div>
+
+            {error ? <p className="chat-error">{error}</p> : null}
+            {submitError ? <p className="chat-error">{submitError}</p> : null}
+
             <div className="chat-transcript">
-              {messages.map((message) => (
-                <article className="chat-message" key={`${message.time}-${message.author}`}>
-                  <span className="chat-message__time">[{message.time}]</span>
+              {loading ? (
+                <article className="chat-message">
                   <div className="chat-message__body">
-                    <p>
-                      <strong className={`chat-name chat-name--${message.tone}`}>{message.author}:</strong>
-                      {message.badge ? <span className="chat-badge">{message.badge}</span> : null}
-                      {" "}{message.lines[0]}
-                    </p>
-                    {message.lines.slice(1).map((line) => (
-                      <p className={line.includes("github.com") || line.startsWith("Example:") ? "chat-link-line" : ""} key={line}>{line}</p>
-                    ))}
-                    {message.callout ? <p className="chat-error">{message.callout}</p> : null}
-                    {message.replies ? <a className="chat-thread" href="#">-&gt; {message.replies}</a> : null}
+                    <p>Loading chat history...</p>
                   </div>
                 </article>
-              ))}
+              ) : chatPosts.length > 0 ? (
+                chatPosts.map((post, index) => {
+                  const relatedComments = commentsBySection[`post:${post.id}`] ?? [];
+                  const lines = splitContentLines(post.content);
+
+                  return (
+                    <article className="chat-message" key={post.id}>
+                      <span className="chat-message__time">
+                        [{formatTimestamp(post.created_at)}]
+                      </span>
+                      <div className="chat-message__body">
+                        <p>
+                          <strong className={`chat-name chat-name--${pickTone(index)}`}>
+                            {getDisplayName(post.user_id)}:
+                          </strong>{" "}
+                          {lines[0] ?? post.content}
+                        </p>
+                        {lines.slice(1).map((line) => (
+                          <p key={`${post.id}-${line}`}>{line}</p>
+                        ))}
+                        {relatedComments.length > 0 ? (
+                          <a
+                            className="chat-thread"
+                            href={buildScopedHref(`/posts/${post.id}`)}
+                          >
+                            -&gt; {relatedComments.length} replies - View thread
+                          </a>
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })
+              ) : (
+                <article className="chat-message">
+                  <div className="chat-message__body">
+                    <p>No chat messages yet. Send the first one below.</p>
+                  </div>
+                </article>
+              )}
             </div>
+
             <div className="chat-toolbar" aria-label="Message tools">
               {["A", "A*", "B", "I", "U", "link", "img", ":)"].map((tool) => (
-                <button type="button" key={tool}>{tool}</button>
+                <button type="button" key={tool}>
+                  {tool}
+                </button>
               ))}
             </div>
-            <form className="chat-composer">
-              <label className="sr-only" htmlFor="chat-message">Message</label>
-              <textarea id="chat-message" aria-label="Message" />
-              <button type="submit">Send</button>
-              <button type="button" aria-label="Voice message">)))</button>
+
+            <form className="chat-composer" onSubmit={(event) => void handleSubmit(event)}>
+              <label className="sr-only" htmlFor="chat-message">
+                Message
+              </label>
+              <textarea
+                id="chat-message"
+                aria-label="Message"
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                placeholder="Share a message with the room..."
+              />
+              <button type="submit" disabled={isSubmitting || !bundle}>
+                {isSubmitting ? "Sending..." : "Send"}
+              </button>
+              <a href={buildScopedHref("/posts")} aria-label="Open post stream">
+                )))
+              </a>
             </form>
           </section>
 
@@ -155,15 +227,20 @@ export function ChatPage() {
               <div className="chat-info-card__body">
                 <PodRoomIcon />
                 <div>
-                  <h2>github.com</h2>
+                  <h2>{getChatTitle(bundle)}</h2>
                   <p>Code, collaborate, build.</p>
                 </div>
-                <p className="chat-info-card__meta">Created: Feb 8, 2024</p>
-                <p className="chat-info-card__meta">124 online <span className="live-dot" /> 582 members</p>
+                <p className="chat-info-card__meta">
+                  Created: {bundle ? formatTimestamp(bundle.room.created_at) : "Loading..."}
+                </p>
+                <p className="chat-info-card__meta">
+                  {chatPosts.length} chat messages <span className="live-dot" />{" "}
+                  {discussionPosts.length} active threads
+                </p>
               </div>
             </section>
-            <RailPanel title="Recent Posts" action="View all posts" items={posts} />
-            <RailPanel title="Recent Activity" action="View full history" items={recent} />
+            <RailPanel title="Recent Posts" action={buildScopedHref("/posts")} items={discussionPosts} />
+            <CommentPanel title="Recent Activity" action={buildScopedHref("/posts")} items={recentCommentActivity} />
           </aside>
         </div>
       </section>
@@ -171,22 +248,106 @@ export function ChatPage() {
   );
 }
 
-function PanelHeader({ title }: { title: string }) {
-  return <header className="chat-panel-header"><h2>{title}</h2></header>;
+function getChatTitle(bundle: ReturnType<typeof usePageBundle>["bundle"]) {
+  if (!bundle) {
+    return "current-page";
+  }
+
+  try {
+    return new URL(bundle.page.normalized_url).hostname;
+  } catch {
+    return bundle.page.normalized_url;
+  }
 }
 
-function RailPanel({ title, action, items }: { title: string; action: string; items: Activity[] }) {
+function pickTone(index: number) {
+  return ["purple", "pink", "green", "blue", "brown"][index % 5];
+}
+
+function PanelHeader({ title }: { title: string }) {
+  return (
+    <header className="chat-panel-header">
+      <h2>{title}</h2>
+    </header>
+  );
+}
+
+function RailPanel({
+  title,
+  action,
+  items,
+}: {
+  title: string;
+  action: string;
+  items: ReturnType<typeof usePageBundle>["bundle"] extends infer _
+    ? Array<{
+        id: string;
+        header: string | null;
+        content: string;
+        created_at: string;
+        type: string;
+      }>
+    : never;
+}) {
   return (
     <section className="chat-rail-panel">
       <PanelHeader title={title} />
       <div className="chat-rail-panel__body">
-        {items.map((item) => (
-          <article className="chat-rail-item" key={`${title}-${item.title}`}>
-            <h3>{item.title}</h3>
-            <p>{item.meta}{item.count ? <span>{item.count} replies</span> : null}</p>
+        {items.length > 0 ? (
+          items.map((item) => (
+            <article className="chat-rail-item" key={item.id}>
+              <h3>{item.header || item.content}</h3>
+              <p>
+                {item.type} <span>{formatTimestamp(item.created_at)}</span>
+              </p>
+            </article>
+          ))
+        ) : (
+          <article className="chat-rail-item">
+            <h3>No recent posts</h3>
+            <p>Create a guide or question to populate this panel.</p>
           </article>
-        ))}
-        <a href="#">{action}</a>
+        )}
+        <a href={action}>View all posts</a>
+      </div>
+    </section>
+  );
+}
+
+function CommentPanel({
+  title,
+  action,
+  items,
+}: {
+  title: string;
+  action: string;
+  items: Array<{
+    id: string;
+    content: string;
+    created_at: string;
+    user_id: string | null;
+  }>;
+}) {
+  return (
+    <section className="chat-rail-panel">
+      <PanelHeader title={title} />
+      <div className="chat-rail-panel__body">
+        {items.length > 0 ? (
+          items.map((item) => (
+            <article className="chat-rail-item" key={item.id}>
+              <h3>{getDisplayName(item.user_id)}</h3>
+              <p>
+                {item.content} <span>{formatTimestamp(item.created_at)}</span>
+              </p>
+            </article>
+          ))
+        ) : (
+          <article className="chat-rail-item">
+            <h3>No recent activity</h3>
+            <p>Replies and answers will appear here.</p>
+          </article>
+        )}
+        <a href={action}>View full history</a>
       </div>
     </section>
   );
@@ -210,7 +371,12 @@ function PodRoomIcon() {
     <span className="chat-room-icon" aria-hidden="true">
       <svg viewBox="0 0 48 48" fill="none">
         <circle cx="24" cy="24" r="18" stroke="currentColor" strokeWidth="4" />
-        <path d="M8 24h32M24 6c6 5 9 11 9 18s-3 13-9 18M24 6c-6 5-9 11-9 18s3 13 9 18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <path
+          d="M8 24h32M24 6c6 5 9 11 9 18s-3 13-9 18M24 6c-6 5-9 11-9 18s3 13 9 18"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
       </svg>
     </span>
   );

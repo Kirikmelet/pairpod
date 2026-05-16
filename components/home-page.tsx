@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { AuthForm } from "@/components/auth-form";
+import { PodSelectionPage } from "@/components/pod-selection-page";
 import { TodosApp } from "@/components/todos-app";
 import { createClient } from "@/utils/supabase/client";
 
@@ -89,7 +90,11 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
             Sign out
           </button>
         </div>
-        <TodosApp variant={variant} onOpenApp={onOpenApp} />
+        {isPopup ? (
+          <TodosApp variant={variant} onOpenApp={onOpenApp} />
+        ) : (
+          <PodSelectionPage userEmail={user.email ?? null} />
+        )}
       </div>
     </AppShell>
   );
