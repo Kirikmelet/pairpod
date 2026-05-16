@@ -1,4 +1,5 @@
-import { cp, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
@@ -6,8 +7,10 @@ import { spawn } from "node:child_process";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = path.join(root, "out");
 const appDir = path.join(root, "extension", "app");
-const apiDir = path.join(root, "app", "api");
-const apiStashDir = path.join(root, ".build-stash", "app-api");
+const staticExportExcludedRoutes = [
+  path.join(root, "app", "api"),
+  path.join(root, "app", "auth"),
+];
 
 function run(command, args, env) {
   return new Promise((resolve, reject) => {
@@ -29,16 +32,23 @@ function run(command, args, env) {
   });
 }
 
-await run("node", ["scripts/bundle-extension-popup.mjs"]);
+await run("npm", ["run", "bundle:extension-popup"]);
 
-let apiRoutesStashed = false;
+const stashedRoutes = [];
+const buildStashDir = await mkdtemp(path.join(os.tmpdir(), "uncommonhacks-extension-"));
 try {
-  apiRoutesStashed = await stashApiRoutes();
+  for (const source of staticExportExcludedRoutes) {
+    const stashedRoute = await stashRoute(source, buildStashDir);
+    if (stashedRoute) {
+      stashedRoutes.push(stashedRoute);
+    }
+  }
   await run("npm", ["run", "build"], { BUILD_EXTENSION: "1" });
 } finally {
-  if (apiRoutesStashed) {
-    await restoreApiRoutes();
+  while (stashedRoutes.length > 0) {
+    await restoreRoute(stashedRoutes.pop());
   }
+  await rm(buildStashDir, { recursive: true, force: true });
 }
 
 await rm(appDir, { recursive: true, force: true });
@@ -47,23 +57,24 @@ await cp(outDir, appDir, { recursive: true });
 await rewriteRootRelativePaths(appDir);
 console.log(`Copied static export to ${path.relative(root, appDir)}`);
 
-async function stashApiRoutes() {
+async function stashRoute(source, stashDir) {
   try {
-    await mkdir(path.dirname(apiStashDir), { recursive: true });
-    await rm(apiStashDir, { recursive: true, force: true });
-    await rename(apiDir, apiStashDir);
-    return true;
+    const stash = path.join(stashDir, path.relative(root, source));
+    await mkdir(path.dirname(stash), { recursive: true });
+    await cp(source, stash, { recursive: true });
+    await rm(source, { recursive: true, force: true });
+    return { source, stash };
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-      return false;
+      return null;
     }
     throw error;
   }
 }
 
-async function restoreApiRoutes() {
-  await rm(apiDir, { recursive: true, force: true });
-  await rename(apiStashDir, apiDir);
+async function restoreRoute({ source, stash }) {
+  await rm(source, { recursive: true, force: true });
+  await cp(stash, source, { recursive: true });
 }
 
 async function rewriteRootRelativePaths(dir) {

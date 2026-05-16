@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "build:extension": "node scripts/generate-extension-icons.mjs && node scripts/build-extension.mjs",
-    "bundle:extension-popup": "node scripts/bundle-extension-popup.mjs",
+    "bundle:extension-popup": "vite build --config extension/vite.config.ts && node scripts/update-extension-manifest.mjs",
     "start": "next start",
     "lint": "eslint"
   },
@@ -22,11 +22,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "esbuild": "^0.25.5",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "postcss": "^8.5.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "^7.3.3"
   }
 }
