@@ -16,3 +16,28 @@ export function getSiteUrl(requestOrigin?: string) {
 }
 
 export const GOOGLE_LOGIN_PATH = "/auth/login/google";
+
+type ExtensionRuntimeApi = {
+  runtime?: {
+    getURL(path: string): string;
+  };
+};
+
+const globalWithExtensionApis = globalThis as typeof globalThis & {
+  browser?: ExtensionRuntimeApi;
+  chrome?: ExtensionRuntimeApi;
+};
+
+export function getStaticEmailAuthRedirectUrl(variant: "page" | "popup") {
+  if (variant === "popup") {
+    const runtime =
+      globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
+    const extensionUrl = runtime?.runtime?.getURL("app/index.html");
+
+    if (extensionUrl) {
+      return extensionUrl;
+    }
+  }
+
+  return getSiteUrl();
+}

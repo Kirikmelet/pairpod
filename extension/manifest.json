@@ -22,7 +22,8 @@
     "service_worker": "background.js"
   },
   "permissions": [
-    "identity"
+    "identity",
+    "storage"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
