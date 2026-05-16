@@ -1,0 +1,18 @@
+import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { loadEnvLocal, requireSupabaseEnv } from "./load-env.mjs";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const manifestPath = path.join(root, "extension", "manifest.json");
+
+const env = await loadEnvLocal(root);
+const { url: supabaseUrl } = requireSupabaseEnv(env);
+const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+const supabaseOrigin = new URL(supabaseUrl).origin;
+const hostPermission = `${supabaseOrigin}/*`;
+
+manifest.host_permissions = [hostPermission];
+await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+console.log(`Manifest host_permissions: ${hostPermission}`);

@@ -53,3 +53,4 @@ await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`Bundled ${path.relative(root, entry)} -> ${path.relative(root, outfile)}`);
 console.log(`Compiled ${path.relative(root, cssInput)} -> ${path.relative(root, cssOutfile)}`);
 console.log(`Manifest host_permissions: ${hostPermission}`);
+
