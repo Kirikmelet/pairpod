@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client";
-import { TodosApp } from "../../components/todos-app";
+import { HomePage } from "../../components/home-page";
 
 const runtime = globalThis.browser ?? globalThis.chrome;
 const rootElement = document.getElementById("root");
@@ -9,7 +9,7 @@ if (!rootElement) {
 }
 
 createRoot(rootElement).render(
-  <TodosApp
+  <HomePage
     variant="popup"
     onOpenApp={() => {
       const appUrl = runtime.runtime.getURL("app/index.html");
