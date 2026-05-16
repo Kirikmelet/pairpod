@@ -14,7 +14,7 @@ const hostPermission = `${supabaseOrigin}/*`;
 
 manifest.host_permissions = [hostPermission];
 manifest.permissions = Array.from(
-  new Set([...(manifest.permissions ?? []), "identity"]),
+  new Set([...(manifest.permissions ?? []), "identity", "storage"]),
 );
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
