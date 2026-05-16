@@ -6,7 +6,10 @@ import type { FormEvent, ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { AuthForm } from "@/components/auth-form";
 import { TodosApp } from "@/components/todos-app";
-import { createClient } from "@/utils/supabase/client";
+import {
+  completeClientSideAuthRedirect,
+  createClient,
+} from "@/utils/supabase/client";
 
 type UserProfile = {
   id: string;
@@ -55,10 +58,15 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
 
   useEffect(() => {
     const supabase = createClient();
+    let isMounted = true;
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) {
+        return;
+      }
+
       setUser(session?.user ?? null);
       if (!session?.user) {
         setProfile(null);
@@ -67,8 +75,34 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    void completeClientSideAuthRedirect()
+      .then((didCompleteRedirect) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (didCompleteRedirect) {
+          return refreshUser();
+        }
+
+        return refreshUser();
+      })
+      .catch(() => {
+        if (isMounted) {
+          setUser(null);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [refreshUser]);
 
   const handleSignOut = async () => {
     const supabase = createClient();

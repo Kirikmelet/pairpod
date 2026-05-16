@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
+import { getStaticEmailAuthRedirectUrl } from "@/utils/auth-redirect";
 import { createClient } from "@/utils/supabase/client";
 
 type AuthFormProps = {
@@ -30,7 +31,13 @@ export function AuthForm({
     const supabase = createClient();
 
     if (mode === "signup") {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: getStaticEmailAuthRedirectUrl(variant),
+        },
+      });
       if (error) {
         setStatus(error.message);
         setIsLoading(false);
