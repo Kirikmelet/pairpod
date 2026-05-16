@@ -1,4 +1,5 @@
 "use strict";
+"use client";
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -21450,255 +21451,6 @@
     }
   });
 
-  // node_modules/cookie/dist/index.js
-  var require_dist = __commonJS({
-    "node_modules/cookie/dist/index.js"(exports) {
-      "use strict";
-      Object.defineProperty(exports, "__esModule", { value: true });
-      exports.parseCookie = parseCookie;
-      exports.parse = parseCookie;
-      exports.stringifyCookie = stringifyCookie;
-      exports.stringifySetCookie = stringifySetCookie;
-      exports.serialize = stringifySetCookie;
-      exports.parseSetCookie = parseSetCookie;
-      exports.stringifySetCookie = stringifySetCookie;
-      exports.serialize = stringifySetCookie;
-      var cookieNameRegExp = /^[\u0021-\u003A\u003C\u003E-\u007E]+$/;
-      var cookieValueRegExp = /^[\u0021-\u003A\u003C-\u007E]*$/;
-      var domainValueRegExp = /^([.]?[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)([.][a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
-      var pathValueRegExp = /^[\u0020-\u003A\u003D-\u007E]*$/;
-      var maxAgeRegExp = /^-?\d+$/;
-      var __toString = Object.prototype.toString;
-      var NullObject = /* @__PURE__ */ (() => {
-        const C = function() {
-        };
-        C.prototype = /* @__PURE__ */ Object.create(null);
-        return C;
-      })();
-      function parseCookie(str, options) {
-        const obj = new NullObject();
-        const len = str.length;
-        if (len < 2)
-          return obj;
-        const dec = options?.decode || decode;
-        let index = 0;
-        do {
-          const eqIdx = eqIndex(str, index, len);
-          if (eqIdx === -1)
-            break;
-          const endIdx = endIndex(str, index, len);
-          if (eqIdx > endIdx) {
-            index = str.lastIndexOf(";", eqIdx - 1) + 1;
-            continue;
-          }
-          const key = valueSlice(str, index, eqIdx);
-          if (obj[key] === void 0) {
-            obj[key] = dec(valueSlice(str, eqIdx + 1, endIdx));
-          }
-          index = endIdx + 1;
-        } while (index < len);
-        return obj;
-      }
-      function stringifyCookie(cookie, options) {
-        const enc = options?.encode || encodeURIComponent;
-        const cookieStrings = [];
-        for (const name of Object.keys(cookie)) {
-          const val = cookie[name];
-          if (val === void 0)
-            continue;
-          if (!cookieNameRegExp.test(name)) {
-            throw new TypeError(`cookie name is invalid: ${name}`);
-          }
-          const value = enc(val);
-          if (!cookieValueRegExp.test(value)) {
-            throw new TypeError(`cookie val is invalid: ${val}`);
-          }
-          cookieStrings.push(`${name}=${value}`);
-        }
-        return cookieStrings.join("; ");
-      }
-      function stringifySetCookie(_name, _val, _opts) {
-        const cookie = typeof _name === "object" ? _name : { ..._opts, name: _name, value: String(_val) };
-        const options = typeof _val === "object" ? _val : _opts;
-        const enc = options?.encode || encodeURIComponent;
-        if (!cookieNameRegExp.test(cookie.name)) {
-          throw new TypeError(`argument name is invalid: ${cookie.name}`);
-        }
-        const value = cookie.value ? enc(cookie.value) : "";
-        if (!cookieValueRegExp.test(value)) {
-          throw new TypeError(`argument val is invalid: ${cookie.value}`);
-        }
-        let str = cookie.name + "=" + value;
-        if (cookie.maxAge !== void 0) {
-          if (!Number.isInteger(cookie.maxAge)) {
-            throw new TypeError(`option maxAge is invalid: ${cookie.maxAge}`);
-          }
-          str += "; Max-Age=" + cookie.maxAge;
-        }
-        if (cookie.domain) {
-          if (!domainValueRegExp.test(cookie.domain)) {
-            throw new TypeError(`option domain is invalid: ${cookie.domain}`);
-          }
-          str += "; Domain=" + cookie.domain;
-        }
-        if (cookie.path) {
-          if (!pathValueRegExp.test(cookie.path)) {
-            throw new TypeError(`option path is invalid: ${cookie.path}`);
-          }
-          str += "; Path=" + cookie.path;
-        }
-        if (cookie.expires) {
-          if (!isDate(cookie.expires) || !Number.isFinite(cookie.expires.valueOf())) {
-            throw new TypeError(`option expires is invalid: ${cookie.expires}`);
-          }
-          str += "; Expires=" + cookie.expires.toUTCString();
-        }
-        if (cookie.httpOnly) {
-          str += "; HttpOnly";
-        }
-        if (cookie.secure) {
-          str += "; Secure";
-        }
-        if (cookie.partitioned) {
-          str += "; Partitioned";
-        }
-        if (cookie.priority) {
-          const priority = typeof cookie.priority === "string" ? cookie.priority.toLowerCase() : void 0;
-          switch (priority) {
-            case "low":
-              str += "; Priority=Low";
-              break;
-            case "medium":
-              str += "; Priority=Medium";
-              break;
-            case "high":
-              str += "; Priority=High";
-              break;
-            default:
-              throw new TypeError(`option priority is invalid: ${cookie.priority}`);
-          }
-        }
-        if (cookie.sameSite) {
-          const sameSite = typeof cookie.sameSite === "string" ? cookie.sameSite.toLowerCase() : cookie.sameSite;
-          switch (sameSite) {
-            case true:
-            case "strict":
-              str += "; SameSite=Strict";
-              break;
-            case "lax":
-              str += "; SameSite=Lax";
-              break;
-            case "none":
-              str += "; SameSite=None";
-              break;
-            default:
-              throw new TypeError(`option sameSite is invalid: ${cookie.sameSite}`);
-          }
-        }
-        return str;
-      }
-      function parseSetCookie(str, options) {
-        const dec = options?.decode || decode;
-        const len = str.length;
-        const endIdx = endIndex(str, 0, len);
-        const eqIdx = eqIndex(str, 0, endIdx);
-        const setCookie = eqIdx === -1 ? { name: "", value: dec(valueSlice(str, 0, endIdx)) } : {
-          name: valueSlice(str, 0, eqIdx),
-          value: dec(valueSlice(str, eqIdx + 1, endIdx))
-        };
-        let index = endIdx + 1;
-        while (index < len) {
-          const endIdx2 = endIndex(str, index, len);
-          const eqIdx2 = eqIndex(str, index, endIdx2);
-          const attr = eqIdx2 === -1 ? valueSlice(str, index, endIdx2) : valueSlice(str, index, eqIdx2);
-          const val = eqIdx2 === -1 ? void 0 : valueSlice(str, eqIdx2 + 1, endIdx2);
-          switch (attr.toLowerCase()) {
-            case "httponly":
-              setCookie.httpOnly = true;
-              break;
-            case "secure":
-              setCookie.secure = true;
-              break;
-            case "partitioned":
-              setCookie.partitioned = true;
-              break;
-            case "domain":
-              setCookie.domain = val;
-              break;
-            case "path":
-              setCookie.path = val;
-              break;
-            case "max-age":
-              if (val && maxAgeRegExp.test(val))
-                setCookie.maxAge = Number(val);
-              break;
-            case "expires":
-              if (!val)
-                break;
-              const date = new Date(val);
-              if (Number.isFinite(date.valueOf()))
-                setCookie.expires = date;
-              break;
-            case "priority":
-              if (!val)
-                break;
-              const priority = val.toLowerCase();
-              if (priority === "low" || priority === "medium" || priority === "high") {
-                setCookie.priority = priority;
-              }
-              break;
-            case "samesite":
-              if (!val)
-                break;
-              const sameSite = val.toLowerCase();
-              if (sameSite === "lax" || sameSite === "strict" || sameSite === "none") {
-                setCookie.sameSite = sameSite;
-              }
-              break;
-          }
-          index = endIdx2 + 1;
-        }
-        return setCookie;
-      }
-      function endIndex(str, min, len) {
-        const index = str.indexOf(";", min);
-        return index === -1 ? len : index;
-      }
-      function eqIndex(str, min, max) {
-        const index = str.indexOf("=", min);
-        return index < max ? index : -1;
-      }
-      function valueSlice(str, min, max) {
-        let start = min;
-        let end = max;
-        do {
-          const code = str.charCodeAt(start);
-          if (code !== 32 && code !== 9)
-            break;
-        } while (++start < end);
-        while (end > start) {
-          const code = str.charCodeAt(end - 1);
-          if (code !== 32 && code !== 9)
-            break;
-          end--;
-        }
-        return str.slice(start, end);
-      }
-      function decode(str) {
-        if (str.indexOf("%") === -1)
-          return str;
-        try {
-          return decodeURIComponent(str);
-        } catch (e) {
-          return str;
-        }
-      }
-      function isDate(val) {
-        return __toString.call(val) === "[object Date]";
-      }
-    }
-  });
-
   // node_modules/react/cjs/react-jsx-runtime.development.js
   var require_react_jsx_runtime_development = __commonJS({
     "node_modules/react/cjs/react-jsx-runtime.development.js"(exports) {
@@ -21969,9 +21721,9 @@
   });
 
   // extension/src/popup.tsx
-  var import_client2 = __toESM(require_client());
+  var import_client3 = __toESM(require_client());
 
-  // components/todos-app.tsx
+  // app/hook/use-chatroom.ts
   var import_react = __toESM(require_react());
 
   // node_modules/tslib/tslib.es6.mjs
@@ -42536,635 +42288,108 @@ ${suffix}`;
   }
   if (shouldShowDeprecationWarning()) console.warn("\u26A0\uFE0F  Node.js 18 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 20 or later. For more information, visit: https://github.com/orgs/supabase/discussions/37217");
 
-  // node_modules/@supabase/ssr/dist/module/version.js
-  var VERSION = "0.6.1";
-
-  // node_modules/@supabase/ssr/dist/module/utils/helpers.js
-  function isBrowser2() {
-    return typeof window !== "undefined" && typeof window.document !== "undefined";
-  }
-
-  // node_modules/@supabase/ssr/dist/module/utils/constants.js
-  var DEFAULT_COOKIE_OPTIONS = {
-    path: "/",
-    sameSite: "lax",
-    httpOnly: false,
-    // https://developer.chrome.com/blog/cookie-max-age-expires
-    // https://httpwg.org/http-extensions/draft-ietf-httpbis-rfc6265bis.html#name-cookie-lifetime-limits
-    maxAge: 400 * 24 * 60 * 60
-  };
-
-  // node_modules/@supabase/ssr/dist/module/utils/chunker.js
-  var MAX_CHUNK_SIZE = 3180;
-  var CHUNK_LIKE_REGEX = /^(.*)[.](0|[1-9][0-9]*)$/;
-  function isChunkLike(cookieName, key) {
-    if (cookieName === key) {
-      return true;
-    }
-    const chunkLike = cookieName.match(CHUNK_LIKE_REGEX);
-    if (chunkLike && chunkLike[1] === key) {
-      return true;
-    }
-    return false;
-  }
-  function createChunks(key, value, chunkSize) {
-    const resolvedChunkSize = chunkSize ?? MAX_CHUNK_SIZE;
-    let encodedValue = encodeURIComponent(value);
-    if (encodedValue.length <= resolvedChunkSize) {
-      return [{ name: key, value }];
-    }
-    const chunks = [];
-    while (encodedValue.length > 0) {
-      let encodedChunkHead = encodedValue.slice(0, resolvedChunkSize);
-      const lastEscapePos = encodedChunkHead.lastIndexOf("%");
-      if (lastEscapePos > resolvedChunkSize - 3) {
-        encodedChunkHead = encodedChunkHead.slice(0, lastEscapePos);
-      }
-      let valueHead = "";
-      while (encodedChunkHead.length > 0) {
-        try {
-          valueHead = decodeURIComponent(encodedChunkHead);
-          break;
-        } catch (error) {
-          if (error instanceof URIError && encodedChunkHead.at(-3) === "%" && encodedChunkHead.length > 3) {
-            encodedChunkHead = encodedChunkHead.slice(0, encodedChunkHead.length - 3);
-          } else {
-            throw error;
-          }
-        }
-      }
-      chunks.push(valueHead);
-      encodedValue = encodedValue.slice(encodedChunkHead.length);
-    }
-    return chunks.map((value2, i) => ({ name: `${key}.${i}`, value: value2 }));
-  }
-  async function combineChunks(key, retrieveChunk) {
-    const value = await retrieveChunk(key);
-    if (value) {
-      return value;
-    }
-    let values = [];
-    for (let i = 0; ; i++) {
-      const chunkName = `${key}.${i}`;
-      const chunk = await retrieveChunk(chunkName);
-      if (!chunk) {
-        break;
-      }
-      values.push(chunk);
-    }
-    if (values.length > 0) {
-      return values.join("");
-    }
-    return null;
-  }
-
-  // node_modules/@supabase/ssr/dist/module/utils/base64url.js
-  var TO_BASE64URL2 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".split("");
-  var IGNORE_BASE64URL2 = " 	\n\r=".split("");
-  var FROM_BASE64URL2 = (() => {
-    const charMap = new Array(128);
-    for (let i = 0; i < charMap.length; i += 1) {
-      charMap[i] = -1;
-    }
-    for (let i = 0; i < IGNORE_BASE64URL2.length; i += 1) {
-      charMap[IGNORE_BASE64URL2[i].charCodeAt(0)] = -2;
-    }
-    for (let i = 0; i < TO_BASE64URL2.length; i += 1) {
-      charMap[TO_BASE64URL2[i].charCodeAt(0)] = i;
-    }
-    return charMap;
-  })();
-  function stringToBase64URL(str) {
-    const base64 = [];
-    let queue = 0;
-    let queuedBits = 0;
-    const emitter = (byte) => {
-      queue = queue << 8 | byte;
-      queuedBits += 8;
-      while (queuedBits >= 6) {
-        const pos = queue >> queuedBits - 6 & 63;
-        base64.push(TO_BASE64URL2[pos]);
-        queuedBits -= 6;
-      }
-    };
-    stringToUTF82(str, emitter);
-    if (queuedBits > 0) {
-      queue = queue << 6 - queuedBits;
-      queuedBits = 6;
-      while (queuedBits >= 6) {
-        const pos = queue >> queuedBits - 6 & 63;
-        base64.push(TO_BASE64URL2[pos]);
-        queuedBits -= 6;
-      }
-    }
-    return base64.join("");
-  }
-  function stringFromBase64URL2(str) {
-    const conv = [];
-    const emit = (codepoint) => {
-      conv.push(String.fromCodePoint(codepoint));
-    };
-    const state = {
-      utf8seq: 0,
-      codepoint: 0
-    };
-    let queue = 0;
-    let queuedBits = 0;
-    for (let i = 0; i < str.length; i += 1) {
-      const codepoint = str.charCodeAt(i);
-      const bits = FROM_BASE64URL2[codepoint];
-      if (bits > -1) {
-        queue = queue << 6 | bits;
-        queuedBits += 6;
-        while (queuedBits >= 8) {
-          stringFromUTF82(queue >> queuedBits - 8 & 255, state, emit);
-          queuedBits -= 8;
-        }
-      } else if (bits === -2) {
-        continue;
-      } else {
-        throw new Error(`Invalid Base64-URL character "${str.at(i)}" at position ${i}`);
-      }
-    }
-    return conv.join("");
-  }
-  function codepointToUTF82(codepoint, emit) {
-    if (codepoint <= 127) {
-      emit(codepoint);
-      return;
-    } else if (codepoint <= 2047) {
-      emit(192 | codepoint >> 6);
-      emit(128 | codepoint & 63);
-      return;
-    } else if (codepoint <= 65535) {
-      emit(224 | codepoint >> 12);
-      emit(128 | codepoint >> 6 & 63);
-      emit(128 | codepoint & 63);
-      return;
-    } else if (codepoint <= 1114111) {
-      emit(240 | codepoint >> 18);
-      emit(128 | codepoint >> 12 & 63);
-      emit(128 | codepoint >> 6 & 63);
-      emit(128 | codepoint & 63);
-      return;
-    }
-    throw new Error(`Unrecognized Unicode codepoint: ${codepoint.toString(16)}`);
-  }
-  function stringToUTF82(str, emit) {
-    for (let i = 0; i < str.length; i += 1) {
-      let codepoint = str.charCodeAt(i);
-      if (codepoint > 55295 && codepoint <= 56319) {
-        const highSurrogate = (codepoint - 55296) * 1024 & 65535;
-        const lowSurrogate = str.charCodeAt(i + 1) - 56320 & 65535;
-        codepoint = (lowSurrogate | highSurrogate) + 65536;
-        i += 1;
-      }
-      codepointToUTF82(codepoint, emit);
-    }
-  }
-  function stringFromUTF82(byte, state, emit) {
-    if (state.utf8seq === 0) {
-      if (byte <= 127) {
-        emit(byte);
-        return;
-      }
-      for (let leadingBit = 1; leadingBit < 6; leadingBit += 1) {
-        if ((byte >> 7 - leadingBit & 1) === 0) {
-          state.utf8seq = leadingBit;
-          break;
-        }
-      }
-      if (state.utf8seq === 2) {
-        state.codepoint = byte & 31;
-      } else if (state.utf8seq === 3) {
-        state.codepoint = byte & 15;
-      } else if (state.utf8seq === 4) {
-        state.codepoint = byte & 7;
-      } else {
-        throw new Error("Invalid UTF-8 sequence");
-      }
-      state.utf8seq -= 1;
-    } else if (state.utf8seq > 0) {
-      if (byte <= 127) {
-        throw new Error("Invalid UTF-8 sequence");
-      }
-      state.codepoint = state.codepoint << 6 | byte & 63;
-      state.utf8seq -= 1;
-      if (state.utf8seq === 0) {
-        emit(state.codepoint);
-      }
-    }
-  }
-
-  // node_modules/@supabase/ssr/dist/module/cookies.js
-  var import_cookie = __toESM(require_dist());
-  var BASE64_PREFIX = "base64-";
-  function createStorageFromOptions(options, isServerClient) {
-    const cookies = options.cookies ?? null;
-    const cookieEncoding = options.cookieEncoding;
-    const setItems = {};
-    const removedItems = {};
-    let getAll;
-    let setAll;
-    if (cookies) {
-      if ("get" in cookies) {
-        const getWithHints = async (keyHints) => {
-          const chunkNames = keyHints.flatMap((keyHint) => [
-            keyHint,
-            ...Array.from({ length: 5 }).map((_, i) => `${keyHint}.${i}`)
-          ]);
-          const chunks = [];
-          for (let i = 0; i < chunkNames.length; i += 1) {
-            const value = await cookies.get(chunkNames[i]);
-            if (!value && typeof value !== "string") {
-              continue;
-            }
-            chunks.push({ name: chunkNames[i], value });
-          }
-          return chunks;
-        };
-        getAll = async (keyHints) => await getWithHints(keyHints);
-        if ("set" in cookies && "remove" in cookies) {
-          setAll = async (setCookies) => {
-            for (let i = 0; i < setCookies.length; i += 1) {
-              const { name, value, options: options2 } = setCookies[i];
-              if (value) {
-                await cookies.set(name, value, options2);
-              } else {
-                await cookies.remove(name, options2);
-              }
-            }
-          };
-        } else if (isServerClient) {
-          setAll = async () => {
-            console.warn("@supabase/ssr: createServerClient was configured without set and remove cookie methods, but the client needs to set cookies. This can lead to issues such as random logouts, early session termination or increased token refresh requests. If in NextJS, check your middleware.ts file, route handlers and server actions for correctness. Consider switching to the getAll and setAll cookie methods instead of get, set and remove which are deprecated and can be difficult to use correctly.");
-          };
-        } else {
-          throw new Error("@supabase/ssr: createBrowserClient requires configuring a getAll and setAll cookie method (deprecated: alternatively both get, set and remove can be used)");
-        }
-      } else if ("getAll" in cookies) {
-        getAll = async () => await cookies.getAll();
-        if ("setAll" in cookies) {
-          setAll = cookies.setAll;
-        } else if (isServerClient) {
-          setAll = async () => {
-            console.warn("@supabase/ssr: createServerClient was configured without the setAll cookie method, but the client needs to set cookies. This can lead to issues such as random logouts, early session termination or increased token refresh requests. If in NextJS, check your middleware.ts file, route handlers and server actions for correctness.");
-          };
-        } else {
-          throw new Error("@supabase/ssr: createBrowserClient requires configuring both getAll and setAll cookie methods (deprecated: alternatively both get, set and remove can be used)");
-        }
-      } else {
-        throw new Error(`@supabase/ssr: ${isServerClient ? "createServerClient" : "createBrowserClient"} requires configuring getAll and setAll cookie methods (deprecated: alternatively use get, set and remove).${isBrowser2() ? " As this is called in a browser runtime, consider removing the cookies option object to use the document.cookie API automatically." : ""}`);
-      }
-    } else if (!isServerClient && isBrowser2()) {
-      const noHintGetAll = () => {
-        const parsed = (0, import_cookie.parse)(document.cookie);
-        return Object.keys(parsed).map((name) => ({
-          name,
-          value: parsed[name] ?? ""
-        }));
-      };
-      getAll = () => noHintGetAll();
-      setAll = (setCookies) => {
-        setCookies.forEach(({ name, value, options: options2 }) => {
-          document.cookie = (0, import_cookie.serialize)(name, value, options2);
-        });
-      };
-    } else if (isServerClient) {
-      throw new Error("@supabase/ssr: createServerClient must be initialized with cookie options that specify getAll and setAll functions (deprecated, not recommended: alternatively use get, set and remove)");
-    } else {
-      getAll = () => {
-        return [];
-      };
-      setAll = () => {
-        throw new Error("@supabase/ssr: createBrowserClient in non-browser runtimes (including Next.js pre-rendering mode) was not initialized cookie options that specify getAll and setAll functions (deprecated: alternatively use get, set and remove), but they were needed");
-      };
-    }
-    if (!isServerClient) {
-      return {
-        getAll,
-        // for type consistency
-        setAll,
-        // for type consistency
-        setItems,
-        // for type consistency
-        removedItems,
-        // for type consistency
-        storage: {
-          isServer: false,
-          getItem: async (key) => {
-            const allCookies = await getAll([key]);
-            const chunkedCookie = await combineChunks(key, async (chunkName) => {
-              const cookie = allCookies?.find(({ name }) => name === chunkName) || null;
-              if (!cookie) {
-                return null;
-              }
-              return cookie.value;
-            });
-            if (!chunkedCookie) {
-              return null;
-            }
-            let decoded = chunkedCookie;
-            if (chunkedCookie.startsWith(BASE64_PREFIX)) {
-              decoded = stringFromBase64URL2(chunkedCookie.substring(BASE64_PREFIX.length));
-            }
-            return decoded;
-          },
-          setItem: async (key, value) => {
-            const allCookies = await getAll([key]);
-            const cookieNames = allCookies?.map(({ name }) => name) || [];
-            const removeCookies = new Set(cookieNames.filter((name) => isChunkLike(name, key)));
-            let encoded = value;
-            if (cookieEncoding === "base64url") {
-              encoded = BASE64_PREFIX + stringToBase64URL(value);
-            }
-            const setCookies = createChunks(key, encoded);
-            setCookies.forEach(({ name }) => {
-              removeCookies.delete(name);
-            });
-            const removeCookieOptions = {
-              ...DEFAULT_COOKIE_OPTIONS,
-              ...options?.cookieOptions,
-              maxAge: 0
-            };
-            const setCookieOptions = {
-              ...DEFAULT_COOKIE_OPTIONS,
-              ...options?.cookieOptions,
-              maxAge: DEFAULT_COOKIE_OPTIONS.maxAge
-            };
-            delete removeCookieOptions.name;
-            delete setCookieOptions.name;
-            const allToSet = [
-              ...[...removeCookies].map((name) => ({
-                name,
-                value: "",
-                options: removeCookieOptions
-              })),
-              ...setCookies.map(({ name, value: value2 }) => ({
-                name,
-                value: value2,
-                options: setCookieOptions
-              }))
-            ];
-            if (allToSet.length > 0) {
-              await setAll(allToSet);
-            }
-          },
-          removeItem: async (key) => {
-            const allCookies = await getAll([key]);
-            const cookieNames = allCookies?.map(({ name }) => name) || [];
-            const removeCookies = cookieNames.filter((name) => isChunkLike(name, key));
-            const removeCookieOptions = {
-              ...DEFAULT_COOKIE_OPTIONS,
-              ...options?.cookieOptions,
-              maxAge: 0
-            };
-            delete removeCookieOptions.name;
-            if (removeCookies.length > 0) {
-              await setAll(removeCookies.map((name) => ({
-                name,
-                value: "",
-                options: removeCookieOptions
-              })));
-            }
-          }
-        }
-      };
-    }
-    return {
-      getAll,
-      setAll,
-      setItems,
-      removedItems,
-      storage: {
-        // to signal to the libraries that these cookies are
-        // coming from a server environment and their value
-        // should not be trusted
-        isServer: true,
-        getItem: async (key) => {
-          if (typeof setItems[key] === "string") {
-            return setItems[key];
-          }
-          if (removedItems[key]) {
-            return null;
-          }
-          const allCookies = await getAll([key]);
-          const chunkedCookie = await combineChunks(key, async (chunkName) => {
-            const cookie = allCookies?.find(({ name }) => name === chunkName) || null;
-            if (!cookie) {
-              return null;
-            }
-            return cookie.value;
-          });
-          if (!chunkedCookie) {
-            return null;
-          }
-          let decoded = chunkedCookie;
-          if (typeof chunkedCookie === "string" && chunkedCookie.startsWith(BASE64_PREFIX)) {
-            decoded = stringFromBase64URL2(chunkedCookie.substring(BASE64_PREFIX.length));
-          }
-          return decoded;
-        },
-        setItem: async (key, value) => {
-          if (key.endsWith("-code-verifier")) {
-            await applyServerStorage({
-              getAll,
-              setAll,
-              // pretend only that the code verifier was set
-              setItems: { [key]: value },
-              // pretend that nothing was removed
-              removedItems: {}
-            }, {
-              cookieOptions: options?.cookieOptions ?? null,
-              cookieEncoding
-            });
-          }
-          setItems[key] = value;
-          delete removedItems[key];
-        },
-        removeItem: async (key) => {
-          delete setItems[key];
-          removedItems[key] = true;
-        }
-      }
-    };
-  }
-  async function applyServerStorage({ getAll, setAll, setItems, removedItems }, options) {
-    const cookieEncoding = options.cookieEncoding;
-    const cookieOptions = options.cookieOptions ?? null;
-    const allCookies = await getAll([
-      ...setItems ? Object.keys(setItems) : [],
-      ...removedItems ? Object.keys(removedItems) : []
-    ]);
-    const cookieNames = allCookies?.map(({ name }) => name) || [];
-    const removeCookies = Object.keys(removedItems).flatMap((itemName) => {
-      return cookieNames.filter((name) => isChunkLike(name, itemName));
-    });
-    const setCookies = Object.keys(setItems).flatMap((itemName) => {
-      const removeExistingCookiesForItem = new Set(cookieNames.filter((name) => isChunkLike(name, itemName)));
-      let encoded = setItems[itemName];
-      if (cookieEncoding === "base64url") {
-        encoded = BASE64_PREFIX + stringToBase64URL(encoded);
-      }
-      const chunks = createChunks(itemName, encoded);
-      chunks.forEach((chunk) => {
-        removeExistingCookiesForItem.delete(chunk.name);
-      });
-      removeCookies.push(...removeExistingCookiesForItem);
-      return chunks;
-    });
-    const removeCookieOptions = {
-      ...DEFAULT_COOKIE_OPTIONS,
-      ...cookieOptions,
-      maxAge: 0
-    };
-    const setCookieOptions = {
-      ...DEFAULT_COOKIE_OPTIONS,
-      ...cookieOptions,
-      maxAge: DEFAULT_COOKIE_OPTIONS.maxAge
-    };
-    delete removeCookieOptions.name;
-    delete setCookieOptions.name;
-    await setAll([
-      ...removeCookies.map((name) => ({
-        name,
-        value: "",
-        options: removeCookieOptions
-      })),
-      ...setCookies.map(({ name, value }) => ({
-        name,
-        value,
-        options: setCookieOptions
-      }))
-    ]);
-  }
-
-  // node_modules/@supabase/ssr/dist/module/createBrowserClient.js
-  var cachedBrowserClient;
-  function createBrowserClient(supabaseUrl2, supabaseKey2, options) {
-    const shouldUseSingleton = options?.isSingleton === true || (!options || !("isSingleton" in options)) && isBrowser2();
-    if (shouldUseSingleton && cachedBrowserClient) {
-      return cachedBrowserClient;
-    }
-    if (!supabaseUrl2 || !supabaseKey2) {
-      throw new Error(`@supabase/ssr: Your project's URL and API key are required to create a Supabase client!
-
-Check your Supabase project's API settings to find these values
-
-https://supabase.com/dashboard/project/_/settings/api`);
-    }
-    const { storage } = createStorageFromOptions({
-      ...options,
-      cookieEncoding: options?.cookieEncoding ?? "base64url"
-    }, false);
-    const client = createClient(supabaseUrl2, supabaseKey2, {
-      ...options,
-      global: {
-        ...options?.global,
-        headers: {
-          ...options?.global?.headers,
-          "X-Client-Info": `supabase-ssr/${VERSION} createBrowserClient`
-        }
-      },
-      auth: {
-        ...options?.auth,
-        ...options?.cookieOptions?.name ? { storageKey: options.cookieOptions.name } : null,
-        flowType: "pkce",
-        autoRefreshToken: isBrowser2(),
-        detectSessionInUrl: isBrowser2(),
-        persistSession: true,
-        storage
-      }
-    });
-    if (shouldUseSingleton) {
-      cachedBrowserClient = client;
-    }
-    return client;
-  }
-
   // utils/supabase/client.ts
   var supabaseUrl = "https://xgfgqzveuyeceupfaebh.supabase.co";
   var supabaseKey = "sb_publishable_0Hgx9YihoeNsaIGv7ZWUww_zKZsbDvM";
-  var createClient2 = () => createBrowserClient(
-    supabaseUrl,
-    supabaseKey
-  );
+  var createClient2 = () => createClient(supabaseUrl, supabaseKey);
 
-  // components/todos-app.tsx
-  var import_jsx_runtime = __toESM(require_jsx_runtime());
-  function TodosApp({ variant = "page", onOpenApp }) {
-    const [todos, setTodos] = (0, import_react.useState)([]);
-    const [status, setStatus] = (0, import_react.useState)("Loading todos\u2026");
-    const [isError, setIsError] = (0, import_react.useState)(false);
-    const loadTodos = (0, import_react.useCallback)(async () => {
-      setStatus("Loading todos\u2026");
-      setIsError(false);
+  // app/hook/use-chatroom.ts
+  function useChatroom(pageId) {
+    const [room, setRoom] = (0, import_react.useState)(null);
+    const [loading, setLoading] = (0, import_react.useState)(Boolean(pageId));
+    const [error, setError] = (0, import_react.useState)(null);
+    const loadRoom = (0, import_react.useCallback)(async () => {
+      if (!pageId) {
+        return null;
+      }
       const supabase = createClient2();
-      const { data, error } = await supabase.from("todos").select("id, name");
-      if (error) {
-        setTodos([]);
-        setStatus(error.message);
-        setIsError(true);
+      const { data, error: loadError } = await supabase.from("rooms").select("*").eq("page_id", pageId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (loadError) {
+        throw loadError;
+      }
+      return data;
+    }, [pageId]);
+    const refresh = (0, import_react.useCallback)(async () => {
+      const data = await loadRoom();
+      setRoom(data);
+      return data;
+    }, [loadRoom]);
+    const ensureRoom = (0, import_react.useCallback)(async () => {
+      if (!pageId) {
+        throw new Error("pageId is required");
+      }
+      const existing = await loadRoom();
+      if (existing) {
+        setRoom(existing);
+        return existing;
+      }
+      const supabase = createClient2();
+      const payload = { page_id: pageId };
+      const { data, error: createError } = await supabase.from("rooms").insert(payload).select().single();
+      if (createError) {
+        throw createError;
+      }
+      setRoom(data);
+      return data;
+    }, [loadRoom, pageId]);
+    (0, import_react.useEffect)(() => {
+      if (!pageId) {
+        setRoom(null);
+        setLoading(false);
         return;
       }
-      setTodos(data ?? []);
-      setStatus(`${data?.length ?? 0} todo(s)`);
-    }, []);
-    (0, import_react.useEffect)(() => {
-      void loadTodos();
-    }, [loadTodos]);
-    const isPopup = variant === "popup";
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-      "div",
-      {
-        className: isPopup ? "flex w-[320px] flex-col gap-4 bg-background p-4 text-foreground" : "flex min-h-full flex-col items-center justify-center bg-zinc-50 px-6 py-16 font-sans dark:bg-black",
-        children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-          "div",
-          {
-            className: isPopup ? "flex w-full flex-col gap-3" : "flex w-full max-w-lg flex-col gap-6 rounded-3xl bg-white p-8 shadow-sm dark:bg-zinc-950",
-            children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "flex flex-col gap-1", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                  "h1",
-                  {
-                    className: isPopup ? "text-base font-semibold" : "text-3xl font-semibold tracking-tight text-black dark:text-zinc-50",
-                    children: "Uncommon Hacks"
-                  }
-                ),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                  "p",
-                  {
-                    className: `text-sm ${isError ? "text-red-600 dark:text-red-400" : "text-zinc-500 dark:text-zinc-400"}`,
-                    children: status
-                  }
-                )
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "max-h-56 list-disc space-y-2 overflow-auto pl-5 text-sm", children: todos.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { className: "list-none pl-0 text-zinc-500 dark:text-zinc-400", children: "No todos yet." }) : todos.map((todo) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: todo.name }, todo.id)) }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid gap-2", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                  "button",
-                  {
-                    type: "button",
-                    onClick: () => void loadTodos(),
-                    className: "rounded-full border border-zinc-200 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900",
-                    children: "Reload"
-                  }
-                ),
-                onOpenApp ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                  "button",
-                  {
-                    type: "button",
-                    onClick: onOpenApp,
-                    className: "rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-colors hover:opacity-90",
-                    children: "Open app"
-                  }
-                ) : null
-              ] })
-            ]
+      let cancelled = false;
+      void (async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          const data = await loadRoom();
+          if (!cancelled) {
+            setRoom(data);
           }
-        )
-      }
+        } catch (loadError) {
+          if (!cancelled) {
+            setError(
+              loadError instanceof Error ? loadError.message : "Failed to load room"
+            );
+          }
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [loadRoom, pageId]);
+    return { room, loading, error, ensureRoom, refresh };
+  }
+
+  // app/hook/use-posts.ts
+  var import_react2 = __toESM(require_react());
+
+  // app/page.tsx
+  var import_react3 = __toESM(require_react());
+  var import_jsx_runtime = __toESM(require_jsx_runtime());
+  function Page() {
+    const { room, loading, error, ensureRoom, refresh } = useChatroom(
+      crypto.randomUUID()
     );
+    if (error) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { children: [
+      "Error! `$",
+      error,
+      "`"
+    ] });
+    (0, import_react3.useEffect)(() => {
+      refresh().then((status) => console.debug(`Refresh ${status}`));
+    });
+    if (!room) {
+      ensureRoom().then((status) => {
+        console.debug(`Ensured room ${status}`);
+      });
+    }
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: "67" });
   }
 
   // extension/src/popup.tsx
@@ -43174,17 +42399,20 @@ https://supabase.com/dashboard/project/_/settings/api`);
   if (!rootElement) {
     throw new Error("Missing #root element in popup.html");
   }
-  (0, import_client2.createRoot)(rootElement).render(
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-      TodosApp,
-      {
-        variant: "popup",
-        onOpenApp: () => {
-          const appUrl = runtime.runtime.getURL("app/index.html");
-          runtime.tabs.create({ url: appUrl });
+  (0, import_client3.createRoot)(rootElement).render(
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Page, {}),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+        "button",
+        {
+          onClick: () => {
+            const appUrl = runtime.runtime.getURL("app/index.html");
+            runtime.tabs.create({ url: appUrl });
+          },
+          children: "Open"
         }
-      }
-    )
+      )
+    ] })
   );
 })();
 /*! Bundled license information:

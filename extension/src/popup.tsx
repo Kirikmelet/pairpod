@@ -1,5 +1,6 @@
+"use client";
 import { createRoot } from "react-dom/client";
-import { TodosApp } from "../../components/todos-app";
+import Page from "@/app/page";
 
 const runtime = globalThis.browser ?? globalThis.chrome;
 const rootElement = document.getElementById("root");
@@ -9,11 +10,15 @@ if (!rootElement) {
 }
 
 createRoot(rootElement).render(
-  <TodosApp
-    variant="popup"
-    onOpenApp={() => {
-      const appUrl = runtime.runtime.getURL("app/index.html");
-      runtime.tabs.create({ url: appUrl });
-    }}
-  />,
+  <div>
+    <Page />
+    <button
+      onClick={() => {
+        const appUrl = runtime.runtime.getURL("app/index.html");
+        runtime.tabs.create({ url: appUrl });
+      }}
+    >
+      Open
+    </button>
+  </div>,
 );
