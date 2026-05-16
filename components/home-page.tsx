@@ -19,9 +19,7 @@ type UserProfile = {
   needsUsername: boolean;
 };
 
-type ApiResponse<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: string };
+type ApiResponse<T> = { ok: true; data: T } | { ok: false; error: string };
 
 type HomePageProps = {
   variant?: "page" | "popup";
@@ -283,7 +281,10 @@ function UsernameForm({ email, onComplete }: UsernameFormProps) {
         </p>
       </header>
 
-      <form className="app-stack" onSubmit={(event) => void handleSubmit(event)}>
+      <form
+        className="app-stack"
+        onSubmit={(event) => void handleSubmit(event)}
+      >
         <label className="form-group">
           <span className="form-label">Username</span>
           <span className="input-wrap">
@@ -367,7 +368,9 @@ async function fetchProfile(
   } = await supabase.auth.getSession();
 
   if (!session?.access_token) {
-    throw new Error("Your sign-in session was not found. Please sign in again.");
+    throw new Error(
+      "Your sign-in session was not found. Please sign in again.",
+    );
   }
 
   const response = await fetch("/api/profile", {
@@ -440,8 +443,22 @@ function AppBackground() {
         <ellipse cx="650" cy="520" rx="620" ry="340" fill="#3d8e22" />
         <ellipse cx="600" cy="540" rx="540" ry="300" fill="#4aa828" />
         <ellipse cx="560" cy="530" rx="440" ry="260" fill="#5cb838" />
-        <ellipse cx="520" cy="510" rx="320" ry="190" fill="#6ebe44" opacity="0.7" />
-        <ellipse cx="500" cy="500" rx="200" ry="120" fill="#8cd960" opacity="0.45" />
+        <ellipse
+          cx="520"
+          cy="510"
+          rx="320"
+          ry="190"
+          fill="#6ebe44"
+          opacity="0.7"
+        />
+        <ellipse
+          cx="500"
+          cy="500"
+          rx="200"
+          ry="120"
+          fill="#8cd960"
+          opacity="0.45"
+        />
       </svg>
       <div className="ground" />
       <div className="bubbles">
@@ -457,10 +474,31 @@ function AppBackground() {
 
 function PodTitleIcon() {
   return (
-    <svg className="xp-title-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <ellipse cx="8" cy="9.5" rx="6" ry="5.5" fill="#6ebe44" stroke="#3d8e22" strokeWidth="0.8" />
+    <svg
+      className="xp-title-icon"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <ellipse
+        cx="8"
+        cy="9.5"
+        rx="6"
+        ry="5.5"
+        fill="#6ebe44"
+        stroke="#3d8e22"
+        strokeWidth="0.8"
+      />
       <ellipse cx="7" cy="8" rx="3.5" ry="3.5" fill="rgba(255,255,255,0.3)" />
-      <line x1="8" y1="4" x2="8" y2="1.5" stroke="#3a7820" strokeWidth="1.5" strokeLinecap="round" />
+      <line
+        x1="8"
+        y1="4"
+        x2="8"
+        y2="1.5"
+        stroke="#3a7820"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
       <circle cx="6.5" cy="1.5" r="1.5" fill="#8cd960" />
       <circle cx="9.5" cy="2" r="1.2" fill="#6ebe44" />
     </svg>
@@ -486,13 +524,50 @@ function UserIcon() {
 
 function UserSetupIcon() {
   return (
-    <svg className="logo-pod" viewBox="0 0 38 44" fill="none" aria-hidden="true">
-      <ellipse cx="19" cy="27" rx="16" ry="16" fill="#6ebe44" stroke="#3d8e22" strokeWidth="1.2" />
+    <svg
+      className="logo-pod"
+      viewBox="0 0 38 44"
+      fill="none"
+      aria-hidden="true"
+    >
+      <ellipse
+        cx="19"
+        cy="27"
+        rx="16"
+        ry="16"
+        fill="#6ebe44"
+        stroke="#3d8e22"
+        strokeWidth="1.2"
+      />
       <circle cx="19" cy="22" r="6" fill="white" opacity="0.85" />
-      <path d="M8 39c2.2-7 5.9-10.5 11-10.5S27.8 32 30 39" fill="white" opacity="0.85" />
-      <path d="M19 8 Q15 2 11 1 Q14 5 14 10" stroke="#3a7820" strokeWidth="1.5" fill="#4a9e2a" strokeLinecap="round" />
-      <path d="M19 8 Q23 2 28 1 Q24 5 24 10" stroke="#3a7820" strokeWidth="1.5" fill="#6ebe44" strokeLinecap="round" />
-      <line x1="19" y1="12" x2="19" y2="8" stroke="#3a7820" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M8 39c2.2-7 5.9-10.5 11-10.5S27.8 32 30 39"
+        fill="white"
+        opacity="0.85"
+      />
+      <path
+        d="M19 8 Q15 2 11 1 Q14 5 14 10"
+        stroke="#3a7820"
+        strokeWidth="1.5"
+        fill="#4a9e2a"
+        strokeLinecap="round"
+      />
+      <path
+        d="M19 8 Q23 2 28 1 Q24 5 24 10"
+        stroke="#3a7820"
+        strokeWidth="1.5"
+        fill="#6ebe44"
+        strokeLinecap="round"
+      />
+      <line
+        x1="19"
+        y1="12"
+        x2="19"
+        y2="8"
+        stroke="#3a7820"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
