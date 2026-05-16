@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3WPosts - Auth callbacks</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./globals.css" />
+  </head>
+  <body>
+    <main class="post-shell">
+      <section class="post-window xp-window" aria-labelledby="post-detail-title">
+        <div class="xp-title-bar chat-titlebar">
+          <svg class="xp-title-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true"><ellipse cx="8" cy="9.5" rx="6" ry="5.5" fill="#6ebe44" stroke="#3d8e22" stroke-width="0.8"></ellipse><circle cx="6.4" cy="9" r="1.4" fill="#1a2a44"></circle><circle cx="9.6" cy="9" r="1.4" fill="#1a2a44"></circle><path d="M6 12c1.2 1 2.8 1 4 0" stroke="#2d5018" stroke-width="1" stroke-linecap="round"></path><line x1="8" y1="4" x2="8" y2="1.5" stroke="#3a7820" stroke-width="1.5" stroke-linecap="round"></line><circle cx="6.5" cy="1.5" r="1.5" fill="#8cd960"></circle></svg>
+          <span class="xp-title-text">3WPosts - How should we structure auth callbacks?</span>
+          <div class="xp-title-controls" aria-hidden="true"><span class="xp-title-btn xp-title-btn--min">_</span><span class="xp-title-btn xp-title-btn--max">[]</span><span class="xp-title-btn xp-title-btn--close">x</span></div>
+        </div>
+        <nav class="chat-menu" aria-label="Post detail menu"><a href="./chat.html">Chat</a><a href="./login.html">Pods</a><a href="./posts.html">Posts</a><a href="#">Sort</a><a href="#">Help</a></nav>
+        <div class="post-detail-layout">
+          <section class="post-detail-main">
+            <header class="chat-panel-header"><h2>Full Post</h2></header>
+            <article class="post-card post-card--blue post-card--full">
+              <div class="post-votes"><button type="button">+</button><strong>32</strong><button type="button">-</button></div>
+              <div class="post-card__body">
+                <header><span class="post-tag">backend</span><h1 id="post-detail-title">How should we structure auth callbacks?</h1><p>posted by <strong>debugger99</strong> - 8m ago</p></header>
+                <p>I am wiring Supabase auth into the extension flow and want to keep the server routes tidy. Anyone have a clean pattern for redirect handling? The tricky part is keeping the extension, web app, and callback route all speaking the same redirect language without scattering URL checks across the client.</p>
+                <footer><a href="./posts.html">Back to post list</a><a href="./chat.html">Continue in #chat</a></footer>
+              </div>
+            </article>
+            <section class="post-comments" aria-label="Comments">
+              <header class="chat-panel-header"><h2>Comments (3)</h2></header>
+              <div class="post-comments__list">
+                <article class="post-comment post-comment--green"><div class="post-comment__avatar">R</div><div class="post-comment__body"><header><h2>rootkit</h2><span>6m ago</span></header><p>Keep the callback route tiny. Validate the code, exchange it server-side, then centralize the final redirect in one helper.</p><div class="post-comment__votes"><button type="button">Like</button><strong>18</strong><button type="button">Dislike</button><strong>1</strong></div></div></article>
+                <article class="post-comment post-comment--purple"><div class="post-comment__avatar">L</div><div class="post-comment__body"><header><h2>luna_dev</h2><span>4m ago</span></header><p>Also make the error page styled. Auth failures feel much less scary when they land inside the same XP window chrome.</p><div class="post-comment__votes"><button type="button">Like</button><strong>11</strong><button type="button">Dislike</button><strong>0</strong></div></div></article>
+                <article class="post-comment post-comment--blue"><div class="post-comment__avatar">P</div><div class="post-comment__body"><header><h2>pixelboy</h2><span>2m ago</span></header><p>For the extension, I would avoid storing intermediate state in the popup. Let the browser tab complete auth, then ask users to reload the extension.</p><div class="post-comment__votes"><button type="button">Like</button><strong>9</strong><button type="button">Dislike</button><strong>2</strong></div></div></article>
+              </div>
+            </section>
+          </section>
+          <aside class="post-sidebar"><section class="post-shortcuts"><header class="chat-panel-header"><h2>Post Actions</h2></header><a href="./posts.html">Back to posts</a><a href="./chat.html">Open #chat stream</a><a href="#">Follow thread</a></section></aside>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
