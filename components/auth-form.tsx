@@ -22,8 +22,6 @@ export function AuthForm({
   const [status, setStatus] = useState<string | null>(initialStatus);
   const [isLoading, setIsLoading] = useState(false);
 
-  const isPopup = variant === "popup";
-
   const handleEmailAuth = async (event: FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
@@ -101,13 +99,23 @@ export function AuthForm({
         </button>
       </div>
 
-      <GoogleSignInButton variant={variant} disabled={isLoading} />
-
-      {isPopup ? (
-        <p className="status-note text-center">
-          Sign in opens in a new tab. Reload the extension when finished.
-        </p>
-      ) : null}
+      <GoogleSignInButton
+        variant={variant}
+        disabled={isLoading}
+        onStart={() => {
+          setIsLoading(true);
+          setStatus(null);
+        }}
+        onError={(message) => {
+          setStatus(message);
+          setIsLoading(false);
+        }}
+        onSuccess={() => {
+          setStatus(null);
+          setIsLoading(false);
+          onSuccess?.();
+        }}
+      />
 
       <div className="divider">
         <span>or use email</span>

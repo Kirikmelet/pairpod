@@ -1,14 +1,30 @@
 "use client";
 
-import { GOOGLE_LOGIN_PATH, getSiteUrl } from "@/utils/auth-redirect";
+import { GOOGLE_LOGIN_PATH } from "@/utils/auth-redirect";
+import { createClient } from "@/utils/supabase/client";
 
 type GoogleSignInButtonProps = {
   variant?: "page" | "popup";
   disabled?: boolean;
   className?: string;
+  onError?: (message: string) => void;
+  onStart?: () => void;
+  onSuccess?: () => void;
 };
 
 type ExtensionRuntimeApi = {
+  identity?: {
+    getRedirectURL(path?: string): string;
+    launchWebAuthFlow(
+      details: { interactive: boolean; url: string },
+      callback?: (responseUrl?: string) => void,
+    ): Promise<string | undefined> | void;
+  };
+  runtime?: {
+    lastError?: {
+      message?: string;
+    };
+  };
   tabs?: {
     create(input: { url: string }): void;
   };
@@ -23,18 +39,56 @@ export function GoogleSignInButton({
   variant = "page",
   disabled = false,
   className = "",
+  onError,
+  onStart,
+  onSuccess,
 }: GoogleSignInButtonProps) {
-  const siteUrl = getSiteUrl();
-  const loginUrl = `${siteUrl}${GOOGLE_LOGIN_PATH}`;
-
-  const handlePopupClick = () => {
+  const handlePopupClick = async () => {
     const runtime =
       globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
-    if (runtime?.tabs?.create) {
-      runtime.tabs.create({ url: loginUrl });
+
+    if (!runtime?.identity) {
+      onError?.("This browser does not expose the extension identity API.");
       return;
     }
-    window.open(loginUrl, "_blank", "noopener,noreferrer");
+
+    onStart?.();
+
+    try {
+      const supabase = createClient();
+      const redirectTo = runtime.identity.getRedirectURL("auth/callback");
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data.url) {
+        throw new Error("Google did not return a sign-in URL.");
+      }
+
+      const responseUrl = await launchIdentityFlow(runtime, data.url);
+      if (!responseUrl) {
+        throw new Error("Google sign-in was cancelled.");
+      }
+
+      await completeSupabaseSession(supabase, responseUrl);
+      onSuccess?.();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Google sign-in failed.";
+      onError?.(message);
+    }
   };
 
   const baseClass = "btn-social";
@@ -68,6 +122,62 @@ export function GoogleSignInButton({
       Continue with Google
     </a>
   );
+}
+
+async function launchIdentityFlow(runtime: ExtensionRuntimeApi, url: string) {
+  return await new Promise<string | undefined>((resolve, reject) => {
+    const maybePromise = runtime.identity?.launchWebAuthFlow(
+      { interactive: true, url },
+      (responseUrl) => {
+        const message = runtime.runtime?.lastError?.message;
+        if (message) {
+          reject(new Error(message));
+          return;
+        }
+
+        resolve(responseUrl);
+      },
+    );
+
+    if (maybePromise && typeof maybePromise.then === "function") {
+      maybePromise.then(resolve, reject);
+    }
+  });
+}
+
+async function completeSupabaseSession(
+  supabase: ReturnType<typeof createClient>,
+  responseUrl: string,
+) {
+  const url = new URL(responseUrl);
+  const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+  const accessToken = hashParams.get("access_token");
+  const refreshToken = hashParams.get("refresh_token");
+
+  if (accessToken && refreshToken) {
+    const { error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return;
+  }
+
+  const code = url.searchParams.get("code");
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      throw error;
+    }
+
+    return;
+  }
+
+  throw new Error("The identity provider did not return a Supabase session.");
 }
 
 function GoogleIcon() {
