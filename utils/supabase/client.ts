@@ -55,6 +55,18 @@ export const createClient = () => {
   return createSupabaseClient<AppDatabase>(url, key);
 };
 
+export function getSupabaseBrowserAuthConfig() {
+  const { url, key } = getSupabasePublicConfig(
+    "utils/supabase/client.ts getSupabaseBrowserAuthConfig()",
+  );
+
+  return {
+    key,
+    storageKey: getSupabaseAuthStorageKey(url),
+    url,
+  };
+}
+
 export async function completeClientSideAuthRedirect() {
   if (typeof window === "undefined") {
     return false;
@@ -92,6 +104,11 @@ export async function completeClientSideAuthRedirect() {
   }
 
   return false;
+}
+
+function getSupabaseAuthStorageKey(url: string) {
+  const projectRef = new URL(url).hostname.split(".")[0];
+  return `sb-${projectRef}-auth-token`;
 }
 
 function createExtensionStorageAdapter(): SupabaseStorageAdapter | null {

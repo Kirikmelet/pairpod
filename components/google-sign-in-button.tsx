@@ -1,7 +1,10 @@
 "use client";
 
 import { GOOGLE_LOGIN_PATH } from "@/utils/auth-redirect";
-import { createClient } from "@/utils/supabase/client";
+import {
+  createClient,
+  getSupabaseBrowserAuthConfig,
+} from "@/utils/supabase/client";
 
 type GoogleSignInButtonProps = {
   variant?: "page" | "popup";
@@ -24,11 +27,32 @@ type ExtensionRuntimeApi = {
     lastError?: {
       message?: string;
     };
+    sendMessage(
+      message: GoogleAuthMessage,
+      callback?: (response?: GoogleAuthResponse) => void,
+    ): Promise<GoogleAuthResponse | undefined> | void;
   };
   tabs?: {
     create(input: { url: string }): void;
   };
 };
+
+type GoogleAuthMessage = {
+  authUrl: string;
+  storageKey: string;
+  supabaseKey: string;
+  supabaseUrl: string;
+  type: "peerpod.googleAuth";
+};
+
+type GoogleAuthResponse =
+  | {
+      ok: true;
+    }
+  | {
+      error?: string;
+      ok: false;
+    };
 
 const globalWithExtensionApis = globalThis as typeof globalThis & {
   browser?: ExtensionRuntimeApi;
@@ -47,7 +71,7 @@ export function GoogleSignInButton({
     const runtime =
       globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
 
-    if (!runtime?.identity) {
+    if (!runtime?.identity || !runtime.runtime?.sendMessage) {
       onError?.("This browser does not expose the extension identity API.");
       return;
     }
@@ -56,6 +80,7 @@ export function GoogleSignInButton({
 
     try {
       const supabase = createClient();
+      const { key, storageKey, url } = getSupabaseBrowserAuthConfig();
       const redirectTo = runtime.identity.getRedirectURL("auth/callback");
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -77,12 +102,18 @@ export function GoogleSignInButton({
         throw new Error("Google did not return a sign-in URL.");
       }
 
-      const responseUrl = await launchIdentityFlow(runtime, data.url);
-      if (!responseUrl) {
-        throw new Error("Google sign-in was cancelled.");
+      const response = await runGoogleAuthInBackground(runtime, {
+        authUrl: data.url,
+        storageKey,
+        supabaseKey: key,
+        supabaseUrl: url,
+        type: "peerpod.googleAuth",
+      });
+
+      if (!response?.ok) {
+        throw new Error(response?.error ?? "Google sign-in failed.");
       }
 
-      await completeSupabaseSession(supabase, responseUrl);
       onSuccess?.();
     } catch (error) {
       const message =
@@ -124,60 +155,27 @@ export function GoogleSignInButton({
   );
 }
 
-async function launchIdentityFlow(runtime: ExtensionRuntimeApi, url: string) {
-  return await new Promise<string | undefined>((resolve, reject) => {
-    const maybePromise = runtime.identity?.launchWebAuthFlow(
-      { interactive: true, url },
-      (responseUrl) => {
-        const message = runtime.runtime?.lastError?.message;
-        if (message) {
-          reject(new Error(message));
+async function runGoogleAuthInBackground(
+  runtime: ExtensionRuntimeApi,
+  message: GoogleAuthMessage,
+) {
+  return await new Promise<GoogleAuthResponse | undefined>(
+    (resolve, reject) => {
+      const maybePromise = runtime.runtime?.sendMessage(message, (response) => {
+        const runtimeError = runtime.runtime?.lastError?.message;
+        if (runtimeError) {
+          reject(new Error(runtimeError));
           return;
         }
 
-        resolve(responseUrl);
-      },
-    );
+        resolve(response);
+      });
 
-    if (maybePromise && typeof maybePromise.then === "function") {
-      maybePromise.then(resolve, reject);
+      if (maybePromise && typeof maybePromise.then === "function") {
+        maybePromise.then(resolve, reject);
+      }
     }
-  });
-}
-
-async function completeSupabaseSession(
-  supabase: ReturnType<typeof createClient>,
-  responseUrl: string,
-) {
-  const url = new URL(responseUrl);
-  const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
-  const accessToken = hashParams.get("access_token");
-  const refreshToken = hashParams.get("refresh_token");
-
-  if (accessToken && refreshToken) {
-    const { error } = await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
-
-    if (error) {
-      throw error;
-    }
-
-    return;
-  }
-
-  const code = url.searchParams.get("code");
-  if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) {
-      throw error;
-    }
-
-    return;
-  }
-
-  throw new Error("The identity provider did not return a Supabase session.");
+  );
 }
 
 function GoogleIcon() {
