@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3WPosts - github.com</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&family=Fredoka:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./globals.css" />
+  </head>
+  <body>
+    <main class="post-shell">
+      <section class="post-window xp-window" aria-labelledby="post-stream-title">
+        <div class="xp-title-bar chat-titlebar">
+          <svg class="xp-title-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <ellipse cx="8" cy="9.5" rx="6" ry="5.5" fill="#6ebe44" stroke="#3d8e22" stroke-width="0.8"></ellipse>
+            <circle cx="6.4" cy="9" r="1.4" fill="#1a2a44"></circle>
+            <circle cx="9.6" cy="9" r="1.4" fill="#1a2a44"></circle>
+            <path d="M6 12c1.2 1 2.8 1 4 0" stroke="#2d5018" stroke-width="1" stroke-linecap="round"></path>
+            <line x1="8" y1="4" x2="8" y2="1.5" stroke="#3a7820" stroke-width="1.5" stroke-linecap="round"></line>
+            <circle cx="6.5" cy="1.5" r="1.5" fill="#8cd960"></circle>
+          </svg>
+          <span class="xp-title-text" id="post-stream-title">3WPosts - github.com</span>
+          <div class="xp-title-controls" aria-hidden="true">
+            <span class="xp-title-btn xp-title-btn--min">_</span>
+            <span class="xp-title-btn xp-title-btn--max">[]</span>
+            <span class="xp-title-btn xp-title-btn--close">x</span>
+          </div>
+        </div>
+
+        <nav class="chat-menu" aria-label="Post stream menu">
+          <a href="./chat.html">Chat</a>
+          <a href="./login.html">Pods</a>
+          <a href="#">New Post</a>
+          <a href="#">Sort</a>
+          <a href="#">Help</a>
+        </nav>
+
+        <div class="post-layout">
+          <aside class="post-compose-panel">
+            <header class="chat-panel-header"><h2>Create Post</h2></header>
+            <form class="post-compose">
+              <label><span>Title</span><input type="text" value="Share something with github.com" /></label>
+              <label><span>Post</span><textarea>Ask a question, share a commit, or start a thread...</textarea></label>
+              <button type="button">Post to Pod</button>
+            </form>
+            <div class="post-room-card">
+              <span class="chat-room-icon" aria-hidden="true">
+                <svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="4"></circle><path d="M8 24h32M24 6c6 5 9 11 9 18s-3 13-9 18M24 6c-6 5-9 11-9 18s3 13 9 18" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+              </span>
+              <div><h2>github.com</h2><p>Code, collaborate, build.</p></div>
+              <a href="./chat.html">Open #chat</a>
+            </div>
+          </aside>
+
+          <section class="post-stream" aria-label="Post stream">
+            <header class="chat-panel-header"><h2>Post Stream</h2></header>
+            <div class="post-filterbar">
+              <button type="button" class="active">Hot</button>
+              <button type="button">New</button>
+              <button type="button">Unanswered</button>
+              <button type="button">Following</button>
+            </div>
+            <div class="post-list">
+              <article class="post-card post-card--blue"><div class="post-votes"><button type="button">+</button><strong>32</strong><button type="button">-</button></div><div class="post-card__body"><header><span class="post-tag">backend</span><h2>How should we structure auth callbacks?</h2><p>posted by <strong>debugger99</strong> - 8m ago</p></header><p>I am wiring Supabase auth into the extension flow and want to keep the server routes tidy. Anyone have a clean pattern for redirect handling?</p><footer><a href="./chat.html">Continue in #chat</a><a href="#">14 replies</a><button type="button">Save</button></footer></div></article>
+              <article class="post-card post-card--purple"><div class="post-votes"><button type="button">+</button><strong>27</strong><button type="button">-</button></div><div class="post-card__body"><header><span class="post-tag">design</span><h2>Tiny UI polish pass on the pod cards</h2><p>posted by <strong>luna_dev</strong> - 18m ago</p></header><p>The shared globals are doing most of the work now. I pushed a pass that makes the pod selection cards feel closer to the chat chrome.</p><footer><a href="./chat.html">Continue in #chat</a><a href="#">8 replies</a><button type="button">Save</button></footer></div></article>
+              <article class="post-card post-card--green"><div class="post-votes"><button type="button">+</button><strong>58</strong><button type="button">-</button></div><div class="post-card__body"><header><span class="post-tag">git</span><h2>Git workflow tips for small teams</h2><p>posted by <strong>octo_lover</strong> - 42m ago</p></header><p>Squash feature branches, keep main deployable, and write commit messages like the next person is reading during a small emergency.</p><footer><a href="./chat.html">Continue in #chat</a><a href="#">32 replies</a><button type="button">Save</button></footer></div></article>
+              <article class="post-card post-card--orange"><div class="post-votes"><button type="button">+</button><strong>41</strong><button type="button">-</button></div><div class="post-card__body"><header><span class="post-tag">tools</span><h2>Best VS Code extensions for Next apps?</h2><p>posted by <strong>dev_jay</strong> - 1h ago</p></header><p>Looking for a lean setup that helps with TypeScript, Tailwind-ish class cleanup, and Supabase types without turning my editor into a control panel.</p><footer><a href="./chat.html">Continue in #chat</a><a href="#">18 replies</a><button type="button">Save</button></footer></div></article>
+            </div>
+          </section>
+
+          <aside class="post-sidebar">
+            <section class="chat-rail-panel"><header class="chat-panel-header"><h2>Hot Threads</h2></header><div class="chat-rail-panel__body"><article class="chat-rail-item"><h3>Review my PR checklist</h3><p>rootkit - 21 replies</p></article><article class="chat-rail-item"><h3>Edge extension reload flow</h3><p>pixelboy - 13 replies</p></article><article class="chat-rail-item"><h3>Database type generation</h3><p>code_newbie - 9 replies</p></article><a href="#">View all threads</a></div></section>
+            <section class="chat-rail-panel"><header class="chat-panel-header"><h2>Room Stats</h2></header><div class="chat-rail-panel__body"><article class="chat-rail-item"><h3>124 online</h3><p>right now</p></article><article class="chat-rail-item"><h3>582 members</h3><p>in this pod</p></article><article class="chat-rail-item"><h3>48 posts</h3><p>today</p></article><a href="#">Full activity</a></div></section>
+            <section class="post-shortcuts"><header class="chat-panel-header"><h2>Connected Views</h2></header><a href="./chat.html"># chat stream</a><a href="./login.html">Your pods</a><a href="#">Saved posts</a></section>
+          </aside>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
