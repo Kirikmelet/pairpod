@@ -1,19 +1,18 @@
-"use client";
-import { useChatroom } from "./hook";
-import { useEffect } from "react";
+import { Suspense } from "react";
+import { HomePage } from "@/components/home-page";
 
 export default function Page() {
-  const { room, loading, error, ensureRoom, refresh } = useChatroom(
-    crypto.randomUUID(),
+  return (
+    <Suspense
+      fallback={
+        <div className="app-scene">
+          <div className="app-scene__content">
+            <p className="status-note">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <HomePage variant="page" />
+    </Suspense>
   );
-  if (error) return <p>Error! `${error}`</p>;
-  useEffect(() => {
-    refresh().then((status) => console.debug(`Refresh ${status}`));
-  });
-  if (!room) {
-    ensureRoom().then((status) => {
-      console.debug(`Ensured room ${status}`);
-    });
-  }
-  return <div>67</div>;
 }

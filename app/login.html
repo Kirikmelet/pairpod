@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Uncommon Hacks - Welcome</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&family=Fredoka:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./globals.css" />
+  </head>
+  <body>
+    <div class="sky" aria-hidden="true"></div>
+
+    <div class="clouds" aria-hidden="true">
+      <div class="cloud cloud-1"></div>
+      <div class="cloud cloud-2"></div>
+      <div class="cloud cloud-3"></div>
+      <div class="cloud cloud-4"></div>
+      <div class="cloud cloud-5"></div>
+    </div>
+
+    <svg
+      class="hills-svg"
+      viewBox="0 0 1000 500"
+      preserveAspectRatio="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <ellipse cx="650" cy="520" rx="620" ry="340" fill="#3d8e22"></ellipse>
+      <ellipse cx="600" cy="540" rx="540" ry="300" fill="#4aa828"></ellipse>
+      <ellipse cx="560" cy="530" rx="440" ry="260" fill="#5cb838"></ellipse>
+      <ellipse cx="520" cy="510" rx="320" ry="190" fill="#6ebe44" opacity="0.7"></ellipse>
+      <ellipse cx="500" cy="500" rx="200" ry="120" fill="#8cd960" opacity="0.45"></ellipse>
+    </svg>
+    <div class="ground" aria-hidden="true"></div>
+
+    <div class="bubbles" aria-hidden="true">
+      <div class="bubble bubble-1"></div>
+      <div class="bubble bubble-2"></div>
+      <div class="bubble bubble-3"></div>
+      <div class="bubble bubble-4"></div>
+      <div class="bubble bubble-5"></div>
+    </div>
+
+    <main class="page-layout">
+      <section class="xp-window app-window pop-in" aria-labelledby="login-title">
+        <div class="xp-title-bar">
+          <svg class="xp-title-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <ellipse cx="8" cy="9.5" rx="6" ry="5.5" fill="#6ebe44" stroke="#3d8e22" stroke-width="0.8"></ellipse>
+            <ellipse cx="7" cy="8" rx="3.5" ry="3.5" fill="rgba(255,255,255,0.3)"></ellipse>
+            <line x1="8" y1="4" x2="8" y2="1.5" stroke="#3a7820" stroke-width="1.5" stroke-linecap="round"></line>
+            <circle cx="6.5" cy="1.5" r="1.5" fill="#8cd960"></circle>
+            <circle cx="9.5" cy="2" r="1.2" fill="#6ebe44"></circle>
+          </svg>
+          <span class="xp-title-text">Uncommon Hacks - Welcome</span>
+          <div class="xp-title-controls" aria-hidden="true">
+            <span class="xp-title-btn xp-title-btn--min">_</span>
+            <span class="xp-title-btn xp-title-btn--max">[]</span>
+            <span class="xp-title-btn xp-title-btn--close">x</span>
+          </div>
+        </div>
+
+        <div class="xp-window-body" id="windowBody">
+          <header class="brand pop-in">
+            <div class="brand-row">
+              <svg class="logo-pod" viewBox="0 0 38 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M19 6 Q15 1 11 0 Q14 4 14 8" stroke="#3a7820" stroke-width="1.5" fill="#4a9e2a" stroke-linecap="round"></path>
+                <path d="M19 6 Q23 0 28 0 Q24 4 24 9" stroke="#3a7820" stroke-width="1.5" fill="#6ebe44" stroke-linecap="round"></path>
+                <line x1="19" y1="10" x2="19" y2="6" stroke="#3a7820" stroke-width="2" stroke-linecap="round"></line>
+                <ellipse cx="19" cy="27" rx="16" ry="16" fill="#6ebe44" stroke="#3d8e22" stroke-width="1.2"></ellipse>
+                <ellipse cx="17" cy="23" rx="10" ry="11" fill="white" opacity="0.25"></ellipse>
+                <circle cx="14" cy="25" r="3.5" fill="white" stroke="#3d8e22" stroke-width="0.6"></circle>
+                <circle cx="24" cy="25" r="3.5" fill="white" stroke="#3d8e22" stroke-width="0.6"></circle>
+                <circle cx="14.8" cy="25.5" r="1.8" fill="#1a2a44"></circle>
+                <circle cx="24.8" cy="25.5" r="1.8" fill="#1a2a44"></circle>
+                <path d="M15 32 Q19 36 23 32" stroke="#2d5018" stroke-width="1.3" stroke-linecap="round" fill="none"></path>
+              </svg>
+              <h1 class="brand-name" id="login-title">
+                <span class="peer">Uncommon</span>
+                <span class="pod">Hacks</span>
+              </h1>
+            </div>
+            <p class="brand-tagline">your pod on every page</p>
+          </header>
+
+          <div class="tabs pop-in" role="tablist" aria-label="Authentication mode">
+            <button class="tab active" id="tabIn" type="button" role="tab" aria-selected="true">Sign In</button>
+            <button class="tab" id="tabUp" type="button" role="tab" aria-selected="false">Register</button>
+          </div>
+
+          <form class="app-stack" action="#" method="post">
+            <div class="signup-fields">
+              <label class="form-group">
+                <span class="form-label">Pick a Username</span>
+                <span class="input-wrap">
+                  <input class="form-input" type="text" name="username" placeholder="coolguy2003" autocomplete="username" />
+                  <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <circle cx="12" cy="8" r="4"></circle>
+                    <path d="M5 20c0-4 3.5-7 7-7s7 3 7 7"></path>
+                  </svg>
+                </span>
+              </label>
+            </div>
+
+            <label class="form-group pop-in">
+              <span class="form-label">Email Address</span>
+              <span class="input-wrap">
+                <input class="form-input" type="email" name="email" placeholder="you@example.com" autocomplete="email" required />
+                <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                  <path d="M3 7l9 5 9-5"></path>
+                </svg>
+              </span>
+            </label>
+
+            <label class="form-group pop-in">
+              <span class="form-label">Password</span>
+              <span class="input-wrap">
+                <input class="form-input" type="password" name="password" placeholder="Password" autocomplete="current-password" required />
+                <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+                  <path d="M8 11V7a4 4 0 018 0v4"></path>
+                </svg>
+              </span>
+            </label>
+
+            <div class="signin-fields">
+              <div class="form-meta pop-in">
+                <label class="checkbox-label">
+                  <input type="checkbox" class="checkbox-input" checked />
+                  Remember me
+                </label>
+                <a href="#" class="form-link">Forgot password?</a>
+              </div>
+            </div>
+
+            <button class="btn-primary pop-in" id="submitBtn" type="submit">Sign In</button>
+
+            <div class="divider pop-in"><span>or</span></div>
+
+            <a href="#" class="btn-social pop-in">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"></path>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"></path>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"></path>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"></path>
+              </svg>
+              Continue with Google
+            </a>
+
+            <div class="text-center pop-in">
+              <div class="live-pill">
+                <span class="live-dot"></span>
+                <span><strong>12,847</strong> pods active</span>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const windowBody = document.getElementById("windowBody");
+      const signInTab = document.getElementById("tabIn");
+      const registerTab = document.getElementById("tabUp");
+      const submitButton = document.getElementById("submitBtn");
+
+      function setMode(mode) {
+        const isRegistering = mode === "register";
+        windowBody.classList.toggle("signup-mode", isRegistering);
+        signInTab.classList.toggle("active", !isRegistering);
+        registerTab.classList.toggle("active", isRegistering);
+        signInTab.setAttribute("aria-selected", String(!isRegistering));
+        registerTab.setAttribute("aria-selected", String(isRegistering));
+        submitButton.textContent = isRegistering ? "Create Account" : "Sign In";
+      }
+
+      signInTab.addEventListener("click", () => setMode("signin"));
+      registerTab.addEventListener("click", () => setMode("register"));
+    </script>
+  </body>
+</html>
