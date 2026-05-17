@@ -112,7 +112,7 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
       <AppShell isPopup={isPopup} title="PairPod - Sign in">
         <AuthForm
           variant={variant}
-          initialStatus={authError}
+          initialStatus={null}
           onSuccess={() => void refreshUser()}
         />
       </AppShell>
