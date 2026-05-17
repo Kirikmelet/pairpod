@@ -133,7 +133,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
 
         <nav className="chat-menu chat-nav" aria-label="Chat menu">
           <a href={buildScopedHref("/")}>Room</a>
-          <a href={buildScopedHref("/posts")}>Posts</a>
+          <a href={buildScopedHref("/posts")} className="nav-cta">→ Posts</a>
           <a href={buildScopedHref("/chat")} className="chat-nav__active">Chat</a>
           <a href={buildScopedHref("/posts")}>Questions</a>
           <a href={buildScopedHref("/")}>Help</a>

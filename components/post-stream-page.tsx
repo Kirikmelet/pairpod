@@ -451,9 +451,9 @@ function PostShell({
             </div>
           </div>
           <nav className="chat-menu post-nav" aria-label="Post stream menu">
-            <a href={chatHref}>Chat</a>
+            <a href={chatHref} className="nav-cta">→ Chat</a>
             <a href={podsHref}>Pods</a>
-            <a href={postsHref}>Posts</a>
+            <a href={postsHref} className="post-nav__active">Posts</a>
             <a href={postsHref}>Sort</a>
             <a href={podsHref}>Help</a>
           </nav>

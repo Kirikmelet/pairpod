@@ -1862,6 +1862,38 @@ body {
   background: rgba(59,140,245,0.12) !important;
 }
 
+/* Active page indicator — used on post nav */
+.post-nav__active {
+  color: var(--accent-blue) !important;
+  background: rgba(59,140,245,0.12) !important;
+  font-weight: var(--fw-extrabold) !important;
+}
+
+/* Cross-page CTA — green pill used on both nav bars */
+.nav-cta {
+  padding: 5px 14px !important;
+  border-radius: var(--radius-pill) !important;
+  background: linear-gradient(180deg,
+    rgba(122,222,100,0.22),
+    rgba(68,184,52,0.16)
+  ) !important;
+  border: 1.5px solid rgba(68,184,52,0.45) !important;
+  color: var(--accent-green) !important;
+  font-weight: var(--fw-extrabold) !important;
+  text-decoration: none !important;
+  letter-spacing: 0.01em;
+  transition: all var(--dur-fast) var(--ease-smooth) !important;
+  box-shadow: 0 1px 4px rgba(68,184,52,0.15);
+}
+.nav-cta:hover {
+  background: linear-gradient(180deg,
+    rgba(122,222,100,0.38),
+    rgba(68,184,52,0.28)
+  ) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(68,184,52,0.22) !important;
+}
+
 .chat-layout {
   min-height: 0;
   display: grid;
