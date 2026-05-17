@@ -585,3 +585,34 @@ body {
 .extension-app .profile-field input {
   min-height: 36px;
 }
+
+.extension-app .dm-shell,
+.extension-app .dm-window {
+  width: 100%;
+  min-height: 100vh;
+  max-height: 100vh;
+  margin: 0;
+  border-width: 1px;
+}
+
+.extension-app .dm-layout {
+  grid-template-columns: 1fr;
+  max-height: calc(100vh - 72px);
+  overflow: auto;
+}
+
+.extension-app .dm-sidebar {
+  max-height: 190px;
+}
+
+.extension-app .dm-thread-list {
+  max-height: 150px;
+}
+
+.extension-app .dm-conversation__header h1 {
+  font-size: var(--fs-xl);
+}
+
+.extension-app .dm-message {
+  max-width: 92%;
+}
