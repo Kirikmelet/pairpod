@@ -120,7 +120,9 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
       await refresh();
     } catch (sendError) {
       setSubmitError(
-        sendError instanceof Error ? sendError.message : "Failed to send message",
+        sendError instanceof Error
+          ? sendError.message
+          : "Failed to send message",
       );
     } finally {
       setIsSubmitting(false);
@@ -149,13 +151,9 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
 
           <nav className="chat-menu chat-nav" aria-label="Chat menu">
             <a href={buildScopedHref("/")}>Room</a>
-<<<<<<< HEAD
             <a href={buildScopedHref("/posts")} className="nav-cta">
               Posts
             </a>
-=======
-            <a href={buildScopedHref("/posts")} className="nav-cta">→ Posts</a>
->>>>>>> 381cf7dc6357c71f301dea6c2227c669f94d8437
             <a href={buildScopedHref("/chat")} className="chat-nav__active">
               Chat
             </a>
@@ -180,7 +178,9 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                 {authors.length > 0 ? (
                   authors.map((member, index) => (
                     <article className="chat-member" key={member.name}>
-                      <span className={`chat-avatar chat-avatar--${(index % 8) + 1}`}>
+                      <span
+                        className={`chat-avatar chat-avatar--${(index % 8) + 1}`}
+                      >
                         {member.name.charAt(0).toUpperCase()}
                       </span>
                       <div>
@@ -210,29 +210,18 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                 )}
               </div>
               <div className="chat-member-actions">
-                <a href={buildScopedHref("/posts")} className="chat-side-button">
+                <a
+                  href={buildScopedHref("/posts")}
+                  className="chat-side-button"
+                >
                   <span className="chat-side-icon" aria-hidden="true">
-<<<<<<< HEAD
                     <ListIcon />
-=======
-                    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-                      <rect x="3" y="5" width="14" height="2" rx="1" fill="currentColor" />
-                      <rect x="3" y="9" width="10" height="2" rx="1" fill="currentColor" />
-                      <rect x="3" y="13" width="12" height="2" rx="1" fill="currentColor" />
-                    </svg>
->>>>>>> 381cf7dc6357c71f301dea6c2227c669f94d8437
                   </span>
                   Open Posts
                 </a>
                 <a href={buildScopedHref("/")} className="chat-side-button">
                   <span className="chat-side-icon" aria-hidden="true">
-<<<<<<< HEAD
                     <HomeIcon />
-=======
-                    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-                      <path d="M10 3L3 9h2v8h4v-5h2v5h4V9h2L10 3z" fill="currentColor" />
-                    </svg>
->>>>>>> 381cf7dc6357c71f301dea6c2227c669f94d8437
                   </span>
                   Back to Pod
                 </a>
@@ -291,7 +280,8 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                               className="chat-thread"
                               href={buildScopedHref(`/posts/${post.id}`)}
                             >
-                              -&gt; {relatedComments.length} replies - View thread
+                              -&gt; {relatedComments.length} replies - View
+                              thread
                             </a>
                           ) : null}
                         </div>
@@ -350,15 +340,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   className="chat-composer__posts"
                   aria-label="Open post stream"
                 >
-<<<<<<< HEAD
                   <ListIcon />
-=======
-                  <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-                    <rect x="3" y="4" width="14" height="2" rx="1" fill="currentColor" />
-                    <rect x="3" y="9" width="10" height="2" rx="1" fill="currentColor" />
-                    <rect x="3" y="14" width="12" height="2" rx="1" fill="currentColor" />
-                  </svg>
->>>>>>> 381cf7dc6357c71f301dea6c2227c669f94d8437
                 </a>
               </form>
             </section>
@@ -374,11 +356,14 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   </div>
                   <p className="chat-info-card__meta">
                     Created:{" "}
-                    {bundle ? formatTimestamp(bundle.room.created_at) : "Loading..."}
+                    {bundle
+                      ? formatTimestamp(bundle.room.created_at)
+                      : "Loading..."}
                   </p>
                   <p className="chat-info-card__meta">
-                    {chatPosts.length} chat messages <span className="live-dot" />{" "}
-                    {discussionPosts.length} active threads
+                    {chatPosts.length} chat messages{" "}
+                    <span className="live-dot" /> {discussionPosts.length}{" "}
+                    active threads
                   </p>
                 </div>
               </section>
@@ -421,8 +406,22 @@ function ChatSceneBackground() {
         <ellipse cx="650" cy="520" rx="620" ry="340" fill="#3d8e22" />
         <ellipse cx="600" cy="540" rx="540" ry="300" fill="#4aa828" />
         <ellipse cx="560" cy="530" rx="440" ry="260" fill="#5cb838" />
-        <ellipse cx="520" cy="510" rx="320" ry="190" fill="#6ebe44" opacity="0.7" />
-        <ellipse cx="500" cy="500" rx="200" ry="120" fill="#8cd960" opacity="0.45" />
+        <ellipse
+          cx="520"
+          cy="510"
+          rx="320"
+          ry="190"
+          fill="#6ebe44"
+          opacity="0.7"
+        />
+        <ellipse
+          cx="500"
+          cy="500"
+          rx="200"
+          ry="120"
+          fill="#8cd960"
+          opacity="0.45"
+        />
       </svg>
       <div className="ground" />
       <div className="bubbles">
