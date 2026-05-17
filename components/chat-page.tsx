@@ -172,6 +172,26 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                 ) : (
                   <article className="chat-member">
                     <span className="chat-avatar chat-avatar--1">A</span>
+        </div>
+
+        <nav className="chat-menu chat-nav" aria-label="Chat menu">
+          <a href={buildScopedHref("/")}>Room</a>
+          <a href={buildScopedHref("/posts")} className="nav-cta">→ Posts</a>
+          <a href={buildScopedHref("/chat")} className="chat-nav__active">Chat</a>
+          <a href={buildScopedHref("/posts")}>Questions</a>
+          <a href={buildScopedHref("/")}>Help</a>
+        </nav>
+
+        <div className="chat-layout">
+          <aside className="chat-members" aria-label="Room members">
+            <PanelHeader title={`Members (${authors.length || 1})`} />
+            <div className="chat-members__list">
+              {authors.length > 0 ? (
+                authors.map((member, index) => (
+                  <article className="chat-member" key={member.name}>
+                    <span className={`chat-avatar chat-avatar--${(index % 8) + 1}`}>
+                      {member.name.charAt(0).toUpperCase()}
+                    </span>
                     <div>
                       <h2>Anonymous</h2>
                       <p>
