@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   formatTimestamp,
@@ -12,6 +12,7 @@ import {
   type PostRecord,
   type CommentRecord,
   type UserProfileRecord,
+  useCurrentUserProfile,
   usePageBundle,
 } from "@/lib/client/page-api";
 
@@ -25,6 +26,7 @@ type PostStreamPageProps = {
 };
 
 export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
+  const { profile: currentProfile, loading: profileLoading } = useCurrentUserProfile();
   const {
     bundle,
     commentsByPost,
@@ -40,6 +42,12 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
   const isPopup = variant === "popup";
   const domainName = getRoomDisplayName(domainUrl);
   const [mode, setMode] = useState<"question" | "guide">("question");
+
+  useEffect(() => {
+    if (!profileLoading && !currentProfile) {
+      window.location.href = "/";
+    }
+  }, [currentProfile, profileLoading]);
   const [header, setHeader] = useState("");
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -116,6 +124,27 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
       );
     }
   };
+
+  if (profileLoading || !currentProfile) {
+    return (
+      <PostShell
+        title="PairPod - Posts"
+        labelledBy="post-stream-title"
+        chatHref={buildScopedHref("/chat")}
+        postsHref={buildScopedHref("/posts")}
+        podsHref={buildScopedHref("/")}
+        globalHref={buildRoomHref("/posts", "global")}
+        domainHref={buildRoomHref("/posts", "domain")}
+        domainName={domainName}
+        roomScope={roomScope}
+        variant={variant}
+      >
+        <p className="status-note" style={{ padding: "var(--space-lg)" }}>
+          {profileLoading ? "Loading..." : "Redirecting to login..."}
+        </p>
+      </PostShell>
+    );
+  }
 
   return (
     <PostShell
@@ -283,6 +312,7 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
 }
 
 export function PostDetailPage({ postId }: { postId: string }) {
+  const { profile: currentProfile, loading: profileLoading } = useCurrentUserProfile();
   const {
     bundle,
     commentsByPost,
@@ -296,6 +326,12 @@ export function PostDetailPage({ postId }: { postId: string }) {
     roomScope,
   } = usePageBundle();
   const domainName = getRoomDisplayName(domainUrl);
+
+  useEffect(() => {
+    if (!profileLoading && !currentProfile) {
+      window.location.href = "/";
+    }
+  }, [currentProfile, profileLoading]);
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -362,6 +398,26 @@ export function PostDetailPage({ postId }: { postId: string }) {
       );
     }
   };
+
+  if (profileLoading || !currentProfile) {
+    return (
+      <PostShell
+        title="PairPod - Post"
+        labelledBy="post-detail-title"
+        chatHref={buildScopedHref("/chat")}
+        postsHref={buildScopedHref("/posts")}
+        podsHref={buildScopedHref("/")}
+        globalHref={buildRoomHref("/posts", "global")}
+        domainHref={buildRoomHref("/posts", "domain")}
+        domainName={domainName}
+        roomScope={roomScope}
+      >
+        <p className="status-note" style={{ padding: "var(--space-lg)" }}>
+          {profileLoading ? "Loading..." : "Redirecting to login..."}
+        </p>
+      </PostShell>
+    );
+  }
 
   if (loading) {
     return (
