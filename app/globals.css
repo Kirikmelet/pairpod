@@ -3135,6 +3135,20 @@ textarea.post-compose-input {
   padding: var(--space-xl);
 }
 
+.profile-nav button {
+  border: none;
+  background: transparent;
+  color: var(--text-mid);
+  font-family: var(--font-body);
+  font-size: inherit;
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+}
+
+.profile-nav button:hover {
+  color: var(--accent-blue);
+}
+
 .profile-header {
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
