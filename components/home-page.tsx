@@ -202,7 +202,11 @@ function useExtensionHashRoute():
   useEffect(() => {
     const handleHashChange = () => setHash(window.location.hash);
     window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", handleHashChange);
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("popstate", handleHashChange);
+    };
   }, []);
 
   const path = hash.replace(/^#/, "").split("?")[0] || "/";

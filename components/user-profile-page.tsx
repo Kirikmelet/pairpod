@@ -29,7 +29,11 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
       setError(null);
 
       try {
-        const nextProfile = await loadPublicUserProfile(userId);
+        const nextProfile = await withTimeout(
+          loadPublicUserProfile(userId),
+          8000,
+          "Could not load this profile. Try going back and opening it again.",
+        );
         if (isActive) {
           setProfile(nextProfile);
         }
@@ -145,6 +149,26 @@ export function UserProfilePage({ userId }: UserProfilePageProps) {
       </div>
     </main>
   );
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+) {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
 }
 
 function formatProfileDate(timestamp: string) {

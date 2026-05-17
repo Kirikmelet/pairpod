@@ -626,7 +626,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
                   />
                 ))
               ) : (
-                <article className="post-comment post-comment--blue">
+                <article className="post-comment post-comment--blue post-comment--empty">
                   <div className="post-comment__avatar">A</div>
                   <div className="post-comment__body">
                     <header>
