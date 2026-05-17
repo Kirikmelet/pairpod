@@ -12,8 +12,14 @@ const env = await loadEnvLocal(root);
 const { url: supabaseUrl, key: supabaseKey } = requireSupabaseEnv(env);
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const supabaseOrigin = new URL(supabaseUrl).origin;
-const siteOrigin = new URL(env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").origin;
-const hostPermissions = [`${supabaseOrigin}/*`, `${siteOrigin}/*`];
+const supabaseRealtimeOrigin = supabaseOrigin.replace(/^https:/, "wss:");
+const siteUrl = env.NEXT_PUBLIC_SITE_URL?.trim();
+const hostPermissions = [`${supabaseOrigin}/*`];
+
+if (siteUrl) {
+  const siteOrigin = new URL(siteUrl).origin;
+  hostPermissions.push(`${siteOrigin}/*`);
+}
 
 manifest.host_permissions = Array.from(new Set(hostPermissions));
 manifest.permissions = Array.from(
@@ -22,6 +28,14 @@ manifest.permissions = Array.from(
 manifest.action = {
   ...(manifest.action ?? {}),
   default_popup: "login.html",
+};
+manifest.content_security_policy = {
+  ...(manifest.content_security_policy ?? {}),
+  extension_pages: [
+    "script-src 'self'",
+    "object-src 'self'",
+    `connect-src 'self' ${supabaseOrigin} ${supabaseRealtimeOrigin}`,
+  ].join("; "),
 };
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 await writeExtensionLoginAssets();

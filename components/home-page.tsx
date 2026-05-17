@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
+import { AuthForm } from "@/components/auth-form";
 import { ChatPage } from "@/components/chat-page";
 import { PodSelectionPage } from "@/components/pod-selection-page";
 import { PostDetailPage, PostStreamPage } from "@/components/post-stream-page";
@@ -26,6 +27,7 @@ type ExtensionRuntime = {
 export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const refreshUser = useCallback(async () => {
     const supabase = createClient();
@@ -36,6 +38,7 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
       return;
     }
 
+    setAuthError(null);
     setUser(data.user);
   }, []);
 
@@ -69,6 +72,7 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
       .catch(() => {
         if (isMounted) {
           setUser(null);
+          setAuthError("Could not complete sign in. Please try again.");
         }
       })
       .finally(() => {
@@ -101,12 +105,7 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
 
   if (!user) {
     if (isPopup) {
-      redirectToStaticLogin();
-      return (
-        <AppShell isPopup={isPopup} title="PairPod - Sign in">
-          <p className="status-note">Opening sign in...</p>
-        </AppShell>
-      );
+      return <StaticLoginRedirect isPopup={isPopup} />;
     }
 
     return (
