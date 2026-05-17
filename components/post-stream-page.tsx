@@ -88,6 +88,8 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
 
   /* -- handlers ---------------------------------------------------- */
   const handleSubmit = async (event: FormEvent) => {
+    const endpoint = mode === "question" ? "/api/questions" : "/api/guides";
+
     event.preventDefault();
 
     if (!bundle || !content.trim()) {
@@ -98,7 +100,6 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
     setSubmitError(null);
 
     try {
-      const endpoint = mode === "question" ? "/api/questions" : "/api/guides";
 
       await postJson(endpoint, {
         /* DB column: room_id (uuid) */
