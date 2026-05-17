@@ -2,7 +2,7 @@ import { logEvent } from '@/lib/server/helpers/logEvent'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
 import { createPost } from '@/lib/server/discussions'
 import { findOrCreateDefaultRoom } from '@/lib/server/pages'
-import { getCurrentUserProfile } from '@/lib/server/profiles'
+import { getCurrentUserProfile } from '@/lib/server/profile'
 
 type ChatRequestBody = {
   roomId?: unknown

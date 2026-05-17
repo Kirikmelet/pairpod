@@ -2,7 +2,7 @@ import 'server-only'
 
 import { cookies } from 'next/headers'
 import { normalizeUrl } from '@/lib/server/helpers/normalizeUrl'
-import { loadUserProfiles, type UserProfileRow } from '@/lib/server/profiles'
+import { loadUserProfiles, type UserProfileRow } from '@/lib/server/profile'
 import { createClient } from '@/utils/supabase/server'
 
 export type PageRow = {

@@ -22,31 +22,6 @@ type UserProfileRow = {
   configurations: Json;
   avatar_url: string | null;
 };
-
-type MutableUsersTable = {
-  select(columns: string): {
-    eq(column: string, value: string): {
-      limit(count: number): Promise<{ data: UserProfileRow[] | null; error: Error | null }>;
-    };
-  };
-  upsert(
-    value: Partial<UserProfileRow> & { id: string },
-    options?: { onConflict?: string },
-  ): {
-    select(columns: string): {
-      limit(count: number): Promise<{ data: UserProfileRow[] | null; error: Error | null }>;
-    };
-  };
-  update(value: Partial<UserProfileRow>): {
-    eq(column: string, value: string): {
-      select(columns: string): {
-        limit(count: number): Promise<{ data: UserProfileRow[] | null; error: Error | null }>;
-      };
-    };
-  };
-};
-
-const PROFILE_COLUMNS = "id,email,username,configurations,avatar_url";
 const DEFAULT_AVATAR_URL =
   "https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png";
 
@@ -72,6 +47,14 @@ export function ProfileSettingsPage({
     [authEmail, displayName, username],
   );
 
+  function hydrateForm(nextProfile: UserProfileRow) {
+    const configuration = readConfiguration(nextProfile.configurations);
+    setProfile(nextProfile);
+    setUsername(nextProfile.username ?? "");
+    setDisplayName(configuration.displayName ?? "");
+    setAvatarUrl(nextProfile.avatar_url || DEFAULT_AVATAR_URL);
+  }
+
   useEffect(() => {
     let isMounted = true;
 
@@ -80,47 +63,13 @@ export function ProfileSettingsPage({
       setError(null);
 
       try {
-        const supabase = createClient();
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
-
-        if (authError || !user) {
-          throw new Error("You must be signed in to edit your profile.");
-        }
-
-        const users = supabase.from("users") as unknown as MutableUsersTable;
-        const { data, error: loadError } = await users
-          .select(PROFILE_COLUMNS)
-          .eq("id", user.id)
-          .limit(1);
-
-        if (loadError) {
-          throw loadError;
-        }
-
-        const existing = data?.[0] ?? null;
-        const nextProfile =
-          existing ??
-          (await upsertProfile({
-            id: user.id,
-            email: user.email ?? null,
-            username: readMetadataString(user.user_metadata.username),
-            configurations: {
-              displayName:
-                readMetadataString(user.user_metadata.full_name) ||
-                readMetadataString(user.user_metadata.name),
-            },
-            avatar_url:
-              readMetadataString(user.user_metadata.avatar_url) || DEFAULT_AVATAR_URL,
-          }));
+        const nextProfile = await loadProfileRequest();
 
         if (!isMounted) {
           return;
         }
 
-        setAuthEmail(user.email ?? null);
+        setAuthEmail(nextProfile.email ?? null);
         hydrateForm(nextProfile);
       } catch (profileError) {
         if (isMounted) {
@@ -144,14 +93,6 @@ export function ProfileSettingsPage({
     };
   }, []);
 
-  const hydrateForm = (nextProfile: UserProfileRow) => {
-    const configuration = readConfiguration(nextProfile.configurations);
-    setProfile(nextProfile);
-    setUsername(nextProfile.username ?? "");
-    setDisplayName(configuration.displayName ?? "");
-    setAvatarUrl(nextProfile.avatar_url || DEFAULT_AVATAR_URL);
-  };
-
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -164,13 +105,10 @@ export function ProfileSettingsPage({
     setStatus(null);
 
     try {
-      const nextProfile = await updateProfile(profile.id, {
+      const nextProfile = await updateProfile({
         username: normalizeOptionalText(username),
-        configurations: {
-          ...readConfiguration(profile.configurations),
-          displayName: normalizeOptionalText(displayName),
-        },
-        avatar_url: avatarUrl,
+        displayName: normalizeOptionalText(displayName),
+        avatarUrl,
       });
 
       hydrateForm(nextProfile);
@@ -201,27 +139,7 @@ export function ProfileSettingsPage({
 
     try {
       const resized = await resizePngToAvatar(file);
-      const supabase = createClient();
-      const path = `${profile.id}/avatar.png`;
-      const { error: uploadError } = await supabase.storage
-        .from("profile_pictures")
-        .upload(path, resized, {
-          cacheControl: "3600",
-          contentType: "image/png",
-          upsert: true,
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      const { data } = supabase.storage.from("profile_pictures").getPublicUrl(path);
-      const nextAvatarUrl = `${data.publicUrl}?v=${Date.now()}`;
-      setAvatarUrl(nextAvatarUrl);
-
-      const nextProfile = await updateProfile(profile.id, {
-        avatar_url: nextAvatarUrl,
-      });
+      const nextProfile = await uploadAvatar(resized);
       hydrateForm(nextProfile);
       setStatus("Avatar updated.");
     } catch (uploadError) {
@@ -416,43 +334,119 @@ function goBack(fallbackHref: string) {
   }, 120);
 }
 
-async function upsertProfile(profile: UserProfileRow) {
-  const supabase = createClient();
-  const users = supabase.from("users") as unknown as MutableUsersTable;
-  const { data, error } = await users
-    .upsert(profile, { onConflict: "id" })
-    .select(PROFILE_COLUMNS)
-    .limit(1);
+async function loadProfileRequest() {
+  const response = await fetchProfileApi("/api/profile", {
+    method: "GET",
+  });
 
-  if (error) {
-    throw error;
-  }
-
-  if (!data?.[0]) {
-    throw new Error("Could not create your profile.");
-  }
-
-  return data[0];
+  return toUserProfileRow(response);
 }
 
-async function updateProfile(id: string, patch: Partial<UserProfileRow>) {
+async function updateProfile(patch: {
+  username?: string | null;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+}) {
+  const response = await fetchProfileApi("/api/profile", {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  return toUserProfileRow(response);
+}
+
+async function uploadAvatar(file: Blob) {
+  const formData = new FormData();
+  formData.set("file", file, "avatar.png");
+
+  const response = await fetchProfileApi("/api/profile/avatar", {
+    method: "POST",
+    body: formData,
+  });
+
+  return toUserProfileRow(response);
+}
+
+async function fetchProfileApi(pathname: string, init: RequestInit) {
+  const remoteApiUrl = getRemoteApiUrl(pathname);
   const supabase = createClient();
-  const users = supabase.from("users") as unknown as MutableUsersTable;
-  const { data, error } = await users
-    .update(patch)
-    .eq("id", id)
-    .select(PROFILE_COLUMNS)
-    .limit(1);
+  const { data, error } = await supabase.auth.getSession();
+  const session = data.session;
+  const user = session?.user ?? null;
 
   if (error) {
     throw error;
   }
 
-  if (!data?.[0]) {
-    throw new Error("Could not update your profile.");
+  if (!session?.access_token || !user) {
+    throw new Error("You must be signed in to edit your profile.");
   }
 
-  return data[0];
+  const isExtension = Boolean(getExtensionRuntime()?.runtime?.id);
+  const target = isExtension && remoteApiUrl ? remoteApiUrl : pathname;
+  const response = await fetch(target, {
+    ...init,
+    headers: buildProfileRequestHeaders(
+      init.headers,
+      session.access_token,
+      target !== pathname,
+    ),
+  });
+  const payload = (await response.json()) as
+    | { ok: true; data: ProfileApiResponse }
+    | { ok: false; error: string };
+
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.ok ? "Could not update your profile." : payload.error);
+  }
+
+  return payload.data;
+}
+
+type ProfileApiResponse = {
+  id: string;
+  email: string | null;
+  username: string | null;
+  displayName: string | null;
+  avatarUrl: string;
+};
+
+function toUserProfileRow(profile: ProfileApiResponse): UserProfileRow {
+  return {
+    id: profile.id,
+    email: profile.email,
+    username: profile.username,
+    configurations: {
+      displayName: profile.displayName,
+    },
+    avatar_url: profile.avatarUrl || DEFAULT_AVATAR_URL,
+  };
+}
+
+function getRemoteApiUrl(pathname: string) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (!siteUrl) {
+    return null;
+  }
+
+  return new URL(pathname, siteUrl.endsWith("/") ? siteUrl : `${siteUrl}/`).toString();
+}
+
+function buildProfileRequestHeaders(
+  headers: HeadersInit | undefined,
+  accessToken: string,
+  includeAuthorization: boolean,
+) {
+  const nextHeaders = new Headers(headers);
+
+  if (includeAuthorization) {
+    nextHeaders.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  return nextHeaders;
 }
 
 async function resizePngToAvatar(file: File) {
@@ -520,10 +514,6 @@ function readConfiguration(configurations: Json) {
 
 function normalizeOptionalText(value: string) {
   return value.trim() || null;
-}
-
-function readMetadataString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function ProfileBackground() {
