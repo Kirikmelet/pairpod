@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { logEvent } from '@/lib/server/helpers/logEvent'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
 import { createComment } from '@/lib/server/discussions'
+import { getCurrentUserProfile } from '@/lib/server/profiles'
 import { createClient } from '@/utils/supabase/server'
 
 type AnswerRequestBody = {
@@ -25,7 +26,7 @@ export async function POST(request: Request): Promise<Response> {
   const replyId = typeof body.replyId === 'string' ? body.replyId.trim() : null
   const postId = typeof body.postId === 'string' ? body.postId.trim() : null
   const sectionId = typeof body.sectionId === 'string' ? body.sectionId.trim() : null
-  const userId = typeof body.userId === 'string' ? body.userId.trim() : null
+  const requestUserId = typeof body.userId === 'string' ? body.userId.trim() : null
 
   if (!content) {
     return jsonError('content is required', 400)
@@ -37,6 +38,8 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     let resolvedPostId = postId || sectionId?.replace(/^post:/, '') || ''
+    const profile = await getCurrentUserProfile()
+    const userId = profile?.id ?? requestUserId
 
     if (!resolvedPostId && replyId) {
       const supabase = createClient(await cookies())
