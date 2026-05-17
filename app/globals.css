@@ -1539,6 +1539,10 @@ body {
   padding: var(--space-sm) var(--space-md);
 }
 
+.pod-user-tile > div {
+  min-width: 0;
+}
+
 .pod-user-avatar {
   width: 62px;
   height: 62px;
@@ -1560,6 +1564,9 @@ body {
   color: #111b64;
   font-size: var(--fs-xl);
   line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pod-user-tile p {
@@ -1572,8 +1579,10 @@ body {
 }
 
 .pod-user-menu {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
+  align-self: center;
+  justify-self: end;
   display: grid;
   place-items: center;
   border: 1.5px solid rgba(80,80,210,0.30);
@@ -1582,7 +1591,8 @@ body {
     linear-gradient(180deg, rgba(255,255,255,0.78), rgba(255,255,255,0.18) 48%),
     linear-gradient(180deg, #e4dcff, #9f92ff);
   color: #3924be;
-  font-size: 24px;
+  font-size: var(--fs-xl);
+  line-height: 1;
   font-weight: var(--fw-extrabold);
   box-shadow: var(--shadow-sm);
   cursor: pointer;

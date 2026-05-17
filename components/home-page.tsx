@@ -143,19 +143,10 @@ function ExtensionPopupApp({
         }
       }}
     >
-      <div className="app-user-bar extension-app__bar">
-        <p className="app-user-bar__identity">
-          {getDisplayIdentity(user)}
-          {user.app_metadata?.provider === "google" ? " - Google" : null}
-        </p>
-        <button type="button" onClick={onSignOut} className="text-button">
-          Sign out
-        </button>
-      </div>
       {route.kind === "chat" ? (
         <ChatPage />
       ) : route.kind === "posts" ? (
-        <PostStreamPage />
+        <PostStreamPage variant="popup" />
       ) : route.kind === "post-detail" ? (
         <PostDetailPage postId={route.postId} />
       ) : (
@@ -196,15 +187,6 @@ function useExtensionHashRoute():
   }
 
   return { kind: "home" };
-}
-
-function getDisplayIdentity(user: User) {
-  const fullName =
-    typeof user.user_metadata?.full_name === "string"
-      ? user.user_metadata.full_name.trim()
-      : "";
-
-  return fullName || user.email || "Authenticated user";
 }
 
 type AppShellProps = {

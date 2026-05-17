@@ -6,6 +6,10 @@ import { createClient } from "@/utils/supabase/client";
 import type { Json, TablesInsert } from "@/utils/database.types";
 
 const FALLBACK_URL = "https://example.com";
+const DEFAULT_PORTS = new Map([
+  ["http:", "80"],
+  ["https:", "443"],
+]);
 
 export type PageRecord = {
   id: string;
@@ -128,11 +132,40 @@ export async function postJson<TResponse>(
   return payload.data;
 }
 
+export async function updatePostLikes(post: PostRecord, delta: 1 | -1) {
+  const supabase = createClient();
+  const nextLikes = Math.max(0, post.likes + delta);
+  const { error } = await supabase
+    .from("posts")
+    .update({ likes: nextLikes })
+    .eq("id", post.id);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function updateCommentLikes(comment: CommentRecord, delta: 1 | -1) {
+  const supabase = createClient();
+  const nextLikes = Math.max(0, comment.likes + delta);
+  const { error } = await supabase
+    .from("comments")
+    .update({ likes: nextLikes })
+    .eq("id", comment.id);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export function usePageBundle(): UsePageBundleResult {
   const searchParams = useSearchParams();
   const searchString = searchParams.toString();
 
-  const currentUrl = useMemo(() => resolveCurrentUrl(searchParams), [searchParams, searchString]);
+  const currentUrl = useMemo(
+    () => normalizePageUrl(resolveCurrentUrl(searchParams)),
+    [searchParams, searchString],
+  );
   const currentTitle = useMemo(
     () => searchParams.get("title")?.trim() || getDocumentTitle(),
     [searchParams, searchString],
@@ -265,7 +298,7 @@ async function postDirectToSupabase<TResponse>(
 }
 
 async function loadOrCreatePageBundle(url: string): Promise<PageBundle> {
-  const page = await findOrCreatePage(url);
+  const page = await findOrCreatePage(normalizePageUrl(url));
   const room = await findOrCreateRoom(page.id);
   const supabase = createClient();
 
@@ -306,11 +339,12 @@ async function loadOrCreatePageBundle(url: string): Promise<PageBundle> {
 }
 
 async function findOrCreatePage(url: string): Promise<PageRecord> {
+  const normalizedUrl = normalizePageUrl(url);
   const supabase = createClient();
   const { data: existingPages, error: loadError } = await supabase
     .from("pages")
     .select("*")
-    .eq("normalized_url", url)
+    .eq("normalized_url", normalizedUrl)
     .limit(1);
 
   if (loadError) {
@@ -323,7 +357,7 @@ async function findOrCreatePage(url: string): Promise<PageRecord> {
 
   const { data: createdPages, error: createError } = await supabase
     .from("pages")
-    .insert({ normalized_url: url })
+    .insert({ normalized_url: normalizedUrl })
     .select("*")
     .limit(1);
 
@@ -331,7 +365,7 @@ async function findOrCreatePage(url: string): Promise<PageRecord> {
     const { data: racedPages, error: racedError } = await supabase
       .from("pages")
       .select("*")
-      .eq("normalized_url", url)
+      .eq("normalized_url", normalizedUrl)
       .limit(1);
 
     if (racedError || !racedPages?.[0]) {
@@ -477,6 +511,40 @@ function readString(value: unknown) {
 function readNullableString(value: unknown) {
   const text = readString(value);
   return text || null;
+}
+
+function normalizePageUrl(input: string) {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return FALLBACK_URL;
+  }
+
+  try {
+    const withProtocol = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmed)
+      ? trimmed
+      : `https://${trimmed}`;
+    const url = new URL(withProtocol);
+
+    url.hash = "";
+    url.hostname = url.hostname.toLowerCase();
+
+    const defaultPort = DEFAULT_PORTS.get(url.protocol);
+    if (defaultPort && url.port === defaultPort) {
+      url.port = "";
+    }
+
+    if (url.pathname !== "/") {
+      url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+    }
+
+    const sortedSearchParams = new URLSearchParams(url.searchParams);
+    sortedSearchParams.sort();
+    url.search = sortedSearchParams.toString();
+
+    return url.toString();
+  } catch {
+    return FALLBACK_URL;
+  }
 }
 
 function isExtensionRuntime() {
