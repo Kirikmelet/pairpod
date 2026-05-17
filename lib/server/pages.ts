@@ -1,8 +1,7 @@
 import 'server-only'
 
-import { cookies } from 'next/headers'
 import { normalizeUrl } from '@/lib/server/helpers/normalizeUrl'
-import { createClient } from '@/utils/supabase/server'
+import { supabaseAdmin } from '@/lib/server/supabaseAdmin'
 
 export type PageRow = {
   id: string
@@ -28,7 +27,10 @@ export type PostRow = {
   likes: number
   user_id: string | null
   created_at: string
+  author: AuthorProfile | null
 }
+
+type PostRecord = Omit<PostRow, 'author'>
 
 export type CommentRow = {
   id: string
@@ -39,6 +41,16 @@ export type CommentRow = {
   user_id: string | null
   created_at: string
   section_id: string | null
+  author: AuthorProfile | null
+}
+
+type CommentRecord = Omit<CommentRow, 'author' | 'section_id'>
+
+export type AuthorProfile = {
+  id: string
+  username: string | null
+  displayName: string | null
+  avatarUrl: string | null
 }
 
 export type PageBundle = {
@@ -57,9 +69,8 @@ export async function loadOrCreatePageRoom(url: string): Promise<PageBundle> {
 
 export async function findOrCreatePage(url: string): Promise<PageRow> {
   const normalizedUrl = normalizeUrl(url)
-  const supabase = createClient(await cookies())
 
-  const { data: existingPage, error: existingPageError } = await supabase
+  const { data: existingPage, error: existingPageError } = await supabaseAdmin
     .from('pages')
     .select('*')
     .eq('normalized_url', normalizedUrl)
@@ -73,7 +84,7 @@ export async function findOrCreatePage(url: string): Promise<PageRow> {
     return existingPage
   }
 
-  const { data: createdPage, error: createError } = await supabase
+  const { data: createdPage, error: createError } = await supabaseAdmin
     .from('pages')
     .insert({
       normalized_url: normalizedUrl,
@@ -89,9 +100,7 @@ export async function findOrCreatePage(url: string): Promise<PageRow> {
 }
 
 export async function findOrCreateDefaultRoom(pageId: string): Promise<RoomRow> {
-  const supabase = createClient(await cookies())
-
-  const { data: rooms, error: roomsError } = await supabase
+  const { data: rooms, error: roomsError } = await supabaseAdmin
     .from('rooms')
     .select('*')
     .eq('page_id', pageId)
@@ -108,7 +117,7 @@ export async function findOrCreateDefaultRoom(pageId: string): Promise<RoomRow> 
     return existingRoom
   }
 
-  const { data: createdRoom, error: createError } = await supabase
+  const { data: createdRoom, error: createError } = await supabaseAdmin
     .from('rooms')
     .insert({
       page_id: pageId,
@@ -124,12 +133,10 @@ export async function findOrCreateDefaultRoom(pageId: string): Promise<RoomRow> 
 }
 
 export async function getPageBundle(pageId: string, roomId: string): Promise<PageBundle> {
-  const supabase = createClient(await cookies())
-
   const [pageResult, roomResult, postsResult] = await Promise.all([
-    supabase.from('pages').select('*').eq('id', pageId).single<PageRow>(),
-    supabase.from('rooms').select('*').eq('id', roomId).single<RoomRow>(),
-    supabase.from('posts').select('*').eq('room_id', roomId).order('created_at', { ascending: true }).returns<PostRow[]>(),
+    supabaseAdmin.from('pages').select('*').eq('id', pageId).single<PageRow>(),
+    supabaseAdmin.from('rooms').select('*').eq('id', roomId).single<RoomRow>(),
+    supabaseAdmin.from('posts').select('*').eq('room_id', roomId).order('created_at', { ascending: true }).returns<PostRecord[]>(),
   ])
 
   if (pageResult.error) {
@@ -150,12 +157,12 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
   let comments: CommentRow[] = []
 
   if (postIds.length > 0) {
-    const { data: commentsData, error: commentsError } = await supabase
+    const { data: commentsData, error: commentsError } = await supabaseAdmin
       .from('comments')
       .select('*')
       .in('post_id', postIds)
       .order('created_at', { ascending: true })
-      .returns<Array<Omit<CommentRow, 'section_id'>>>()
+      .returns<CommentRecord[]>()
 
     if (commentsError) {
       throw new Error(`Failed to load comments: ${commentsError.message}`)
@@ -165,13 +172,57 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
       commentsData?.map((comment) => ({
         ...comment,
         section_id: `post:${comment.post_id}`,
+        author: null,
       })) ?? []
   }
+
+  const authorById = await getAuthorProfilesById(
+    [...posts, ...comments].map((entry) => entry.user_id).filter(Boolean) as string[],
+  )
+
+  const enrichedPosts = posts.map((post) => ({
+    ...post,
+    author: post.user_id ? authorById.get(post.user_id) ?? null : null,
+  }))
+
+  const enrichedComments = comments.map((comment) => ({
+    ...comment,
+    author: comment.user_id ? authorById.get(comment.user_id) ?? null : null,
+  }))
 
   return {
     page: pageResult.data,
     room: roomResult.data,
-    posts,
-    comments,
+    posts: enrichedPosts,
+    comments: enrichedComments,
   }
+}
+
+async function getAuthorProfilesById(userIds: string[]): Promise<Map<string, AuthorProfile>> {
+  const uniqueUserIds = [...new Set(userIds.map((userId) => userId.trim()).filter(Boolean))]
+  if (uniqueUserIds.length === 0) {
+    return new Map<string, AuthorProfile>()
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('id, username, display_name, avatar_url')
+    .in('id', uniqueUserIds)
+    .returns<Array<{ id: string; username: string | null; display_name: string | null; avatar_url: string | null }>>()
+
+  if (error) {
+    throw new Error(`Failed to load author profiles: ${error.message}`)
+  }
+
+  return new Map(
+    (data ?? []).map((profile) => [
+      profile.id,
+      {
+        id: profile.id,
+        username: profile.username,
+        displayName: profile.display_name,
+        avatarUrl: profile.avatar_url,
+      },
+    ]),
+  )
 }

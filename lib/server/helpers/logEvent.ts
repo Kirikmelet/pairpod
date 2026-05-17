@@ -1,7 +1,6 @@
 import 'server-only'
 
-import { cookies } from 'next/headers'
-import { createClient } from '@/utils/supabase/server'
+import { supabaseAdmin } from '@/lib/server/supabaseAdmin'
 import type { Json } from '@/utils/database.types'
 
 export type LogEventInput = {
@@ -28,9 +27,7 @@ export async function logEvent({
       throw new Error('eventType is required')
     }
 
-    const supabase = createClient(await cookies())
-
-    const { error } = await supabase.from('events').insert({
+    const { error } = await supabaseAdmin.from('events').insert({
       user_id: userId,
       page_id: pageId,
       room_id: roomId,

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { resolveAuthenticatedProfileIdOrFallback } from "@/lib/server/profile";
 import { createClient } from "@/utils/supabase/server";
 import type { TablesInsert } from "@/utils/database.types";
 
@@ -36,6 +37,9 @@ export async function POST(request: Request) {
   const body = await request.json();
   const roomId = body.room_id as string | undefined;
   const content = body.content as string | undefined;
+  const resolvedUserId = await resolveAuthenticatedProfileIdOrFallback(
+    (body.user_id as string | undefined) ?? null,
+  );
 
   if (!roomId || !content) {
     return NextResponse.json(
@@ -49,7 +53,7 @@ export async function POST(request: Request) {
     room_id: roomId,
     content,
     type: (body.type as string | undefined) ?? "message",
-    user_id: (body.user_id as string | undefined) ?? null,
+    user_id: resolvedUserId,
     header: (body.header as string | undefined) ?? null,
     section_id: (body.section_id as string | undefined) ?? null,
   };

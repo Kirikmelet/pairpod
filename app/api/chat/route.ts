@@ -1,5 +1,6 @@
 import { logEvent } from '@/lib/server/helpers/logEvent'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
+import { resolveAuthenticatedProfileIdOrFallback } from '@/lib/server/profile'
 import { createPost } from '@/lib/server/discussions'
 import { findOrCreateDefaultRoom } from '@/lib/server/pages'
 
@@ -32,10 +33,11 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const resolvedRoomId = roomId || (await findOrCreateDefaultRoom(pageId)).id
+    const resolvedUserId = await resolveAuthenticatedProfileIdOrFallback(userId)
 
     const data = await createPost({
       roomId: resolvedRoomId,
-      userId,
+      userId: resolvedUserId,
       type: 'chat',
       content: message,
       sectionId,
@@ -46,7 +48,7 @@ export async function POST(request: Request): Promise<Response> {
       pageId: pageId || null,
       roomId: resolvedRoomId,
       postId: data.id,
-      userId,
+      userId: resolvedUserId,
       payload: {
         type: data.type,
         sectionId: data.section_id,

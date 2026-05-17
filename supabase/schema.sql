@@ -20,10 +20,13 @@ create table if not exists users (
   id uuid primary key default gen_random_uuid(),
   auth_user_id uuid unique,
   username text unique,
+  display_name text,
+  avatar_url text,
   email text,
   url text,
   configurations jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists pages (

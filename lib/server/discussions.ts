@@ -1,7 +1,6 @@
 import 'server-only'
 
-import { cookies } from 'next/headers'
-import { createClient } from '@/utils/supabase/server'
+import { supabaseAdmin } from '@/lib/server/supabaseAdmin'
 
 const ALLOWED_POST_TYPES = ['chat', 'question', 'guide'] as const
 
@@ -72,9 +71,7 @@ export async function createPost({
     throw new Error('content is required')
   }
 
-  const supabase = createClient(await cookies())
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('posts')
     .insert({
       room_id: trimmedRoomId,
@@ -113,10 +110,8 @@ export async function createComment({
     throw new Error('content is required')
   }
 
-  const supabase = createClient(await cookies())
-
   if (trimmedReplyId) {
-    const { data: parentComment, error: parentError } = await supabase
+    const { data: parentComment, error: parentError } = await supabaseAdmin
       .from('comments')
       .select('post_id')
       .eq('id', trimmedReplyId)
@@ -131,7 +126,7 @@ export async function createComment({
     }
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('comments')
     .insert({
       post_id: trimmedPostId,

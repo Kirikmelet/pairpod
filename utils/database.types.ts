@@ -280,8 +280,11 @@ export type Database = {
           auth_user_id: string | null
           configurations: Json
           created_at: string
+          display_name: string | null
           email: string | null
           id: string
+          avatar_url: string | null
+          updated_at: string
           url: string | null
           username: string | null
         }
@@ -289,8 +292,11 @@ export type Database = {
           auth_user_id?: string | null
           configurations?: Json
           created_at?: string
+          display_name?: string | null
           email?: string | null
           id?: string
+          avatar_url?: string | null
+          updated_at?: string
           url?: string | null
           username?: string | null
         }
@@ -298,8 +304,11 @@ export type Database = {
           auth_user_id?: string | null
           configurations?: Json
           created_at?: string
+          display_name?: string | null
           email?: string | null
           id?: string
+          avatar_url?: string | null
+          updated_at?: string
           url?: string | null
           username?: string | null
         }
