@@ -20,20 +20,39 @@ export async function logEvent({
   roomId = null,
   postId = null,
   commentId = null,
-}: LogEventInput): Promise<void> {
-  const supabase = getSupabaseAdmin()
+}: LogEventInput): Promise<boolean> {
+  try {
+    if (!eventType.trim()) {
+      throw new Error('eventType is required')
+    }
 
-  const { error } = await supabase.from('events').insert({
-    user_id: userId,
-    page_id: pageId,
-    room_id: roomId,
-    post_id: postId,
-    comment_id: commentId,
-    event_type: eventType,
-    payload,
-  })
+    const supabase = getSupabaseAdmin()
 
-  if (error) {
-    throw new Error(`Failed to log event: ${error.message}`)
+    const { error } = await supabase.from('events').insert({
+      user_id: userId,
+      page_id: pageId,
+      room_id: roomId,
+      post_id: postId,
+      comment_id: commentId,
+      event_type: eventType,
+      payload,
+    })
+
+    if (error) {
+      throw new Error(`Failed to log event: ${error.message}`)
+    }
+
+    return true
+  } catch (error) {
+    console.error('logEvent failed', {
+      error,
+      eventType,
+      userId,
+      pageId,
+      roomId,
+      postId,
+      commentId,
+    })
+    return false
   }
 }

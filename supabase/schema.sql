@@ -54,7 +54,7 @@ create table if not exists posts (
 
 create table if not exists comments (
   id uuid primary key default gen_random_uuid(),
-  section_id text,
+  post_id uuid not null references posts(id) on delete cascade,
   reply_id uuid references comments(id) on delete cascade,
   content text not null,
   likes integer not null default 0,
@@ -84,7 +84,7 @@ alter table events enable row level security;
 create index if not exists idx_rooms_page_id on rooms(page_id);
 create index if not exists idx_posts_room_id on posts(room_id);
 create index if not exists idx_posts_user_id on posts(user_id);
-create index if not exists idx_comments_section_id on comments(section_id);
+create index if not exists idx_comments_post_id on comments(post_id);
 create index if not exists idx_comments_reply_id on comments(reply_id);
 create index if not exists idx_comments_user_id on comments(user_id);
 create index if not exists idx_events_user_id on events(user_id);
