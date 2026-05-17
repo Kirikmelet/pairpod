@@ -12,6 +12,7 @@ import {
   usePageBundle,
 } from "@/lib/client/page-api";
 import { createHumanFakeChatDirect } from "@/lib/client/fake-chat";
+import { DmNotificationBadge } from "@/components/dm-notification-badge";
 import { getDmPath, startDirectMessage } from "@/lib/client/dms";
 import { playSfx, useErrorSfx } from "@/lib/client/sfx";
 import { getUserProfilePath } from "@/lib/client/users";
@@ -269,7 +270,10 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
             >
               {domainName}
             </a>
-            <a href={getDmPath("/dms")}>DMs</a>
+            <a className="nav-with-badge" href={getDmPath("/dms")}>
+              DMs
+              <DmNotificationBadge />
+            </a>
             <a href={buildScopedHref("/peers")}>3D Peers</a>
           </nav>
 

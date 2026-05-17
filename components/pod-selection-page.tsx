@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import {
   DEFAULT_AVATAR_URL,
   formatTimestamp,
@@ -11,6 +11,7 @@ import {
   useCurrentUserProfile,
   usePageBundle,
 } from "@/lib/client/page-api";
+import { DmNotificationBadge } from "@/components/dm-notification-badge";
 import { useErrorSfx } from "@/lib/client/sfx";
 import { createClient } from "@/utils/supabase/client";
 
@@ -44,6 +45,7 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
   const [customDomain, setCustomDomain] = useState("");
   const [podName, setPodName] = useState("");
   const [podSlug, setPodSlug] = useState("");
+  const [didEditPodSlug, setDidEditPodSlug] = useState(false);
   useErrorSfx(error);
 
   const posts = bundle?.posts ?? [];
@@ -53,6 +55,15 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
   const currentUserName = profile
     ? getDisplayName(profile.id, { [profile.id]: profile })
     : (userEmail ?? "Signed in user");
+  const normalizedPodSlug = normalizePodSlug(podSlug || podName);
+  const createdPodUrl = normalizedPodSlug ? `https://${normalizedPodSlug}.pairpod.local/` : "";
+  const createdPodHref = useMemo(
+    () =>
+      createdPodUrl
+        ? buildCreatedPodHref("/", createdPodUrl, podName.trim() || normalizedPodSlug)
+        : "",
+    [createdPodUrl, normalizedPodSlug, podName],
+  );
 
   const handleCustomDomainSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -68,12 +79,11 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
     event.preventDefault();
     const name = podName.trim();
     const slug = normalizePodSlug(podSlug || name);
-    if (!slug || typeof window === "undefined") {
+    if (!slug || !createdPodHref || typeof window === "undefined") {
       return;
     }
 
-    const podUrl = `https://${slug}.pairpod.local/`;
-    window.location.href = buildDomainHref("/", podUrl);
+    window.location.href = createdPodHref;
   };
 
   const recentPosts: Activity[] = posts.slice(-3).reverse().map((post) => ({
@@ -149,6 +159,7 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
                   </a>
                   <a className="room-scope-tabs__dm" href={buildScopedHref("/dms")}>
                     DMs
+                    <DmNotificationBadge />
                   </a>
                   <a href={buildScopedHref("/peers")}>3D Peers</a>
                 </div>
@@ -179,9 +190,10 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
                       id="pod-name-input"
                       value={podName}
                       onChange={(event) => {
-                        setPodName(event.target.value);
-                        if (!podSlug.trim()) {
-                          setPodSlug(normalizePodSlug(event.target.value));
+                        const nextName = event.target.value;
+                        setPodName(nextName);
+                        if (!didEditPodSlug) {
+                          setPodSlug(normalizePodSlug(nextName));
                         }
                       }}
                       placeholder="Late night build room"
@@ -193,12 +205,15 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
                     <input
                       id="pod-slug-input"
                       value={podSlug}
-                      onChange={(event) => setPodSlug(normalizePodSlug(event.target.value))}
+                      onChange={(event) => {
+                        setDidEditPodSlug(true);
+                        setPodSlug(normalizePodSlug(event.target.value));
+                      }}
                       placeholder="late-night-build"
                       maxLength={36}
                     />
                   </div>
-                  <button type="submit" disabled={!normalizePodSlug(podSlug || podName)}>
+                  <button type="submit" disabled={!createdPodHref}>
                     Create
                   </button>
                 </form>
@@ -267,24 +282,23 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
                       Make a named room that behaves like its own tiny world for chat, posts, and peers.
                     </p>
                     <p className="pod-card__meta">
-                      {normalizePodSlug(podSlug || podName) || "custom"} · pairpod.local
+                      {normalizedPodSlug || "custom"} · pairpod.local
                     </p>
                   </div>
                   <div className="pod-avatars" aria-hidden="true" />
-                  <button
+                  <a
                     className="pod-card__button"
-                    type="button"
                     aria-label="Create pod"
-                    onClick={() => {
-                      const slug = normalizePodSlug(podSlug || podName);
-                      if (slug && typeof window !== "undefined") {
-                        window.location.href = buildDomainHref("/", `https://${slug}.pairpod.local/`);
+                    href={createdPodHref || "#"}
+                    aria-disabled={!createdPodHref}
+                    onClick={(event) => {
+                      if (!createdPodHref) {
+                        event.preventDefault();
                       }
                     }}
-                    disabled={!normalizePodSlug(podSlug || podName)}
                   >
                     <span aria-hidden="true">+</span>
-                  </button>
+                  </a>
                 </article>
               </div>
             </section>
@@ -305,6 +319,31 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
       </section>
     </main>
   );
+}
+
+function buildCreatedPodHref(pathname: string, url: string, title: string) {
+  const params = new URLSearchParams({
+    room: "domain",
+    url,
+    title,
+  });
+
+  if (isExtensionRuntime()) {
+    return `#${pathname}?${params.toString()}`;
+  }
+
+  return `${pathname}?${params.toString()}`;
+}
+
+function isExtensionRuntime() {
+  const globalWithExtensionApis = globalThis as typeof globalThis & {
+    browser?: { runtime?: { id?: string } };
+    chrome?: { runtime?: { id?: string } };
+  };
+  const runtime =
+    globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
+
+  return Boolean(runtime?.runtime?.id);
 }
 
 function normalizePodSlug(value: string) {

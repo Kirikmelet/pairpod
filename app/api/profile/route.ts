@@ -7,11 +7,13 @@ import {
 } from '@/lib/server/profile'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
 import { createAdminClient } from '@/utils/supabase/admin'
+import type { Character3dConfig } from '@/lib/server/profile'
 
 type ProfilePatchBody = {
   username?: unknown
   displayName?: unknown
   avatarUrl?: unknown
+  character3d?: unknown
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -63,6 +65,7 @@ export async function PATCH(request: Request): Promise<Response> {
       username: readNullableString(body.username),
       displayName: readNullableString(body.displayName),
       avatarUrl: readNullableString(body.avatarUrl),
+      character3d: readCharacter3d(body.character3d),
     })
 
     return jsonSuccess(toProfileResponse(profile))
@@ -96,4 +99,27 @@ function handleProfileRouteError(
 
 function readNullableString(value: unknown) {
   return typeof value === 'string' ? value : null
+}
+
+function readCharacter3d(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined
+  }
+
+  const source = value as Record<string, unknown>
+  const style: Character3dConfig['style'] =
+    source.style === 'runner' || source.style === 'bot' || source.style === 'pod'
+      ? source.style
+      : 'pod'
+
+  return {
+    body: readColor(source.body),
+    accent: readColor(source.accent),
+    head: readColor(source.head),
+    style,
+  }
+}
+
+function readColor(value: unknown) {
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : undefined
 }

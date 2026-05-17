@@ -3,13 +3,14 @@
 import { useEffect, useRef } from "react";
 import { getSupabasePublicConfigOrNull } from "@/utils/supabase/config";
 
-type SoundName = "error" | "goodbye" | "im" | "welcome";
+type SoundName = "error" | "goodbye" | "im" | "mail" | "welcome";
 
 const SFX_BUCKET = "sfx";
 const SOUND_FILES: Record<SoundName, string> = {
   error: "erro.mp3",
   goodbye: "Goodbye.mp3",
   im: "IM.mp3",
+  mail: "You've Got Mail.mp3",
   welcome: "Welcome.mp3",
 };
 

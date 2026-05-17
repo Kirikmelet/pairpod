@@ -633,8 +633,12 @@ body {
   height: 104px;
 }
 
+.extension-app .character-preview {
+  transform: scale(0.82);
+}
+
 .extension-app .avatar-creator__controls {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .extension-app .profile-field input {

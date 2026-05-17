@@ -27,6 +27,25 @@ type UserProfileRow = {
   avatar_url: string | null;
   updated_at: string;
 };
+
+type Character3dConfig = {
+  body: string;
+  accent: string;
+  head: string;
+  style: "pod" | "runner" | "bot";
+};
+
+type ProfileConfiguration = {
+  displayName: string;
+  character3d: Character3dConfig;
+};
+
+const DEFAULT_CHARACTER_3D: Character3dConfig = {
+  body: "#6ebe44",
+  accent: "#2d90ff",
+  head: "#f7ffe8",
+  style: "pod",
+};
 const DEFAULT_AVATAR_URL =
   "https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png";
 const AVATAR_BUCKET = "profile_pictures";
@@ -44,10 +63,10 @@ export function ProfileSettingsPage({
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState(DEFAULT_AVATAR_URL);
-  const [avatarColor, setAvatarColor] = useState("#6ebe44");
-  const [avatarAccent, setAvatarAccent] = useState("#2d90ff");
-  const [avatarFace, setAvatarFace] = useState<"smile" | "focus" | "star">("smile");
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [characterBody, setCharacterBody] = useState(DEFAULT_CHARACTER_3D.body);
+  const [characterAccent, setCharacterAccent] = useState(DEFAULT_CHARACTER_3D.accent);
+  const [characterHead, setCharacterHead] = useState(DEFAULT_CHARACTER_3D.head);
+  const [characterStyle, setCharacterStyle] = useState<Character3dConfig["style"]>(DEFAULT_CHARACTER_3D.style);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -66,6 +85,10 @@ export function ProfileSettingsPage({
     setUsername(nextProfile.username ?? "");
     setDisplayName(nextProfile.display_name ?? configuration.displayName ?? "");
     setAvatarUrl(nextProfile.avatar_url || DEFAULT_AVATAR_URL);
+    setCharacterBody(configuration.character3d.body);
+    setCharacterAccent(configuration.character3d.accent);
+    setCharacterHead(configuration.character3d.head);
+    setCharacterStyle(configuration.character3d.style);
   }
 
   useEffect(() => {
@@ -164,57 +187,34 @@ export function ProfileSettingsPage({
     }
   };
 
-  useEffect(() => {
-    let active = true;
-
-    createGeneratedAvatarBlob({
-      body: avatarColor,
-      accent: avatarAccent,
-      face: avatarFace,
-    })
-      .then((blob) => blobToDataUrl(blob))
-      .then((dataUrl) => {
-        if (active) {
-          setAvatarPreview(dataUrl);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setAvatarPreview(null);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [avatarAccent, avatarColor, avatarFace]);
-
-  const handleGeneratedAvatarSave = async () => {
+  const handleCharacterSave = async () => {
     if (!profile) {
       return;
     }
 
-    setUploading(true);
+    setSaving(true);
     setError(null);
     setStatus(null);
 
     try {
-      const blob = await createGeneratedAvatarBlob({
-        body: avatarColor,
-        accent: avatarAccent,
-        face: avatarFace,
+      const nextProfile = await updateProfile({
+        character3d: {
+          body: characterBody,
+          accent: characterAccent,
+          head: characterHead,
+          style: characterStyle,
+        },
       });
-      const nextProfile = await uploadAvatar(blob);
       hydrateForm(nextProfile);
-      setStatus("Avatar updated.");
+      setStatus("3D character updated.");
     } catch (avatarError) {
       setError(
         avatarError instanceof Error
           ? avatarError.message
-          : "Could not save generated avatar.",
+          : "Could not save 3D character.",
       );
     } finally {
-      setUploading(false);
+      setSaving(false);
     }
   };
 
@@ -323,40 +323,51 @@ export function ProfileSettingsPage({
 
               <section className="avatar-creator" aria-label="Avatar creator">
                 <header>
-                  <p className="app-eyebrow">avatar creator</p>
-                  <h2>Build a pod</h2>
+                  <p className="app-eyebrow">3D character</p>
+                  <h2>PeerScape look</h2>
                 </header>
                 <div className="avatar-creator__preview">
-                  {avatarPreview ? <img src={avatarPreview} alt="" /> : null}
+                  <CharacterPreview
+                    body={characterBody}
+                    accent={characterAccent}
+                    head={characterHead}
+                    style={characterStyle}
+                  />
                 </div>
                 <div className="avatar-creator__controls">
                   <label>
                     <span>Body</span>
                     <input
                       type="color"
-                      value={avatarColor}
-                      onChange={(event) => setAvatarColor(event.target.value)}
+                      value={characterBody}
+                      onChange={(event) => setCharacterBody(event.target.value)}
                     />
                   </label>
                   <label>
                     <span>Accent</span>
                     <input
                       type="color"
-                      value={avatarAccent}
-                      onChange={(event) => setAvatarAccent(event.target.value)}
+                      value={characterAccent}
+                      onChange={(event) => setCharacterAccent(event.target.value)}
                     />
                   </label>
                   <label>
-                    <span>Face</span>
+                    <span>Head</span>
+                    <input
+                      type="color"
+                      value={characterHead}
+                      onChange={(event) => setCharacterHead(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Shape</span>
                     <select
-                      value={avatarFace}
-                      onChange={(event) =>
-                        setAvatarFace(event.target.value as "smile" | "focus" | "star")
-                      }
+                      value={characterStyle}
+                      onChange={(event) => setCharacterStyle(event.target.value as Character3dConfig["style"])}
                     >
-                      <option value="smile">Smile</option>
-                      <option value="focus">Focus</option>
-                      <option value="star">Star</option>
+                      <option value="pod">Pod</option>
+                      <option value="runner">Runner</option>
+                      <option value="bot">Bot</option>
                     </select>
                   </label>
                 </div>
@@ -364,9 +375,9 @@ export function ProfileSettingsPage({
                   className="profile-save-button avatar-creator__save"
                   type="button"
                   disabled={!profile || uploading || saving}
-                  onClick={() => void handleGeneratedAvatarSave()}
+                  onClick={() => void handleCharacterSave()}
                 >
-                  {uploading ? "Saving..." : "Use generated avatar"}
+                  {saving ? "Saving..." : "Save 3D character"}
                 </button>
               </section>
             </div>
@@ -427,6 +438,25 @@ function useProfileNavLinks() {
   return links;
 }
 
+function CharacterPreview({
+  body,
+  accent,
+  head,
+  style,
+}: Character3dConfig) {
+  return (
+    <div className={`character-preview character-preview--${style}`}>
+      <span className="character-preview__antenna" style={{ backgroundColor: accent }} />
+      <span className="character-preview__head" style={{ backgroundColor: head }}>
+        <i style={{ backgroundColor: accent }} />
+        <i style={{ backgroundColor: accent }} />
+      </span>
+      <span className="character-preview__body" style={{ backgroundColor: body }} />
+      <span className="character-preview__ring" style={{ borderColor: accent }} />
+    </div>
+  );
+}
+
 function getExtensionRuntime() {
   const globalWithRuntime = globalThis as typeof globalThis & {
     browser?: ExtensionRuntime;
@@ -471,6 +501,7 @@ async function updateProfile(patch: {
   username?: string | null;
   displayName?: string | null;
   avatarUrl?: string | null;
+  character3d?: Character3dConfig;
 }) {
   if (shouldUseDirectProfileAccess()) {
     return await updateProfileDirect(patch);
@@ -516,6 +547,7 @@ async function updateProfileDirect(patch: {
   username?: string | null;
   displayName?: string | null;
   avatarUrl?: string | null;
+  character3d?: Character3dConfig;
 }) {
   const { supabase, user } = await getAuthenticatedDirectProfileClient();
   const profile = await ensureDirectProfile(supabase, user);
@@ -539,6 +571,11 @@ async function updateProfileDirect(patch: {
 
   if (Object.prototype.hasOwnProperty.call(patch, "avatarUrl")) {
     nextPatch.avatar_url = patch.avatarUrl || profile.avatar_url || DEFAULT_AVATAR_URL;
+  }
+
+  if (patch.character3d) {
+    nextConfiguration.character3d = normalizeCharacter3d(patch.character3d);
+    nextPatch.configurations = nextConfiguration;
   }
 
   const { data, error } = await supabase
@@ -641,6 +678,7 @@ async function ensureDirectProfile(
       avatar_url: DEFAULT_AVATAR_URL,
       configurations: {
         displayName: displayName ?? "",
+        character3d: DEFAULT_CHARACTER_3D,
       },
       updated_at: new Date().toISOString(),
     })
@@ -738,6 +776,7 @@ type ProfileApiResponse = {
   username: string | null;
   displayName: string | null;
   avatarUrl: string;
+  character3d?: Character3dConfig;
 };
 
 function toUserProfileRow(profile: ProfileApiResponse): UserProfileRow {
@@ -748,6 +787,7 @@ function toUserProfileRow(profile: ProfileApiResponse): UserProfileRow {
     username: profile.username,
     configurations: {
       displayName: profile.displayName,
+      character3d: profile.character3d ?? DEFAULT_CHARACTER_3D,
     },
     display_name: profile.displayName,
     avatar_url: profile.avatarUrl || DEFAULT_AVATAR_URL,
@@ -963,20 +1003,40 @@ async function loadImage(src: string) {
   return image;
 }
 
-function readConfiguration(configurations: Json) {
+function readConfiguration(configurations: Json): ProfileConfiguration {
   if (
     configurations &&
     typeof configurations === "object" &&
     !Array.isArray(configurations)
   ) {
     const displayName = configurations.displayName;
+    const character3d = normalizeCharacter3d(configurations.character3d);
     return {
       ...configurations,
       displayName: typeof displayName === "string" ? displayName : "",
+      character3d,
     };
   }
 
-  return { displayName: "" };
+  return { displayName: "", character3d: DEFAULT_CHARACTER_3D };
+}
+
+function normalizeCharacter3d(value: unknown): Character3dConfig {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return DEFAULT_CHARACTER_3D;
+  }
+
+  const candidate = value as Partial<Character3dConfig>;
+  return {
+    body: normalizeColor(candidate.body) ?? DEFAULT_CHARACTER_3D.body,
+    accent: normalizeColor(candidate.accent) ?? DEFAULT_CHARACTER_3D.accent,
+    head: normalizeColor(candidate.head) ?? DEFAULT_CHARACTER_3D.head,
+    style: candidate.style === "runner" || candidate.style === "bot" ? candidate.style : "pod",
+  };
+}
+
+function normalizeColor(value: unknown) {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value) ? value : null;
 }
 
 function normalizeOptionalText(value: string) {

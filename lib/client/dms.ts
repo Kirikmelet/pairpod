@@ -17,6 +17,7 @@ export type DmMemberProfile = {
 
 type DmThreadRow = Tables<"dm_threads">;
 type DmThreadMemberRow = Tables<"dm_thread_members">;
+type DmThreadReadRow = Tables<"dm_thread_reads">;
 type DmMessageRow = Tables<"dm_messages">;
 type UserProfileRow = Tables<"users">;
 
@@ -24,6 +25,7 @@ export type DmThreadSummary = {
   id: string;
   createdAt: string;
   updatedAt: string;
+  readAt: string | null;
   members: DmMemberProfile[];
   latestMessage: {
     id: string;
@@ -32,6 +34,8 @@ export type DmThreadSummary = {
     senderId: string | null;
   } | null;
 };
+
+const DM_OPENED_STORAGE_KEY = "pairpod.dmOpenedAt";
 
 export type DmMessage = {
   id: string;
@@ -73,6 +77,84 @@ export function getDmPath(pathname: string) {
   return pathname;
 }
 
+export function getUnopenedDmThreads(
+  threads: DmThreadSummary[],
+  currentUserId: string | null | undefined,
+) {
+  if (!currentUserId) {
+    return [];
+  }
+
+  return threads.filter((thread) => {
+    const latestMessage = thread.latestMessage;
+    if (!latestMessage || latestMessage.senderId === currentUserId) {
+      return false;
+    }
+
+    const openedAt = getDmThreadOpenedAt(thread.id);
+    const persistedOpenedAt = thread.readAt ? new Date(thread.readAt).getTime() : 0;
+    return new Date(latestMessage.createdAt).getTime() > Math.max(openedAt, persistedOpenedAt);
+  });
+}
+
+export async function markDmThreadOpened(threadId: string, openedAt = new Date().toISOString()) {
+  if (typeof window === "undefined" || !threadId) {
+    return;
+  }
+
+  writeDmThreadOpenedAt(threadId, openedAt);
+
+  try {
+    const profile = await getCurrentDmProfile();
+    const now = new Date().toISOString();
+    const { error } = await createClient()
+      .from("dm_thread_reads")
+      .upsert(
+        {
+          thread_id: threadId,
+          user_id: profile.id,
+          last_opened_at: openedAt,
+          updated_at: now,
+        } satisfies TablesInsert<"dm_thread_reads">,
+        { onConflict: "thread_id,user_id" },
+      );
+
+    if (error) {
+      throw error;
+    }
+  } catch {
+    // The local write above keeps the UI responsive if the read table or RLS is not live yet.
+  }
+}
+
+function writeDmThreadOpenedAt(threadId: string, openedAt: string) {
+  try {
+    const stored = readDmOpenedMap();
+    stored[threadId] = new Date(openedAt).getTime();
+    window.localStorage.setItem(DM_OPENED_STORAGE_KEY, JSON.stringify(stored));
+  } catch {
+    // Read state is local UI memory only.
+  }
+}
+
+function getDmThreadOpenedAt(threadId: string) {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  return readDmOpenedMap()[threadId] ?? 0;
+}
+
+function readDmOpenedMap() {
+  try {
+    return JSON.parse(
+      window.localStorage.getItem(DM_OPENED_STORAGE_KEY) ?? "{}",
+    ) as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+
 function isExtensionRuntime() {
   const globalWithExtensionApis = globalThis as typeof globalThis & {
     browser?: { runtime?: { id?: string } };
@@ -97,7 +179,7 @@ async function listDmThreadsDirect() {
   }
 
   const threadIds = [...new Set((data ?? []).map((row) => row.thread_id))];
-  return await loadThreadSummariesDirect(threadIds);
+  return await loadThreadSummariesDirect(threadIds, profile.id);
 }
 
 async function startDirectMessageDirect(recipientUserId: string) {
@@ -132,7 +214,7 @@ async function startDirectMessageDirect(recipientUserId: string) {
     normalizedRecipientUserId,
   );
   if (existingThreadId) {
-    return await loadThreadSummaryDirect(existingThreadId);
+    return await loadThreadSummaryDirect(existingThreadId, profile.id);
   }
 
   const now = new Date().toISOString();
@@ -160,7 +242,7 @@ async function startDirectMessageDirect(recipientUserId: string) {
     throw new Error(`Could not create DM members: ${membersError.message}`);
   }
 
-  return await loadThreadSummaryDirect(threadId);
+  return await loadThreadSummaryDirect(threadId, profile.id);
 }
 
 async function listDmMessagesDirect(threadId: string) {
@@ -290,8 +372,8 @@ async function findExistingOneOnOneThreadDirect(
   return threads?.[0]?.id ?? null;
 }
 
-async function loadThreadSummaryDirect(threadId: string) {
-  const summaries = await loadThreadSummariesDirect([threadId]);
+async function loadThreadSummaryDirect(threadId: string, currentUserId?: string) {
+  const summaries = await loadThreadSummariesDirect([threadId], currentUserId);
   const summary = summaries[0];
   if (!summary) {
     throw new Error("DM thread not found.");
@@ -300,14 +382,14 @@ async function loadThreadSummaryDirect(threadId: string) {
   return summary;
 }
 
-async function loadThreadSummariesDirect(threadIds: string[]) {
+async function loadThreadSummariesDirect(threadIds: string[], currentUserId?: string) {
   const uniqueThreadIds = [...new Set(threadIds.filter(Boolean))];
   if (uniqueThreadIds.length === 0) {
     return [] satisfies DmThreadSummary[];
   }
 
   const supabase = createClient();
-  const [threadsResult, membersResult, messagesResult] = await Promise.all([
+  const [threadsResult, membersResult, messagesResult, readsResult] = await Promise.all([
     supabase
       .from("dm_threads")
       .select("*")
@@ -325,6 +407,14 @@ async function loadThreadSummariesDirect(threadIds: string[]) {
       .in("thread_id", uniqueThreadIds)
       .order("created_at", { ascending: false })
       .returns<DmMessageRow[]>(),
+    currentUserId
+      ? supabase
+          .from("dm_thread_reads")
+          .select("*")
+          .eq("user_id", currentUserId)
+          .in("thread_id", uniqueThreadIds)
+          .returns<DmThreadReadRow[]>()
+      : Promise.resolve({ data: [] as DmThreadReadRow[], error: null }),
   ]);
 
   if (threadsResult.error) {
@@ -339,6 +429,7 @@ async function loadThreadSummariesDirect(threadIds: string[]) {
     throw new Error(`Could not load DM messages: ${messagesResult.error.message}`);
   }
 
+  const readRows = readsResult.error ? [] : (readsResult.data ?? []);
   const members = membersResult.data ?? [];
   const messages = messagesResult.data ?? [];
   const profiles = await loadDmProfilesDirect(members.map((member) => member.user_id));
@@ -352,16 +443,21 @@ async function loadThreadSummariesDirect(threadIds: string[]) {
   }
 
   const latestMessageByThreadId = new Map<string, DmMessageRow>();
+  const readByThreadId = new Map<string, DmThreadReadRow>();
   for (const message of messages) {
     if (!latestMessageByThreadId.has(message.thread_id)) {
       latestMessageByThreadId.set(message.thread_id, message);
     }
+  }
+  for (const readRow of readRows) {
+    readByThreadId.set(readRow.thread_id, readRow);
   }
 
   return (threadsResult.data ?? []).map((thread) => ({
     id: thread.id,
     createdAt: thread.created_at,
     updatedAt: thread.updated_at,
+    readAt: readByThreadId.get(thread.id)?.last_opened_at ?? null,
     members: (membersByThreadId.get(thread.id) ?? [])
       .map((member) => toMemberProfile(profilesById.get(member.user_id) ?? null))
       .filter((member): member is DmMemberProfile => Boolean(member)),

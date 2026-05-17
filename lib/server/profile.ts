@@ -26,6 +26,7 @@ export type ProfileResponse = {
   username: string | null
   displayName: string | null
   avatarUrl: string
+  character3d: Character3dConfig
 }
 
 export type PublicUserProfile = {
@@ -43,6 +44,21 @@ export type ProfileUpdateInput = {
   username?: string | null
   displayName?: string | null
   avatarUrl?: string | null
+  character3d?: Partial<Character3dConfig>
+}
+
+export type Character3dConfig = {
+  body: string
+  accent: string
+  head: string
+  style: 'pod' | 'runner' | 'bot'
+}
+
+const DEFAULT_CHARACTER_3D: Character3dConfig = {
+  body: '#6ebe44',
+  accent: '#2d90ff',
+  head: '#f7ffe8',
+  style: 'pod',
 }
 
 export class ProfileError extends Error {
@@ -172,6 +188,7 @@ export async function ensureUserProfile(
     email: authUser.email ?? null,
     configurations: {
       displayName: readDisplayNameFromMetadata(authUser),
+      character3d: DEFAULT_CHARACTER_3D,
     } as Json,
     updated_at: new Date().toISOString(),
   }
@@ -264,6 +281,7 @@ export function toProfileResponse(profile: UserProfileRow): ProfileResponse {
     displayName:
       normalizeOptionalText(profile.display_name) ?? configuration.displayName ?? null,
     avatarUrl: normalizeOptionalText(profile.avatar_url) ?? DEFAULT_AVATAR_URL,
+    character3d: configuration.character3d,
   }
 }
 
@@ -303,6 +321,10 @@ async function updateUserProfileInternal(
 
   if (Object.prototype.hasOwnProperty.call(input, 'avatarUrl')) {
     updates.avatar_url = normalizeAvatarUrl(input.avatarUrl, true)
+  }
+
+  if (input.character3d) {
+    nextConfiguration.character3d = normalizeCharacter3d(input.character3d)
   }
 
   updates.configurations = nextConfiguration
@@ -524,13 +546,33 @@ function normalizeAvatarUrl(value: unknown, enforce: boolean): string | null {
 function readConfiguration(configurations: Json) {
   if (configurations && typeof configurations === 'object' && !Array.isArray(configurations)) {
     const displayName = configurations.displayName
+    const character3d = normalizeCharacter3d(configurations.character3d)
     return {
       ...configurations,
       displayName: typeof displayName === 'string' ? displayName.trim() || null : null,
+      character3d,
     }
   }
 
-  return { displayName: null as string | null }
+  return { displayName: null as string | null, character3d: DEFAULT_CHARACTER_3D }
+}
+
+function normalizeCharacter3d(value: unknown): Character3dConfig {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return DEFAULT_CHARACTER_3D
+  }
+
+  const candidate = value as Partial<Character3dConfig>
+  return {
+    body: normalizeColor(candidate.body) ?? DEFAULT_CHARACTER_3D.body,
+    accent: normalizeColor(candidate.accent) ?? DEFAULT_CHARACTER_3D.accent,
+    head: normalizeColor(candidate.head) ?? DEFAULT_CHARACTER_3D.head,
+    style: candidate.style === 'runner' || candidate.style === 'bot' ? candidate.style : 'pod',
+  }
+}
+
+function normalizeColor(value: unknown) {
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : null
 }
 
 function isUniqueViolation(error: unknown, matchers: string[]) {

@@ -2,15 +2,24 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { usePageBundle } from "@/lib/client/page-api";
+import { useCurrentUserProfile, usePageBundle } from "@/lib/client/page-api";
+import type { Json } from "@/utils/database.types";
 
 type PeerNode = {
   id: string;
   label: string;
   message: string;
+  character: Character3dConfig;
   color: string;
   x: number;
   z: number;
+};
+
+type Character3dConfig = {
+  body: string;
+  accent: string;
+  head: string;
+  style: "pod" | "runner" | "bot";
 };
 
 type DoorNode = {
@@ -33,6 +42,12 @@ type PlayerState = {
 };
 
 const COLORS = [0x3b8cf5, 0x44b834, 0xff8c28, 0x7a5cff, 0xe95f9f, 0x14a3a0];
+const DEFAULT_CHARACTER_3D: Character3dConfig = {
+  body: "#6ebe44",
+  accent: "#2d90ff",
+  head: "#f7ffe8",
+  style: "pod",
+};
 const FALLBACK_PEERS: Array<[string, string, string]> = [
   ["you", "You", "scouting the map"],
   ["global", "Global", "global chat is open"],
@@ -49,6 +64,7 @@ const PLAYER_START: PlayerState = {
 
 export function PeerNetworkPage() {
   const { bundle, usersById, buildScopedHref } = usePageBundle();
+  const { profile } = useCurrentUserProfile();
   const mountRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<PlayerState>({ ...PLAYER_START });
   const keysRef = useRef<Set<string>>(new Set());
@@ -88,16 +104,19 @@ export function PeerNetworkPage() {
       const angle = (Math.PI * 2 * index) / fallback.length;
       const radius = index === 0 ? 0 : 5.5 + (index % 3) * 1.4;
       const fallbackMessage = FALLBACK_PEERS[index % FALLBACK_PEERS.length]?.[2] ?? "hello from the pod";
+      const profileForPeer = usersById[id] ?? (id === "you" ? profile : null);
+      const character = readCharacter3d(profileForPeer?.configurations);
       return {
         id,
         label,
         message: messages.get(id)?.slice(0, 72) || fallbackMessage,
+        character,
         color: `#${COLORS[index % COLORS.length].toString(16).padStart(6, "0")}`,
         x: Math.cos(angle) * radius,
         z: Math.sin(angle) * radius,
       };
     });
-  }, [bundle?.comments, bundle?.posts, usersById]);
+  }, [bundle?.comments, bundle?.posts, profile, usersById]);
 
   const doors = useMemo<DoorNode[]>(
     () => [
@@ -247,7 +266,9 @@ export function PeerNetworkPage() {
     };
 
     const refreshPeers = () => {
-      const key = peersRef.current.map((peer) => `${peer.id}:${peer.label}:${peer.message}`).join("|");
+      const key = peersRef.current
+        .map((peer) => `${peer.id}:${peer.label}:${peer.message}:${peer.character.body}:${peer.character.accent}:${peer.character.head}:${peer.character.style}`)
+        .join("|");
       if (key === currentPeerKey) return;
       currentPeerKey = key;
       peerRoot.clear();
@@ -466,9 +487,15 @@ function createPeerAvatar(peer: PeerNode, index: number) {
   group.userData.homeZ = peer.z;
   group.userData.wanderSeed = index * 1.73 + peer.id.length * 0.37;
 
-  const color = new THREE.Color(peer.color);
+  const color = new THREE.Color(peer.character.body || peer.color);
+  const accent = new THREE.Color(peer.character.accent);
+  const headColor = new THREE.Color(peer.character.head);
   const body = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.32, 0.72, 6, 12),
+    peer.character.style === "bot"
+      ? new THREE.BoxGeometry(0.68, 1.05, 0.5)
+      : peer.character.style === "runner"
+        ? new THREE.CapsuleGeometry(0.24, 0.95, 6, 12)
+        : new THREE.CapsuleGeometry(0.32, 0.72, 6, 12),
     new THREE.MeshStandardMaterial({ color, roughness: 0.55 }),
   );
   body.position.y = 0.78;
@@ -476,20 +503,40 @@ function createPeerAvatar(peer: PeerNode, index: number) {
   group.add(body);
 
   const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.3, 24, 16),
-    new THREE.MeshStandardMaterial({ color: 0xf7ffe8, roughness: 0.7 }),
+    peer.character.style === "bot"
+      ? new THREE.BoxGeometry(0.5, 0.42, 0.42)
+      : new THREE.SphereGeometry(0.3, 24, 16),
+    new THREE.MeshStandardMaterial({ color: headColor, roughness: 0.7 }),
   );
   head.position.y = 1.55;
   head.castShadow = true;
   group.add(head);
 
+  if (peer.character.style === "runner") {
+    const limbMaterial = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.62 });
+    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.48, 0.12), limbMaterial);
+    leftLeg.position.set(-0.18, 0.25, 0);
+    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.48, 0.12), limbMaterial);
+    rightLeg.position.set(0.18, 0.25, 0);
+    group.add(leftLeg, rightLeg);
+  }
+
   const beacon = new THREE.Mesh(
     new THREE.TorusGeometry(0.58, 0.035, 8, 40),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 }),
+    new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.8 }),
   );
   beacon.position.y = 0.04;
   beacon.rotation.x = Math.PI / 2;
   group.add(beacon);
+
+  if (peer.character.style === "bot" || peer.character.style === "pod") {
+    const antenna = new THREE.Mesh(
+      new THREE.SphereGeometry(0.09, 12, 8),
+      new THREE.MeshBasicMaterial({ color: accent }),
+    );
+    antenna.position.set(0, 1.98, 0);
+    group.add(antenna);
+  }
 
   const label = createLabelSprite(peer.label);
   label.position.y = 2.25;
@@ -742,8 +789,8 @@ function movePlayer(current: PlayerState, forward: number, strafe: number, dista
   const normalizedStrafe = strafe / magnitude;
   return {
     ...current,
-    x: clamp(current.x + (sin * normalizedForward + cos * normalizedStrafe) * distance, -28, 28),
-    z: clamp(current.z + (cos * normalizedForward - sin * normalizedStrafe) * distance, -28, 28),
+    x: clamp(current.x + (sin * normalizedForward - cos * normalizedStrafe) * distance, -28, 28),
+    z: clamp(current.z + (cos * normalizedForward + sin * normalizedStrafe) * distance, -28, 28),
   };
 }
 
@@ -754,6 +801,29 @@ function isMovementKey(key: string) {
 function truncateCanvasText(value: string, maxLength: number) {
   const trimmed = value.trim().replace(/\s+/g, " ");
   return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength - 3)}...` : trimmed;
+}
+
+function readCharacter3d(configurations: Json | undefined): Character3dConfig {
+  if (!configurations || typeof configurations !== "object" || Array.isArray(configurations)) {
+    return DEFAULT_CHARACTER_3D;
+  }
+
+  const source = configurations.character3d;
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    return DEFAULT_CHARACTER_3D;
+  }
+
+  const candidate = source as Partial<Character3dConfig>;
+  return {
+    body: normalizeColor(candidate.body) ?? DEFAULT_CHARACTER_3D.body,
+    accent: normalizeColor(candidate.accent) ?? DEFAULT_CHARACTER_3D.accent,
+    head: normalizeColor(candidate.head) ?? DEFAULT_CHARACTER_3D.head,
+    style: candidate.style === "runner" || candidate.style === "bot" ? candidate.style : "pod",
+  };
+}
+
+function normalizeColor(value: unknown) {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value) ? value : null;
 }
 
 function disposeObject(object: any) {

@@ -4,8 +4,10 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   getDmPath,
   getMemberDisplayName,
+  getUnopenedDmThreads,
   listDmMessages,
   listDmThreads,
+  markDmThreadOpened,
   sendDmMessage,
   type DmMessage,
   type DmThreadSummary,
@@ -15,6 +17,7 @@ import {
   formatTimestamp,
   useCurrentUserProfile,
 } from "@/lib/client/page-api";
+import { playSfx } from "@/lib/client/sfx";
 import { getUserProfilePath } from "@/lib/client/users";
 import { createClient } from "@/utils/supabase/client";
 
@@ -32,6 +35,7 @@ export function DmPage({ threadId }: DmPageProps) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const notifiedMessageIds = useRef<Set<string>>(new Set());
 
   const currentThread = useMemo(
     () => threads.find((thread) => thread.id === threadId) ?? null,
@@ -53,6 +57,14 @@ export function DmPage({ threadId }: DmPageProps) {
   const title = currentThread
     ? conversationMembers.map(getMemberDisplayName).join(", ") || "Direct Message"
     : "Direct Messages";
+  const unopenedThreads = useMemo(
+    () => getUnopenedDmThreads(threads, profile?.id),
+    [profile?.id, threads],
+  );
+  const unopenedThreadIds = useMemo(
+    () => new Set(unopenedThreads.map((thread) => thread.id)),
+    [unopenedThreads],
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -99,6 +111,11 @@ export function DmPage({ threadId }: DmPageProps) {
         { event: "*", schema: "public", table: "dm_thread_members" },
         () => void loadThreads(),
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "dm_thread_reads" },
+        () => void loadThreads(),
+      )
       .subscribe();
 
     return () => {
@@ -106,6 +123,23 @@ export function DmPage({ threadId }: DmPageProps) {
       void supabase.removeChannel(channel);
     };
   }, []);
+
+  useEffect(() => {
+    const newestMessage = unopenedThreads
+      .map((thread) => thread.latestMessage)
+      .filter((message): message is NonNullable<typeof message> => Boolean(message))
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )[0];
+
+    if (!newestMessage || notifiedMessageIds.current.has(newestMessage.id)) {
+      return;
+    }
+
+    notifiedMessageIds.current.add(newestMessage.id);
+    void playSfx("mail");
+  }, [unopenedThreads]);
 
   useEffect(() => {
     if (!threadId) {
@@ -127,6 +161,8 @@ export function DmPage({ threadId }: DmPageProps) {
         const nextMessages = await listDmMessages(activeThreadId);
         if (isMounted) {
           setMessages(nextMessages);
+          const newestMessage = nextMessages.at(-1);
+          void markDmThreadOpened(activeThreadId, newestMessage?.createdAt);
         }
       } catch (loadError) {
         if (isMounted) {
@@ -219,6 +255,11 @@ export function DmPage({ threadId }: DmPageProps) {
           <a href={getDmPath("/posts")}>Posts</a>
           <a className="chat-nav__active" href={getDmPath("/dms")}>
             DMs
+            {unopenedThreads.length > 0 ? (
+              <span className="dm-notification-badge dm-notification-badge--inline">
+                {unopenedThreads.length > 9 ? "9+" : unopenedThreads.length}
+              </span>
+            ) : null}
           </a>
         </nav>
 
@@ -236,6 +277,7 @@ export function DmPage({ threadId }: DmPageProps) {
                     currentUserId={profile?.id ?? null}
                     isActive={thread.id === threadId}
                     key={thread.id}
+                    hasUnread={unopenedThreadIds.has(thread.id)}
                     thread={thread}
                   />
                 ))
@@ -321,10 +363,12 @@ export function DmPage({ threadId }: DmPageProps) {
 function DmThreadLink({
   currentUserId,
   isActive,
+  hasUnread,
   thread,
 }: {
   currentUserId: string | null;
   isActive: boolean;
+  hasUnread: boolean;
   thread: DmThreadSummary;
 }) {
   const otherMembers = thread.members.filter((member) => member.id !== currentUserId);
@@ -333,7 +377,9 @@ function DmThreadLink({
 
   return (
     <a
-      className={`dm-thread-link ${isActive ? "dm-thread-link--active" : ""}`}
+      className={`dm-thread-link ${isActive ? "dm-thread-link--active" : ""} ${
+        hasUnread ? "dm-thread-link--unread" : ""
+      }`}
       href={getDmPath(`/dms/${thread.id}`)}
     >
       <img src={avatar} alt="" />
@@ -345,6 +391,9 @@ function DmThreadLink({
             : `Started ${formatTimestamp(thread.createdAt)}`}
         </small>
       </span>
+      {hasUnread ? (
+        <span className="dm-notification-badge dm-notification-badge--thread">!</span>
+      ) : null}
     </a>
   );
 }
