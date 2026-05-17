@@ -1,9 +1,8 @@
 import 'server-only'
 
-import { cookies } from 'next/headers'
 import { normalizeUrl } from '@/lib/server/helpers/normalizeUrl'
-import { loadUserProfiles, type UserProfileRow } from '@/lib/server/profile'
-import { createClient } from '@/utils/supabase/server'
+import { loadUserProfiles, type UserProfileRow } from '@/lib/server/profiles'
+import { getSupabaseAdmin } from '@/lib/server/supabaseAdmin'
 
 export type PageRow = {
   id: string
@@ -59,7 +58,7 @@ export async function loadOrCreatePageRoom(url: string): Promise<PageBundle> {
 
 export async function findOrCreatePage(url: string): Promise<PageRow> {
   const normalizedUrl = normalizeUrl(url)
-  const supabase = createClient(await cookies())
+  const supabase = getSupabaseAdmin()
 
   const { data: existingPage, error: existingPageError } = await supabase
     .from('pages')
@@ -91,7 +90,7 @@ export async function findOrCreatePage(url: string): Promise<PageRow> {
 }
 
 export async function findOrCreateDefaultRoom(pageId: string): Promise<RoomRow> {
-  const supabase = createClient(await cookies())
+  const supabase = getSupabaseAdmin()
 
   const { data: rooms, error: roomsError } = await supabase
     .from('rooms')
@@ -126,7 +125,7 @@ export async function findOrCreateDefaultRoom(pageId: string): Promise<RoomRow> 
 }
 
 export async function getPageBundle(pageId: string, roomId: string): Promise<PageBundle> {
-  const supabase = createClient(await cookies())
+  const supabase = getSupabaseAdmin()
 
   const [pageResult, roomResult, postsResult] = await Promise.all([
     supabase.from('pages').select('*').eq('id', pageId).single<PageRow>(),
