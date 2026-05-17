@@ -116,11 +116,13 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
 
   return (
     <main className="chat-shell">
-      <section className="chat-window xp-window" aria-labelledby="chat-title">
+      <ChatSceneBackground />
+      <div className="chat-shell__content">
+      <section className="chat-window xp-window chat-window--animate" aria-labelledby="chat-title">
         <div className="xp-title-bar chat-titlebar">
           <PodGlyph />
           <span className="xp-title-text" id="chat-title">
-            3WChat - {getChatTitle(bundle)}
+            3WChat — {getChatTitle(bundle)}
           </span>
           <div className="xp-title-controls" aria-hidden="true">
             <span className="xp-title-btn xp-title-btn--min">_</span>
@@ -129,10 +131,10 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
           </div>
         </div>
 
-        <nav className="chat-menu" aria-label="Chat menu">
+        <nav className="chat-menu chat-nav" aria-label="Chat menu">
           <a href={buildScopedHref("/")}>Room</a>
           <a href={buildScopedHref("/posts")}>Posts</a>
-          <a href={buildScopedHref("/chat")}>Chat</a>
+          <a href={buildScopedHref("/chat")} className="chat-nav__active">Chat</a>
           <a href={buildScopedHref("/posts")}>Questions</a>
           <a href={buildScopedHref("/")}>Help</a>
         </nav>
@@ -149,7 +151,10 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                     </span>
                     <div>
                       <h2>{member.name}</h2>
-                      <p>{member.status}</p>
+                      <p>
+                        <span className={`chat-status-dot chat-status-dot--${member.status === "Online" ? "online" : "away"}`} />
+                        {member.status}
+                      </p>
                     </div>
                   </article>
                 ))
@@ -158,17 +163,29 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   <span className="chat-avatar chat-avatar--1">A</span>
                   <div>
                     <h2>Anonymous</h2>
-                    <p>No messages yet</p>
+                    <p><span className="chat-status-dot chat-status-dot--away" />Waiting</p>
                   </div>
                 </article>
               )}
             </div>
             <div className="chat-member-actions">
               <a href={buildScopedHref("/posts")} className="chat-side-button">
-                <span className="chat-side-icon">+</span>Open Posts
+                <span className="chat-side-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+                    <rect x="3" y="5" width="14" height="2" rx="1" fill="currentColor"/>
+                    <rect x="3" y="9" width="10" height="2" rx="1" fill="currentColor"/>
+                    <rect x="3" y="13" width="12" height="2" rx="1" fill="currentColor"/>
+                  </svg>
+                </span>
+                Open Posts
               </a>
               <a href={buildScopedHref("/")} className="chat-side-button">
-                <span className="chat-side-icon">[]</span>Back to Pod
+                <span className="chat-side-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+                    <path d="M10 3L3 9h2v8h4v-5h2v5h4V9h2L10 3z" fill="currentColor"/>
+                  </svg>
+                </span>
+                Back to Pod
               </a>
             </div>
           </aside>
@@ -251,16 +268,29 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
               </label>
               <textarea
                 id="chat-message"
+                className="chat-composer__input"
                 aria-label="Message"
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
-                placeholder="Share a message with the room..."
+                placeholder="Send a message to the room..."
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    if (!isSubmitting && bundle && message.trim()) {
+                      event.currentTarget.form?.requestSubmit();
+                    }
+                  }
+                }}
               />
-              <button type="submit" disabled={isSubmitting || !bundle}>
-                {isSubmitting ? "Sending..." : "Send"}
+              <button type="submit" className="chat-composer__send" disabled={isSubmitting || !bundle}>
+                {isSubmitting ? "…" : "Send"}
               </button>
-              <a href={buildScopedHref("/posts")} aria-label="Open post stream">
-                )))
+              <a href={buildScopedHref("/posts")} className="chat-composer__posts" aria-label="Open post stream">
+                <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+                  <rect x="3" y="4" width="14" height="2" rx="1" fill="currentColor"/>
+                  <rect x="3" y="9" width="10" height="2" rx="1" fill="currentColor"/>
+                  <rect x="3" y="14" width="12" height="2" rx="1" fill="currentColor"/>
+                </svg>
               </a>
             </form>
           </section>
@@ -296,7 +326,38 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
           </aside>
         </div>
       </section>
+      </div>
     </main>
+  );
+}
+
+function ChatSceneBackground() {
+  return (
+    <div className="app-background" aria-hidden="true">
+      <div className="sky" />
+      <div className="clouds">
+        <div className="cloud cloud-1" />
+        <div className="cloud cloud-2" />
+        <div className="cloud cloud-3" />
+        <div className="cloud cloud-4" />
+        <div className="cloud cloud-5" />
+      </div>
+      <svg className="hills-svg" viewBox="0 0 1000 500" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="650" cy="520" rx="620" ry="340" fill="#3d8e22" />
+        <ellipse cx="600" cy="540" rx="540" ry="300" fill="#4aa828" />
+        <ellipse cx="560" cy="530" rx="440" ry="260" fill="#5cb838" />
+        <ellipse cx="520" cy="510" rx="320" ry="190" fill="#6ebe44" opacity="0.7" />
+        <ellipse cx="500" cy="500" rx="200" ry="120" fill="#8cd960" opacity="0.45" />
+      </svg>
+      <div className="ground" />
+      <div className="bubbles">
+        <div className="bubble bubble-1" />
+        <div className="bubble bubble-2" />
+        <div className="bubble bubble-3" />
+        <div className="bubble bubble-4" />
+        <div className="bubble bubble-5" />
+      </div>
+    </div>
   );
 }
 
