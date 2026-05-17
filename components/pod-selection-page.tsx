@@ -10,6 +10,7 @@ import {
   useCurrentUserProfile,
   usePageBundle,
 } from "@/lib/client/page-api";
+import { createClient } from "@/utils/supabase/client";
 
 type Activity = {
   domain: string;
@@ -20,6 +21,7 @@ type Activity = {
 
 type PodSelectionPageProps = {
   userEmail?: string | null;
+  onSignOut?: () => void;
 };
 
 export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
