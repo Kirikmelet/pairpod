@@ -399,6 +399,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
   const domainName = getRoomDisplayName(domainUrl);
 
   const [content, setContent] = useState("");
+  const [showReplyComposer, setShowReplyComposer] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
@@ -450,6 +451,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
       });
 
       setContent("");
+      setShowReplyComposer(false);
       await refresh({ silent: true });
     } catch (createError) {
       setSubmitError(
@@ -528,9 +530,12 @@ export function PostDetailPage({ postId }: { postId: string }) {
       return;
     }
 
-    document.getElementById("post-reply-form")?.scrollIntoView({
-      block: "start",
-      behavior: "smooth",
+    setShowReplyComposer(true);
+    window.requestAnimationFrame(() => {
+      document.getElementById("post-reply-form")?.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+      });
     });
   };
 
@@ -619,43 +624,72 @@ export function PostDetailPage({ postId }: { postId: string }) {
                     <header>
                       <h2>No answers yet</h2>
                     </header>
-                    <p>Reply to this thread using the form below.</p>
+                    <p>Be the first to reply to this thread.</p>
+                    <button
+                      className="post-reply-btn post-reply-btn--inline"
+                      type="button"
+                      onClick={scrollToReplyForm}
+                    >
+                      Write reply
+                    </button>
                   </div>
                 </article>
               )}
             </div>
 
-            {/* ---------- reply form ---------- */}
-            <form
-              id="post-reply-form"
-              className="post-compose"
-              onSubmit={(event) => void handleSubmit(event)}
-            >
-              <div className="post-compose-field">
-                <span className="post-compose-label">Reply</span>
-                <textarea
-                  className="post-compose-input"
-                  value={content}
-                  onChange={(event) => setContent(event.target.value)}
-                  placeholder="Write an answer or comment..."
-                />
-              </div>
-
-              {submitError ? (
-                <p className="status-note status-note--error">{submitError}</p>
-              ) : null}
-              {voteError ? (
-                <p className="status-note status-note--error">{voteError}</p>
-              ) : null}
-
-              <button
-                type="submit"
-                className="post-compose-submit"
-                disabled={isSubmitting || !content.trim()}
+            {showReplyComposer ? (
+              <form
+                id="post-reply-form"
+                className="post-compose post-compose--reply"
+                onSubmit={(event) => void handleSubmit(event)}
               >
-                {isSubmitting ? "Posting..." : "Post Reply"}
+                <div className="post-compose-field">
+                  <span className="post-compose-label">Reply to thread</span>
+                  <textarea
+                    className="post-compose-input"
+                    value={content}
+                    onChange={(event) => setContent(event.target.value)}
+                    placeholder="Write an answer or comment..."
+                    rows={4}
+                  />
+                </div>
+
+                {submitError ? (
+                  <p className="status-note status-note--error">{submitError}</p>
+                ) : null}
+                {voteError ? (
+                  <p className="status-note status-note--error">{voteError}</p>
+                ) : null}
+
+                <div className="post-reply-actions">
+                  <button
+                    type="button"
+                    className="post-reply-cancel"
+                    onClick={() => {
+                      setShowReplyComposer(false);
+                      setSubmitError(null);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="post-compose-submit"
+                    disabled={isSubmitting || !content.trim()}
+                  >
+                    {isSubmitting ? "Posting..." : "Post Reply"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                className="post-reply-open"
+                onClick={() => setShowReplyComposer(true)}
+              >
+                Write a reply
               </button>
-            </form>
+            )}
           </section>
         </section>
 

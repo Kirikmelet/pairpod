@@ -15,10 +15,12 @@ const supabaseOrigin = new URL(supabaseUrl).origin;
 const supabaseRealtimeOrigin = supabaseOrigin.replace(/^https:/, "wss:");
 const siteUrl = env.NEXT_PUBLIC_SITE_URL?.trim();
 const hostPermissions = [`${supabaseOrigin}/*`];
+const connectSrc = ["'self'", supabaseOrigin, supabaseRealtimeOrigin];
 
 if (siteUrl) {
   const siteOrigin = new URL(siteUrl).origin;
   hostPermissions.push(`${siteOrigin}/*`);
+  connectSrc.push(siteOrigin);
 }
 
 manifest.host_permissions = Array.from(new Set(hostPermissions));
@@ -34,7 +36,7 @@ manifest.content_security_policy = {
   extension_pages: [
     "script-src 'self'",
     "object-src 'self'",
-    `connect-src 'self' ${supabaseOrigin} ${supabaseRealtimeOrigin}`,
+    `connect-src ${Array.from(new Set(connectSrc)).join(" ")}`,
   ].join("; "),
 };
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

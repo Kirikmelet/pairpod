@@ -386,6 +386,12 @@ async function fetchProfileApi(pathname: string, init: RequestInit) {
   }
 
   const isExtension = Boolean(getExtensionRuntime()?.runtime?.id);
+  if (isExtension && !remoteApiUrl) {
+    throw new Error(
+      "Profile editing in the extension needs NEXT_PUBLIC_SITE_URL so it can reach the PairPod server.",
+    );
+  }
+
   const target = isExtension && remoteApiUrl ? remoteApiUrl : pathname;
   const response = await fetch(target, {
     ...init,

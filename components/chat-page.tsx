@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   formatTimestamp,
   getDisplayName,
@@ -37,6 +37,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
 
   const chatPosts = useMemo(
     () => (bundle?.posts ?? []).filter((post) => post.type === "chat"),
@@ -100,6 +101,18 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     [bundle?.comments],
   );
 
+  useEffect(() => {
+    const transcript = transcriptRef.current;
+    if (!transcript) {
+      return;
+    }
+
+    transcript.scrollTo({
+      top: transcript.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [chatPosts.length]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -117,7 +130,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
         message: message.trim(),
       });
       setMessage("");
-      await refresh();
+      await refresh({ silent: true });
     } catch (sendError) {
       setSubmitError(
         sendError instanceof Error
@@ -246,8 +259,8 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
               {error ? <p className="chat-error">{error}</p> : null}
               {submitError ? <p className="chat-error">{submitError}</p> : null}
 
-              <div className="chat-transcript">
-                {loading ? (
+              <div className="chat-transcript" ref={transcriptRef}>
+                {loading && !bundle ? (
                   <article className="chat-message">
                     <div className="chat-message__body">
                       <p>Loading chat history...</p>

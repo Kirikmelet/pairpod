@@ -518,6 +518,20 @@ body {
   padding: var(--space-sm);
 }
 
+.extension-app .post-compose--reply {
+  margin: var(--space-sm);
+}
+
+.extension-app .post-reply-open {
+  margin: var(--space-sm);
+  min-height: 34px;
+}
+
+.extension-app .post-reply-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
 .extension-app .post-thread-replies {
   margin-left: 0;
   padding-left: var(--space-sm);
