@@ -955,8 +955,8 @@ function resolveDomainUrl(searchParams: ReturnType<typeof useSearchParams>) {
 
 function getDocumentTitle() {
   if (typeof document === "undefined") {
-    return "Uncommon Hacks";
+    return "PairPod";
   }
 
-  return document.title.trim() || "Uncommon Hacks";
+  return document.title.trim() || "PairPod";
 }
