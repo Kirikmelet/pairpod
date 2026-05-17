@@ -79,6 +79,30 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
       return;
     }
 
+  const formData = new FormData(event.target);
+  const postType = event.target.querySelector('select').value;
+  const title = event.target.querySelector('input[type="text"]').value;
+  const content = event.target.querySelector('textarea').value;
+
+  const { data, error } = await supabase
+    .from('posts')
+    .insert([
+      { 
+        type: postType, 
+        header: title, 
+        content: content,
+        // user_id: currentUserId // Usually required for RLS
+      }
+    ])
+    .select();
+
+  if (error) {
+    console.error('Error posting:', error.message);
+  } else {
+    console.log('Post created successfully:', data);
+    // Optional: Reset form or refresh list
+  }
+
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -249,7 +273,6 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
                       <a href={buildScopedHref(`/posts/${post.id}`)}>
                         {getCommentCount(commentsByPost, post.id)} replies
                       </a>
-                      <a href={buildScopedHref(`/posts/${post.id}`)}>Reply</a>
                       <button type="button">Save</button>
                     </footer>
                   </div>
