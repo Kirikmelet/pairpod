@@ -50,10 +50,13 @@ export type CommentRecord = {
 
 export type UserProfileRecord = {
   id: string;
+  auth_user_id?: string | null;
   email: string | null;
   username: string | null;
   configurations: Json;
+  display_name?: string | null;
   avatar_url: string | null;
+  updated_at?: string | null;
 };
 
 export type PageBundle = {
@@ -107,7 +110,8 @@ type MutableUsersTable = {
   ): Promise<{ data: unknown; error: Error | null }>;
 };
 
-const USER_PROFILE_COLUMNS = "id,email,username,configurations,avatar_url";
+const USER_PROFILE_COLUMNS =
+  "id,auth_user_id,email,username,configurations,display_name,avatar_url,updated_at";
 export const DEFAULT_AVATAR_URL =
   "https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png";
 
@@ -121,7 +125,8 @@ export function getDisplayName(
 
   const profile = usersById[userId];
   const configuration = readProfileConfiguration(profile?.configurations);
-  const displayName = configuration.displayName?.trim();
+  const displayName =
+    normalizeOptionalText(profile?.display_name) ?? configuration.displayName?.trim();
 
   if (displayName) {
     return displayName;
@@ -223,12 +228,27 @@ export async function updatePostLikes(post: PostRecord, delta: 1 | -1) {
 
 async function updatePostLikesDirect(post: PostRecord, delta: 1 | -1) {
   const supabase = createClient();
-  const nextLikes = Math.max(0, post.likes + delta);
+  const { data: existingPosts, error: loadError } = await supabase
+    .from("posts")
+    .select("id,likes")
+    .eq("id", post.id)
+    .limit(1);
+
+  if (loadError) {
+    throw loadError;
+  }
+
+  const existingPost = existingPosts?.[0];
+  if (!existingPost) {
+    throw new Error("Could not find post to vote on.");
+  }
+
+  const nextLikes = Math.max(0, existingPost.likes + delta);
   const { data, error } = await supabase
     .from("posts")
     .update({ likes: nextLikes })
     .eq("id", post.id)
-    .select("id")
+    .select("id,likes")
     .limit(1);
 
   if (error) {
@@ -255,12 +275,27 @@ export async function updateCommentLikes(comment: CommentRecord, delta: 1 | -1) 
 
 async function updateCommentLikesDirect(comment: CommentRecord, delta: 1 | -1) {
   const supabase = createClient();
-  const nextLikes = Math.max(0, comment.likes + delta);
+  const { data: existingComments, error: loadError } = await supabase
+    .from("comments")
+    .select("id,likes")
+    .eq("id", comment.id)
+    .limit(1);
+
+  if (loadError) {
+    throw loadError;
+  }
+
+  const existingComment = existingComments?.[0];
+  if (!existingComment) {
+    throw new Error("Could not find comment to vote on.");
+  }
+
+  const nextLikes = Math.max(0, existingComment.likes + delta);
   const { data, error } = await supabase
     .from("comments")
     .update({ likes: nextLikes })
     .eq("id", comment.id)
-    .select("id")
+    .select("id,likes")
     .limit(1);
 
   if (error) {
@@ -823,39 +858,89 @@ async function ensureCurrentUserProfile() {
     return null;
   }
 
-  const users = supabase.from("users") as unknown as MutableUsersTable;
-  const { data, error } = await users
+  const users = supabase.from("users");
+  const { data: existingByAuth, error: existingByAuthError } = await users
+    .select(USER_PROFILE_COLUMNS)
+    .eq("auth_user_id", user.id)
+    .maybeSingle<UserProfileRecord>();
+
+  if (existingByAuthError) {
+    throw existingByAuthError;
+  }
+
+  if (existingByAuth) {
+    return existingByAuth;
+  }
+
+  const { data: legacyById, error: legacyByIdError } = await users
     .select(USER_PROFILE_COLUMNS)
     .eq("id", user.id)
-    .limit(1);
+    .maybeSingle<UserProfileRecord>();
 
-  if (error) {
-    throw error;
+  if (legacyByIdError) {
+    throw legacyByIdError;
   }
 
-  if (data?.[0]) {
-    return data[0];
+  const nextDisplayName =
+    readMetadataString(user.user_metadata.full_name) ||
+    readMetadataString(user.user_metadata.name);
+  const nextAvatarUrl =
+    readMetadataString(user.user_metadata.avatar_url) || DEFAULT_AVATAR_URL;
+
+  if (legacyById) {
+    const nextConfigurations = readProfileConfiguration(legacyById.configurations);
+
+    if (!nextConfigurations.displayName && nextDisplayName) {
+      nextConfigurations.displayName = nextDisplayName;
+    }
+
+    const { data: updatedLegacy, error: updateLegacyError } = await users
+      .update({
+        auth_user_id: user.id,
+        email: user.email ?? legacyById.email,
+        display_name: legacyById.display_name ?? nextDisplayName,
+        avatar_url: legacyById.avatar_url ?? nextAvatarUrl,
+        configurations: nextConfigurations,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", legacyById.id)
+      .select(USER_PROFILE_COLUMNS)
+      .maybeSingle<UserProfileRecord>();
+
+    if (updateLegacyError) {
+      throw updateLegacyError;
+    }
+
+    if (!updatedLegacy) {
+      throw new Error("Could not update your profile.");
+    }
+
+    return updatedLegacy;
   }
 
-  const profile: UserProfileRecord = {
-    id: user.id,
-    email: user.email ?? null,
-    username: readMetadataString(user.user_metadata.username),
-    configurations: {
-      displayName:
-        readMetadataString(user.user_metadata.full_name) ||
-        readMetadataString(user.user_metadata.name),
-    },
-    avatar_url:
-      readMetadataString(user.user_metadata.avatar_url) || DEFAULT_AVATAR_URL,
-  };
+  const { data: createdProfile, error: createProfileError } = await users
+    .insert({
+      auth_user_id: user.id,
+      email: user.email ?? null,
+      username: normalizeUsername(readMetadataString(user.user_metadata.username)),
+      display_name: nextDisplayName,
+      avatar_url: nextAvatarUrl,
+      configurations: {
+        displayName: nextDisplayName,
+      },
+    })
+    .select(USER_PROFILE_COLUMNS)
+    .maybeSingle<UserProfileRecord>();
 
-  const { error: upsertError } = await users.upsert(profile, { onConflict: "id" });
-  if (upsertError) {
-    throw upsertError;
+  if (createProfileError) {
+    throw createProfileError;
   }
 
-  return profile;
+  if (!createdProfile) {
+    throw new Error("Could not create your profile.");
+  }
+
+  return createdProfile;
 }
 
 function readProfileConfiguration(configurations: Json | undefined) {
@@ -875,6 +960,24 @@ function readProfileConfiguration(configurations: Json | undefined) {
 
 function readMetadataString(value: unknown) {
   return typeof value === "string" ? value.trim() : null;
+}
+
+function normalizeOptionalText(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized ? normalized : null;
+}
+
+function normalizeUsername(value: string | null) {
+  const normalized = normalizeOptionalText(value)?.toLowerCase() ?? null;
+  if (!normalized) {
+    return null;
+  }
+
+  return /^[a-z0-9_-]{3,24}$/.test(normalized) ? normalized : null;
 }
 
 function readString(value: unknown) {
@@ -955,8 +1058,8 @@ function resolveDomainUrl(searchParams: ReturnType<typeof useSearchParams>) {
 
 function getDocumentTitle() {
   if (typeof document === "undefined") {
-    return "Uncommon Hacks";
+    return "PairPod";
   }
 
-  return document.title.trim() || "Uncommon Hacks";
+  return document.title.trim() || "PairPod";
 }

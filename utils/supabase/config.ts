@@ -5,7 +5,21 @@ type SupabasePublicConfig = {
   urlSource: "NEXT_PUBLIC_SUPABASE_URL";
 };
 
-function getSupabaseUrl(): { value: string; source: "NEXT_PUBLIC_SUPABASE_URL" } | null {
+type SupabaseServiceRoleConfig = {
+  key: string;
+  keySource: "SUPABASE_SERVICE_ROLE_KEY";
+  url: string;
+  urlSource: "SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_URL";
+};
+
+function getSupabaseUrl():
+  | { value: string; source: "SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_URL" }
+  | null {
+  const serverUrl = process.env.SUPABASE_URL?.trim();
+  if (serverUrl) {
+    return { value: serverUrl, source: "SUPABASE_URL" };
+  }
+
   const nextPublicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   if (nextPublicUrl) {
     return { value: nextPublicUrl, source: "NEXT_PUBLIC_SUPABASE_URL" };
@@ -46,12 +60,48 @@ function buildMissingConfigMessage(context: string): string {
   ].join(" ");
 }
 
+function getSupabaseServiceRoleKey() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (serviceRoleKey) {
+    return {
+      value: serviceRoleKey,
+      source: "SUPABASE_SERVICE_ROLE_KEY" as const,
+    };
+  }
+
+  return null;
+}
+
 export function getSupabasePublicConfig(context: string): SupabasePublicConfig {
   const url = getSupabaseUrl();
   const key = getSupabasePublicKey();
 
   if (!url || !key) {
     throw new Error(buildMissingConfigMessage(context));
+  }
+
+  return {
+    key: key.value,
+    keySource: key.source,
+    url: url.value,
+    urlSource: "NEXT_PUBLIC_SUPABASE_URL",
+  };
+}
+
+export function getSupabaseServiceRoleConfig(
+  context: string,
+): SupabaseServiceRoleConfig {
+  const url = getSupabaseUrl();
+  const key = getSupabaseServiceRoleKey();
+
+  if (!url || !key) {
+    throw new Error(
+      [
+        `${context} requires Supabase server environment variables.`,
+        "Expected URL: SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL.",
+        "Expected service role key: SUPABASE_SERVICE_ROLE_KEY.",
+      ].join(" "),
+    );
   }
 
   return {

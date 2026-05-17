@@ -1,0 +1,158 @@
+/* Toast notifications */
+      .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .toast {
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-family: 'Nunito', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: #fff;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        animation: toastIn 0.3s ease-out, toastOut 0.3s ease-in 2.7s forwards;
+        max-width: 340px;
+      }
+      .toast--success { background: #3d8e22; }
+      .toast--error { background: #c0392b; }
+      .toast--info { background: #2c6fbb; }
+      @keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+      @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-10px); } }
+
+      /* Loading spinner on button */
+      .btn-primary.loading {
+        pointer-events: none;
+        opacity: 0.7;
+        position: relative;
+      }
+      .btn-primary.loading::after {
+        content: '';
+        position: absolute;
+        right: 16px;
+        top: 50%;
+        width: 16px;
+        height: 16px;
+        margin-top: -8px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* Logged-in state */
+      .logged-in-view {
+        display: none;
+        text-align: center;
+        padding: 32px 16px;
+      }
+      .logged-in-view.visible { display: block; }
+      .logged-in-view .welcome-msg {
+        font-family: 'Fredoka', sans-serif;
+        font-size: 22px;
+        font-weight: 600;
+        color: #2d5018;
+        margin-bottom: 6px;
+      }
+      .logged-in-view .user-email {
+        font-family: 'Nunito', sans-serif;
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 24px;
+      }
+      .logged-in-actions {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .btn-home {
+        display: inline-block;
+        padding: 10px 28px;
+        border: 2px solid #3d8e22;
+        border-radius: 8px;
+        background: transparent;
+        color: #3d8e22;
+        font-family: 'Nunito', sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn-home:hover {
+        background: #3d8e22;
+        color: #fff;
+      }
+      .btn-logout {
+        display: inline-block;
+        padding: 10px 28px;
+        border: 2px solid #c0392b;
+        border-radius: 8px;
+        background: transparent;
+        color: #c0392b;
+        font-family: 'Nunito', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn-logout:hover {
+        background: #c0392b;
+        color: #fff;
+      }
+
+      /* Hide form when logged in */
+      body.is-logged-in .tabs,
+      body.is-logged-in .app-stack {
+        display: none;
+      }
+
+html,
+body {
+  width: 380px;
+  min-width: 380px;
+  max-width: 380px;
+  height: 560px;
+  min-height: 560px;
+  max-height: 560px;
+  margin: 0;
+  overflow: hidden;
+}
+
+.page-layout {
+  width: 380px;
+  min-width: 380px;
+  max-width: 380px;
+  height: 560px;
+  min-height: 560px;
+  max-height: 560px;
+  padding: 8px;
+  position: relative;
+  inset: auto;
+}
+
+.app-window {
+  width: 100%;
+  max-width: 100%;
+}
+
+.xp-window-body {
+  max-height: 516px;
+  overflow: auto;
+  padding: 18px;
+}
+
+.clouds,
+.sky,
+.hills-svg,
+.ground,
+.bubbles {
+  position: fixed;
+}

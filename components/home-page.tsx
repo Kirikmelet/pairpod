@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
-import { AuthForm } from "@/components/auth-form";
 import { ChatPage } from "@/components/chat-page";
 import { PodSelectionPage } from "@/components/pod-selection-page";
 import { PostDetailPage, PostStreamPage } from "@/components/post-stream-page";
@@ -26,13 +24,8 @@ type ExtensionRuntime = {
 };
 
 export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
-  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const authError =
-    searchParams.get("error") === "auth"
-      ? (searchParams.get("message") ?? "Sign in failed. Please try again.")
-      : null;
 
   const refreshUser = useCallback(async () => {
     const supabase = createClient();
@@ -100,7 +93,7 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
 
   if (isLoading) {
     return (
-      <AppShell isPopup={isPopup} title="Uncommon Hacks - Loading">
+      <AppShell isPopup={isPopup} title="PairPod - Loading">
         <p className="status-note">Loading...</p>
       </AppShell>
     );
@@ -110,14 +103,14 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
     if (isPopup) {
       redirectToStaticLogin();
       return (
-        <AppShell isPopup={isPopup} title="Uncommon Hacks - Sign in">
+        <AppShell isPopup={isPopup} title="PairPod - Sign in">
           <p className="status-note">Opening sign in...</p>
         </AppShell>
       );
     }
 
     return (
-      <AppShell isPopup={isPopup} title="Uncommon Hacks - Sign in">
+      <AppShell isPopup={isPopup} title="PairPod - Sign in">
         <AuthForm
           variant={variant}
           initialStatus={authError}
@@ -134,17 +127,31 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   return <ExtensionPopupApp user={user} onSignOut={() => void handleSignOut()} />;
 }
 
-function redirectToStaticLogin() {
-  if (typeof window === "undefined") {
-    return;
-  }
+function StaticLoginRedirect({
+  isPopup,
+}: {
+  isPopup: boolean;
+}) {
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
 
-  const runtime = getExtensionRuntime();
-  const loginUrl = runtime?.runtime?.getURL?.("login.html") ?? "login.html";
+    const runtime = getExtensionRuntime();
+    const loginUrl = isPopup
+      ? (runtime?.runtime?.getURL?.("login.html") ?? "login.html")
+      : "/login.html";
 
-  if (!window.location.href.endsWith("/login.html")) {
-    window.location.replace(loginUrl);
-  }
+    if (!window.location.href.endsWith("/login.html")) {
+      window.location.replace(loginUrl);
+    }
+  }, [isPopup]);
+
+  return (
+    <AppShell isPopup={isPopup} title="Uncommon Hacks - Sign in">
+      <p className="status-note">Opening sign in...</p>
+    </AppShell>
+  );
 }
 
 function getExtensionRuntime() {

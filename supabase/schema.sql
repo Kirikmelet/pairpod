@@ -18,13 +18,38 @@ drop table if exists users;
 
 create table if not exists users (
   id uuid primary key default gen_random_uuid(),
-  auth_user_id uuid unique,
+  auth_user_id uuid references auth.users(id) on delete set null,
   username text unique,
   email text,
   url text,
   configurations jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
+  display_name text,
+  avatar_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
+
+alter table users add column if not exists display_name text;
+alter table users add column if not exists avatar_url text;
+alter table users add column if not exists updated_at timestamptz not null default now();
+alter table users add column if not exists auth_user_id uuid;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'users_auth_user_id_fkey'
+      and conrelid = 'public.users'::regclass
+  ) then
+    alter table users
+      add constraint users_auth_user_id_fkey
+      foreign key (auth_user_id)
+      references auth.users(id)
+      on delete set null;
+  end if;
+end
+$$;
 
 create table if not exists pages (
   id uuid primary key default gen_random_uuid(),
@@ -95,6 +120,89 @@ create index if not exists idx_events_comment_id on events(comment_id);
 create index if not exists idx_events_event_type on events(event_type);
 create index if not exists idx_users_auth_user_id on users(auth_user_id);
 create index if not exists idx_users_username on users(username);
+create unique index if not exists users_auth_user_id_unique_idx on users(auth_user_id) where auth_user_id is not null;
+create unique index if not exists users_username_lower_unique_idx on users(lower(username)) where username is not null;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'avatars',
+  'avatars',
+  true,
+  2097152,
+  array['image/png']::text[]
+)
+on conflict (id) do update
+set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'public can read avatars'
+  ) then
+    create policy "public can read avatars"
+      on storage.objects
+      for select
+      to public
+      using (bucket_id = 'avatars');
+  end if;
+end
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'authenticated users can insert own avatar'
+  ) then
+    create policy "authenticated users can insert own avatar"
+      on storage.objects
+      for insert
+      to authenticated
+      with check (
+        bucket_id = 'avatars'
+        and (storage.foldername(name))[1] = auth.uid()::text
+        and name = auth.uid()::text || '/avatar.png'
+      );
+  end if;
+end
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'authenticated users can update own avatar'
+  ) then
+    create policy "authenticated users can update own avatar"
+      on storage.objects
+      for update
+      to authenticated
+      using (
+        bucket_id = 'avatars'
+        and (storage.foldername(name))[1] = auth.uid()::text
+        and name = auth.uid()::text || '/avatar.png'
+      )
+      with check (
+        bucket_id = 'avatars'
+        and (storage.foldername(name))[1] = auth.uid()::text
+        and name = auth.uid()::text || '/avatar.png'
+      );
+  end if;
+end
+$$;
 
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on table users to authenticated;

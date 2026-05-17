@@ -15,7 +15,7 @@ export function TodosApp({ variant = "page", onOpenApp }: TodosAppProps) {
         <header className="app-header">
           <span className="app-eyebrow">Live pod</span>
           <h1 className={`app-title ${isPopup ? "app-title--sm" : ""}`}>
-            Uncommon Hacks
+            PairPod
           </h1>
           <p className="status-note">{status}</p>
         </header>

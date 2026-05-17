@@ -409,6 +409,92 @@ body {
   min-width: 0;
 }
 
+.extension-app .post-detail-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
+  height: calc(100vh - 62px);
+  max-height: calc(100vh - 62px);
+  overflow: auto;
+  padding: var(--space-xs);
+}
+
+.extension-app .post-detail-main,
+.extension-app .post-comments,
+.extension-app .post-comments__list {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.extension-app .post-detail-layout .post-card {
+  min-height: auto;
+  align-content: start;
+}
+
+.extension-app .post-detail-layout .post-card--full {
+  min-height: 180px;
+}
+
+.extension-app .post-comments {
+  padding-bottom: var(--space-sm);
+}
+
+.extension-app .post-comments__list {
+  overflow: visible;
+}
+
+.extension-app .post-comment {
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+}
+
+.extension-app .post-comment__avatar {
+  width: 34px;
+  height: 34px;
+  font-size: var(--fs-md);
+}
+
+.extension-app .post-comment__body {
+  min-width: 0;
+}
+
+.extension-app .post-comment__body header {
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+
+.extension-app .post-comment__body h2,
+.extension-app .post-comment__body p {
+  overflow-wrap: anywhere;
+}
+
+.extension-app .post-comment__votes {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xs);
+}
+
+.extension-app .post-comment__votes button,
+.extension-app .post-reply-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.extension-app .post-reply-form,
+.extension-app .post-comments .post-compose {
+  display: grid;
+  gap: var(--space-sm);
+  margin-left: 0;
+  padding: var(--space-sm);
+}
+
+.extension-app .post-thread-replies {
+  margin-left: 0;
+  padding-left: var(--space-sm);
+}
+
 .extension-app .profile-scene,
 .extension-app .profile-scene__content {
   width: 100%;
@@ -456,65 +542,4 @@ body {
 
 .extension-app .profile-field input {
   min-height: 36px;
-}
-
-/* Hard popup-only forum sizing. This stylesheet only ships in the extension. */
-.post-window {
-  height: 552px !important;
-  min-height: 552px !important;
-  max-height: 552px !important;
-}
-
-.post-shell__content {
-  min-height: 560px !important;
-  padding: 4px !important;
-}
-
-.post-layout {
-  display: grid !important;
-  grid-template-columns: 1fr !important;
-  height: 492px !important;
-  max-height: 492px !important;
-  overflow: hidden !important;
-  padding: 4px !important;
-}
-
-.post-compose-panel,
-.post-sidebar,
-.post-filterbar {
-  display: none !important;
-}
-
-.post-stream {
-  min-height: 0 !important;
-  height: 100% !important;
-  grid-template-rows: 34px auto minmax(0, 1fr) !important;
-  overflow: hidden !important;
-}
-
-.post-stream .chat-panel-header {
-  min-height: 34px !important;
-}
-
-.post-stream .chat-panel-header h2 {
-  font-size: 18px !important;
-}
-
-.post-list {
-  min-height: 0 !important;
-  height: 318px !important;
-  max-height: 318px !important;
-  overflow-y: auto !important;
-  gap: 12px !important;
-  padding: 8px !important;
-  scroll-snap-type: y mandatory !important;
-}
-
-.post-card {
-  min-height: 300px !important;
-  grid-template-columns: 1fr !important;
-  justify-items: center !important;
-  align-content: center !important;
-  text-align: center !important;
-  scroll-snap-align: start !important;
 }
