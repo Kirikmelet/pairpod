@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   formatTimestamp,
@@ -12,6 +12,7 @@ import {
   type PostRecord,
   type CommentRecord,
   type UserProfileRecord,
+  useCurrentUserProfile,
   usePageBundle,
 } from "@/lib/client/page-api";
 import { useErrorSfx } from "@/lib/client/sfx";
@@ -40,6 +41,7 @@ type ReplyTarget = {
 /* ------------------------------------------------------------------ */
 
 export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
+  const { profile: currentProfile, loading: profileLoading } = useCurrentUserProfile();
   const {
     bundle,
     commentsByPost,
@@ -59,6 +61,12 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
 
   /* -- form state -------------------------------------------------- */
   const [mode, setMode] = useState<"question" | "guide">("question");
+
+  useEffect(() => {
+    if (!profileLoading && !currentProfile) {
+      window.location.href = "/";
+    }
+  }, [currentProfile, profileLoading]);
   const [header, setHeader] = useState("");
   const [content, setContent] = useState("");
   const [sectionId, setSectionId] = useState("general");
@@ -379,10 +387,11 @@ function PostCard({
 /* ------------------------------------------------------------------ */
 
 export function PostDetailPage({ postId }: { postId: string }) {
+  const { profile: currentProfile, loading: profileLoading } = useCurrentUserProfile();
   const {
     bundle,
     commentsByPost,
-    currentPostVotesById,
+    currentPostxVotesById,
     currentCommentVotesById,
     usersById,
     loading,

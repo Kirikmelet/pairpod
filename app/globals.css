@@ -2805,6 +2805,33 @@ body {
   animation: pop-in 0.55s var(--ease-bounce) 0.08s forwards;
 }
 
+.post-shell--popup {
+  min-height: auto;
+}
+
+.post-shell--popup .app-background {
+  display: none;
+}
+
+.post-shell--popup .post-shell__content {
+  min-height: auto;
+  padding: 0;
+  align-items: stretch;
+}
+
+.post-window--popup {
+  width: 100%;
+  min-height: auto;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.post-layout--popup {
+  grid-template-columns: 1fr;
+  padding: var(--space-xs);
+}
+
 .post-layout {
   min-height: 0;
   display: grid;
