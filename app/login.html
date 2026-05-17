@@ -370,6 +370,16 @@
         loggedInView.classList.remove('visible');
       }
 
+      function wireHomeButton() {
+        const runtime = globalThis.chrome ?? globalThis.browser;
+        if (runtime?.runtime?.getURL) {
+          homeBtn.href = runtime.runtime.getURL('popup.html');
+          return;
+        }
+
+        homeBtn.href = '/';
+      }
+
       // ── Generate a fallback user ID if Supabase doesn't provide one ──
       function generateUserId() {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -616,6 +626,7 @@
       }
 
       // ── Init ──
+      wireHomeButton();
       handleOAuthRedirect();
       restoreSession();
     </script>
