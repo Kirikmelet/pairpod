@@ -8,6 +8,7 @@ import { AuthForm } from "@/components/auth-form";
 import { ChatPage } from "@/components/chat-page";
 import { PodSelectionPage } from "@/components/pod-selection-page";
 import { PostDetailPage, PostStreamPage } from "@/components/post-stream-page";
+import { ProfileSettingsPage } from "@/components/profile-settings-page";
 import {
   completeClientSideAuthRedirect,
   createClient,
@@ -149,6 +150,8 @@ function ExtensionPopupApp({
         <PostStreamPage variant="popup" />
       ) : route.kind === "post-detail" ? (
         <PostDetailPage postId={route.postId} />
+      ) : route.kind === "profile" ? (
+        <ProfileSettingsPage variant="popup" />
       ) : (
         <PodSelectionPage userEmail={user.email ?? null} />
       )}
@@ -160,6 +163,7 @@ function useExtensionHashRoute():
   | { kind: "home" }
   | { kind: "chat" }
   | { kind: "posts" }
+  | { kind: "profile" }
   | { kind: "post-detail"; postId: string } {
   const [hash, setHash] = useState(() =>
     typeof window === "undefined" ? "" : window.location.hash,
@@ -184,6 +188,10 @@ function useExtensionHashRoute():
 
   if (path === "/posts") {
     return { kind: "posts" };
+  }
+
+  if (path === "/profile") {
+    return { kind: "profile" };
   }
 
   return { kind: "home" };

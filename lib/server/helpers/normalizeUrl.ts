@@ -24,13 +24,8 @@ export function normalizeUrl(input: string): string {
     url.port = ''
   }
 
-  if (url.pathname !== '/') {
-    url.pathname = url.pathname.replace(/\/+$/, '') || '/'
-  }
-
-  const sortedSearchParams = new URLSearchParams(url.searchParams)
-  sortedSearchParams.sort()
-  url.search = sortedSearchParams.toString()
+  url.pathname = '/'
+  url.search = ''
 
   return url.toString()
 }
