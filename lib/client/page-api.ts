@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import type { Json, TablesInsert } from "@/utils/database.types";
@@ -9,6 +9,8 @@ const GLOBAL_ROOM_URL = "https://global.pairpod.local/";
 const FALLBACK_URL = GLOBAL_ROOM_URL;
 const LOCAL_POST_VOTES_KEY = "pairpod.postVotes";
 const LOCAL_COMMENT_VOTES_KEY = "pairpod.commentVotes";
+const REALTIME_REFRESH_DEBOUNCE_MS = 150;
+const ACTIVE_POLL_INTERVAL_MS = 2500;
 const DEFAULT_PORTS = new Map([
   ["http:", "80"],
   ["https:", "443"],
@@ -457,6 +459,7 @@ export function usePageBundle(): UsePageBundleResult {
   const [bundle, setBundle] = useState<PageBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const bundleRef = useRef<PageBundle | null>(null);
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     if (!options?.silent) {
@@ -475,6 +478,7 @@ export function usePageBundle(): UsePageBundleResult {
         const data = await withCurrentUserVotes(
           await loadOrCreatePageBundle(currentUrl),
         );
+        bundleRef.current = data;
         setBundle(data);
         return data;
       }
@@ -489,12 +493,19 @@ export function usePageBundle(): UsePageBundleResult {
       }
 
       const data = await withCurrentUserVotes(payload.data);
+      bundleRef.current = data;
       setBundle(data);
       return data;
     } catch (loadError) {
       const message =
         loadError instanceof Error ? loadError.message : "Failed to load page data";
+      if (options?.silent && bundleRef.current) {
+        console.warn("Silent page data refresh failed.", loadError);
+        return bundleRef.current;
+      }
+
       setError(message);
+      bundleRef.current = null;
       setBundle(null);
       return null;
     } finally {
@@ -524,7 +535,7 @@ export function usePageBundle(): UsePageBundleResult {
 
       refreshTimeout = setTimeout(() => {
         void refresh({ silent: true });
-      }, 250);
+      }, REALTIME_REFRESH_DEBOUNCE_MS);
     };
 
     const channel = supabase
@@ -550,15 +561,37 @@ export function usePageBundle(): UsePageBundleResult {
       )
       .subscribe();
 
-    const pollInterval = setInterval(() => {
+    const refreshIfVisible = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+
       void refresh({ silent: true });
-    }, 15000);
+    };
+
+    const pollInterval = setInterval(
+      refreshIfVisible,
+      ACTIVE_POLL_INTERVAL_MS,
+    );
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refresh({ silent: true });
+      }
+    };
+    const handleFocus = () => {
+      void refresh({ silent: true });
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       if (refreshTimeout) {
         clearTimeout(refreshTimeout);
       }
       clearInterval(pollInterval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
       void supabase.removeChannel(channel);
     };
   }, [bundle?.room.id, refresh]);
