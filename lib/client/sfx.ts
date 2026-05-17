@@ -18,7 +18,7 @@ const audioCache = new Map<SoundName, HTMLAudioElement>();
 let didInstallUnlockListeners = false;
 let didPrimeAudio = false;
 
-export function playSfx(name: SoundName) {
+export async function playSfx(name: SoundName) {
   if (typeof window === "undefined" || !publicConfig) {
     return;
   }
@@ -28,8 +28,13 @@ export function playSfx(name: SoundName) {
     audio.muted = false;
     audio.volume = 1;
     audio.currentTime = 0;
-    void audio.play().catch(() => {});
+    await audio.play();
   } catch {}
+}
+
+export async function playSfxAndWait(name: SoundName, delayMs = 650) {
+  await playSfx(name);
+  await new Promise((resolve) => window.setTimeout(resolve, delayMs));
 }
 
 export function primeSfx() {

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
-import { playSfx, primeSfx, useErrorSfx } from "@/lib/client/sfx";
+import { playSfxAndWait, primeSfx, useErrorSfx } from "@/lib/client/sfx";
 import { getStaticEmailAuthRedirectUrl } from "@/utils/auth-redirect";
 import { createClient } from "@/utils/supabase/client";
 
@@ -46,8 +46,8 @@ export function AuthForm({
         return;
       }
       if (data.session) {
+        await playSfxAndWait("welcome");
         setIsLoading(false);
-        playSfx("welcome");
         onSuccess?.();
         return;
       }
@@ -64,8 +64,8 @@ export function AuthForm({
       return;
     }
 
+    await playSfxAndWait("welcome");
     setIsLoading(false);
-    playSfx("welcome");
     onSuccess?.();
   };
 
@@ -125,9 +125,11 @@ export function AuthForm({
         }}
         onSuccess={() => {
           setStatus(null);
-          setIsLoading(false);
-          playSfx("welcome");
-          onSuccess?.();
+          void (async () => {
+            await playSfxAndWait("welcome");
+            setIsLoading(false);
+            onSuccess?.();
+          })();
         }}
       />
 

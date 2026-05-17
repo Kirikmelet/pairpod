@@ -139,30 +139,91 @@ async function generateFakeChatPlan({
   userCount: number;
   messageCount: number;
 }) {
-  const content = await createMistralChatCompletion({
-    temperature: 0.85,
-    maxTokens: 1000,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You generate compact JSON for a fake but plausible chat room. Return JSON only, no Markdown.",
-      },
-      {
-        role: "user",
-        content: [
-          `Create ${userCount} fake chat users and ${messageCount} chat messages.`,
-          `Room scope: ${scope}.`,
-          `Room URL: ${targetUrl}.`,
-          topic?.trim() ? `Topic: ${topic.trim()}.` : "Topic: casual collaboration.",
-          "Schema: {\"users\":[{\"key\":\"short_stable_key\",\"displayName\":\"Name\",\"username\":\"lowercase_username\",\"bio\":\"short persona\"}],\"messages\":[{\"speaker\":\"matching_user_key\",\"body\":\"one concise chat message\"}]}",
-          "Keep messages friendly, domain-aware when relevant, and never claim to be a real person.",
-        ].join("\n"),
-      },
-    ],
-  });
+  try {
+    const content = await createMistralChatCompletion({
+      temperature: 0.85,
+      maxTokens: 1000,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You generate compact JSON for a fake but plausible chat room. Return JSON only, no Markdown. Write like helpful humans, not like a corporate assistant.",
+        },
+        {
+          role: "user",
+          content: [
+            `Create ${userCount} fake chat users and ${messageCount} chat messages.`,
+            `Room scope: ${scope}.`,
+            `Room URL: ${targetUrl}.`,
+            topic?.trim() ? `Topic: ${topic.trim()}.` : "Topic: casual collaboration.",
+            "Schema: {\"users\":[{\"key\":\"short_stable_key\",\"displayName\":\"Name\",\"username\":\"lowercase_username\",\"bio\":\"short persona\"}],\"messages\":[{\"speaker\":\"matching_user_key\",\"body\":\"one concise chat message\"}]}",
+            "Messages should sound like different real teammates: specific, casual, short, and a little opinionated.",
+            "Never claim to be a real person. Avoid generic AI disclaimers.",
+          ].join("\n"),
+        },
+      ],
+    });
 
-  return normalizeFakeChatPlan(parseJsonObject(content), userCount, messageCount);
+    return normalizeFakeChatPlan(parseJsonObject(content), userCount, messageCount);
+  } catch (error) {
+    console.warn("Mistral fake chat generation fell back to local text.", error);
+    return buildFallbackFakeChatPlan(scope, targetUrl, topic, userCount, messageCount);
+  }
+}
+
+function buildFallbackFakeChatPlan(
+  scope: FakeChatScope,
+  targetUrl: string,
+  topic: string | null | undefined,
+  userCount: number,
+  messageCount: number,
+): FakeChatPlan {
+  const seedUsers: FakeChatUserPlan[] = [
+    {
+      key: "maya",
+      displayName: "Maya Chen",
+      username: "maya_packet",
+      bio: "Practical builder who spots edge cases.",
+    },
+    {
+      key: "noah",
+      displayName: "Noah Patel",
+      username: "noah_mesh",
+      bio: "Systems thinker who likes tight plans.",
+    },
+    {
+      key: "iris",
+      displayName: "Iris Morgan",
+      username: "iris_signal",
+      bio: "Design-minded teammate who cares about flow.",
+    },
+    {
+      key: "sam",
+      displayName: "Sam Rivera",
+      username: "sam_sync",
+      bio: "Calm debugger with a bias for small fixes.",
+    },
+  ].slice(0, userCount);
+  const room = scope === "global" ? "Global" : targetUrl;
+  const subject = topic?.trim() || room;
+  const seedMessages = [
+    `I am reading ${subject} as a shared room, not just a link. That makes the chat feel way more useful.`,
+    "The next nice touch is making replies feel anchored, so people can skim without losing the thread.",
+    "I would keep the fake peers clearly synthetic, but let them talk like teammates who actually looked at the page.",
+    "This works best when the first message gives people something concrete to react to.",
+    `For ${room}, I would nudge users toward asking a question or opening a small DM when the thread gets specific.`,
+    "The UI should probably show presence without making it feel like a full dashboard.",
+    "Tiny opinion: fewer, better messages beats a flood of fake activity.",
+    "The strongest version is when AI peers seed the room, then get out of the way once humans arrive.",
+  ];
+
+  return {
+    users: seedUsers,
+    messages: seedMessages.slice(0, messageCount).map((body, index) => ({
+      speaker: seedUsers[index % seedUsers.length]?.key ?? seedUsers[0].key,
+      body,
+    })),
+  };
 }
 
 async function createFakeUsers(users: FakeChatUserPlan[]) {

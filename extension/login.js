@@ -66,15 +66,20 @@ function primeSfx() {
   }
 }
 
-function playSfx(name) {
+async function playSfx(name) {
   try {
     const audio = getSfxAudio(name);
     if (!audio) return;
     audio.muted = false;
     audio.volume = 1;
     audio.currentTime = 0;
-    void audio.play().catch(() => {});
+    await audio.play();
   } catch {}
+}
+
+async function playSfxAndWait(name, delayMs = 650) {
+  await playSfx(name);
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 window.addEventListener("pointerdown", primeSfx, { passive: true });
@@ -245,12 +250,12 @@ async function upsertUserProfile(session, username) {
     },
     body: JSON.stringify({
       id: user.id,
+      auth_user_id: user.id,
       email: user.email ?? null,
       username: username || user.user_metadata?.username || null,
       configurations: {
         displayName: user.user_metadata?.full_name || user.user_metadata?.name || null,
       },
-      avatar_url: user.user_metadata?.avatar_url || undefined,
     }),
   });
   if (!response.ok) {
@@ -280,7 +285,7 @@ homeBtn?.addEventListener("click", (event) => {
 
 logoutBtn?.addEventListener("click", async () => {
   primeSfx();
-  playSfx("goodbye");
+  await playSfxAndWait("goodbye", 1200);
   await clearSession();
   showLoggedOut();
   showToast("Signed out", "info");
@@ -320,7 +325,7 @@ googleBtn?.addEventListener("click", async (event) => {
       }
     });
     if (!response?.ok) throw new Error(response?.error || "Google sign-in failed.");
-    playSfx("welcome");
+    await playSfxAndWait("welcome");
     showToast("Signed in with Google", "success");
     await restoreSession();
   } catch (error) {
@@ -353,7 +358,7 @@ authForm?.addEventListener("submit", async (event) => {
     }
     await saveSession(session);
     await upsertUserProfile(session, username);
-    playSfx("welcome");
+    await playSfxAndWait("welcome");
     showToast(currentMode === "register" ? "Account created" : "Signed in", "success");
     showLoggedIn(session.user?.email || email, username || session.user?.email || "");
   } catch (error) {

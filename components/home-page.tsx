@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { AuthForm } from "@/components/auth-form";
@@ -9,7 +9,9 @@ import { DmPage } from "@/components/dm-page";
 import { PodSelectionPage } from "@/components/pod-selection-page";
 import { PostDetailPage, PostStreamPage } from "@/components/post-stream-page";
 import { ProfileSettingsPage } from "@/components/profile-settings-page";
-import { playSfx, useErrorSfx, useSfxUnlock } from "@/lib/client/sfx";
+import { UserProfilePage } from "@/components/user-profile-page";
+import { PeerNetworkPage } from "@/components/peer-network-page";
+import { playSfx, playSfxAndWait, useErrorSfx, useSfxUnlock } from "@/lib/client/sfx";
 import {
   completeClientSideAuthRedirect,
   createClient,
@@ -30,6 +32,7 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const didPlayWelcomeRef = useRef(false);
   useSfxUnlock();
   useErrorSfx(authError);
 
@@ -67,11 +70,6 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
           return;
         }
 
-        if (didCompleteRedirect) {
-          playSfx("welcome");
-          return refreshUser();
-        }
-
         return refreshUser();
       })
       .catch(() => {
@@ -92,8 +90,17 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
     };
   }, [refreshUser]);
 
+  useEffect(() => {
+    if (isLoading || !user || didPlayWelcomeRef.current) {
+      return;
+    }
+
+    didPlayWelcomeRef.current = true;
+    void playSfx("welcome");
+  }, [isLoading, user]);
+
   const handleSignOut = async () => {
-    playSfx("goodbye");
+    await playSfxAndWait("goodbye", 1200);
     const supabase = createClient();
     await supabase.auth.signOut();
     setUser(null);
@@ -208,10 +215,14 @@ function ExtensionPopupApp({
         <ChatPage />
       ) : route.kind === "posts" ? (
         <PostStreamPage variant="popup" />
+      ) : route.kind === "peers" ? (
+        <PeerNetworkPage />
       ) : route.kind === "post-detail" ? (
         <PostDetailPage postId={route.postId} />
       ) : route.kind === "profile" ? (
         <ProfileSettingsPage variant="popup" />
+      ) : route.kind === "user-profile" ? (
+        <UserProfilePage userId={route.userId} />
       ) : route.kind === "dms" ? (
         <DmPage threadId={route.threadId} />
       ) : (
@@ -225,7 +236,9 @@ function useExtensionHashRoute():
   | { kind: "home" }
   | { kind: "chat" }
   | { kind: "posts" }
+  | { kind: "peers" }
   | { kind: "profile" }
+  | { kind: "user-profile"; userId: string }
   | { kind: "dms"; threadId?: string }
   | { kind: "post-detail"; postId: string } {
   const [hash, setHash] = useState(() =>
@@ -253,8 +266,17 @@ function useExtensionHashRoute():
     return { kind: "posts" };
   }
 
+  if (path === "/peers") {
+    return { kind: "peers" };
+  }
+
   if (path === "/profile") {
     return { kind: "profile" };
+  }
+
+  const userProfileMatch = path.match(/^\/users\/([^/?#]+)$/);
+  if (userProfileMatch?.[1]) {
+    return { kind: "user-profile", userId: decodeURIComponent(userProfileMatch[1]) };
   }
 
   if (path === "/dms") {

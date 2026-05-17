@@ -133,6 +133,10 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
                   >
                     {domainName}
                   </a>
+                  <a className="room-scope-tabs__dm" href={buildScopedHref("/dms")}>
+                    DMs
+                  </a>
+                  <a href={buildScopedHref("/peers")}>3D Peers</a>
                 </div>
                 <form
                   className="domain-picker"
@@ -214,7 +218,6 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
             <aside className="pod-sidebar" aria-label="Pod activity">
               <UserTile
                 email={userEmail}
-                dmsHref={buildScopedHref("/dms")}
                 profileHref={buildScopedHref("/profile")}
                 avatarUrl={profile?.avatar_url ?? DEFAULT_AVATAR_URL}
                 displayName={currentUserName}
@@ -318,13 +321,11 @@ function ActivityPanel({
 
 function UserTile({
   email,
-  dmsHref,
   profileHref,
   avatarUrl,
   displayName,
 }: {
   email: string | null;
-  dmsHref: string;
   profileHref: string;
   avatarUrl: string;
   displayName: string;
@@ -342,7 +343,6 @@ function UserTile({
         </p>
       </div>
       <div className="pod-user-actions">
-        <a href={dmsHref}>DMs</a>
         <a className="pod-user-menu" href={profileHref} aria-label="Open profile settings">
           <span aria-hidden="true">v</span>
         </a>

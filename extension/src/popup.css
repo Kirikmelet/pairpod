@@ -586,6 +586,73 @@ body {
   min-height: 36px;
 }
 
+.extension-app .peer-map-shell {
+  width: 100%;
+  min-height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  padding: var(--space-xs);
+}
+
+.extension-app .peer-map-window {
+  width: 100%;
+  max-width: 100%;
+  height: calc(100vh - 8px);
+  border-width: 1px;
+}
+
+.extension-app .peer-map-body {
+  max-height: calc(100vh - 72px);
+  padding: var(--space-xs);
+  gap: var(--space-xs);
+  overflow: auto;
+}
+
+.extension-app .peer-map-canvas {
+  min-height: 360px;
+  height: 410px;
+}
+
+.extension-app .peer-map-controls button {
+  min-height: 28px;
+  font-size: var(--fs-xs);
+}
+
+.extension-app .user-profile-window {
+  width: 100%;
+  max-width: 100%;
+  height: calc(100vh - 8px);
+  margin: 0;
+  border-width: 1px;
+}
+
+.extension-app .user-profile-body {
+  max-height: calc(100vh - 72px);
+  overflow: auto;
+  padding: var(--space-sm);
+  gap: var(--space-sm);
+}
+
+.extension-app .user-profile-card {
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+}
+
+.extension-app .user-profile-card h1 {
+  font-size: var(--fs-xl);
+}
+
+.extension-app .user-profile-avatar {
+  width: 56px;
+  height: 56px;
+}
+
+.extension-app .user-profile-facts div {
+  grid-template-columns: 1fr;
+  gap: var(--space-xxs);
+}
+
 .extension-app .dm-shell,
 .extension-app .dm-window {
   width: 100%;

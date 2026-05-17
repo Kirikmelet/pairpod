@@ -409,10 +409,91 @@ create policy "authenticated users can write events"
   using (true)
   with check (true);
 
--- DM routes authenticate the request and enforce membership server-side.
--- Leave RLS enabled on DM tables without browser-facing policies so direct
--- client access stays blocked by default and server-side service role access
--- can perform the necessary membership checks explicitly.
+create or replace function public.current_app_user_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select users.id
+  from public.users
+  where users.auth_user_id = auth.uid()
+  limit 1
+$$;
+
+create or replace function public.can_access_dm_thread(p_thread_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.dm_thread_members member
+    where member.thread_id = p_thread_id
+      and member.user_id = public.current_app_user_id()
+  )
+$$;
+
+create or replace function public.can_manage_dm_thread(p_thread_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.dm_threads thread
+    where thread.id = p_thread_id
+      and thread.created_by = public.current_app_user_id()
+  )
+$$;
+
+create policy "authenticated members can read dm_threads"
+  on dm_threads for select
+  to authenticated
+  using (public.can_access_dm_thread(id));
+
+create policy "authenticated users can create dm_threads"
+  on dm_threads for insert
+  to authenticated
+  with check (created_by = public.current_app_user_id());
+
+create policy "authenticated members can update dm_threads"
+  on dm_threads for update
+  to authenticated
+  using (public.can_access_dm_thread(id))
+  with check (public.can_access_dm_thread(id));
+
+create policy "authenticated members can read dm_thread_members"
+  on dm_thread_members for select
+  to authenticated
+  using (public.can_access_dm_thread(thread_id));
+
+create policy "thread creators can insert dm_thread_members"
+  on dm_thread_members for insert
+  to authenticated
+  with check (public.can_manage_dm_thread(thread_id));
+
+create policy "authenticated members can read dm_messages"
+  on dm_messages for select
+  to authenticated
+  using (public.can_access_dm_thread(thread_id));
+
+create policy "authenticated members can insert dm_messages"
+  on dm_messages for insert
+  to authenticated
+  with check (
+    sender_id = public.current_app_user_id()
+    and public.can_access_dm_thread(thread_id)
+  );
+
+grant execute on function public.current_app_user_id() to authenticated;
+grant execute on function public.can_access_dm_thread(uuid) to authenticated;
+grant execute on function public.can_manage_dm_thread(uuid) to authenticated;
 
 create or replace function public.increment_post_likes(
   p_post_id uuid,

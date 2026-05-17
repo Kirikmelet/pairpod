@@ -15,6 +15,7 @@ import {
   usePageBundle,
 } from "@/lib/client/page-api";
 import { useErrorSfx } from "@/lib/client/sfx";
+import { getUserProfilePath } from "@/lib/client/users";
 
 /* ------------------------------------------------------------------ */
 /*  Supabase config (matches login page)                               */
@@ -465,7 +466,8 @@ function PostCard({
             <a href={postHref}>{post.header || truncate(post.content)}</a>
           </h2>
           <p>
-            posted by <strong>{getDisplayName(post.user_id, usersById)}</strong>{" "}
+            posted by{" "}
+            <ProfileNameLink userId={post.user_id} usersById={usersById} />{" "}
             - {formatTimestamp(post.created_at)}
           </p>
         </header>
@@ -687,9 +689,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
                 <h2>{post.header || truncate(post.content)}</h2>
                 <p>
                   posted by{" "}
-                  <strong>
-                    {getDisplayName(post.user_id, usersById)}
-                  </strong>{" "}
+                  <ProfileNameLink userId={post.user_id} usersById={usersById} />{" "}
                   - {formatTimestamp(post.created_at)}
                 </p>
               </header>
@@ -816,6 +816,27 @@ function pickTone(index: number) {
   return ["blue", "green", "orange", "purple"][index % 4];
 }
 
+function ProfileNameLink({
+  userId,
+  usersById,
+}: {
+  userId: string | null;
+  usersById: Record<string, UserProfileRecord>;
+}) {
+  const displayName = getDisplayName(userId, usersById);
+  const href = getUserProfilePath(userId);
+
+  if (!href) {
+    return <strong>{displayName}</strong>;
+  }
+
+  return (
+    <a className="profile-name-link" href={href}>
+      <strong>{displayName}</strong>
+    </a>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  PostShell                                                          */
 /* ------------------------------------------------------------------ */
@@ -864,6 +885,7 @@ function PostShell({
           <a href={chatHref}>&rarr; Chat</a>
           <a href={podsHref}>Pods</a>
           <a href={postsHref}>Posts</a>
+          <a href={chatHref.replace("/chat", "/peers").replace("#/chat", "#/peers")}>3D Peers</a>
           <a
             href={globalHref}
             className={roomScope === "global" ? "chat-nav__active" : ""}
@@ -1147,7 +1169,9 @@ function CommentCard({
 
       <div className="post-comment__body">
         <header>
-          <h2>@{displayName}</h2>
+          <h2>
+            @<ProfileNameLink userId={comment.user_id} usersById={usersById} />
+          </h2>
           <span>{formatTimestamp(comment.created_at)}</span>
         </header>
         <p>{comment.content}</p>
@@ -1234,7 +1258,7 @@ function CommentCard({
                 <div className="post-comment__body">
                   <header>
                     <h2>
-                      @{getDisplayName(reply.user_id, usersById)}
+                      @<ProfileNameLink userId={reply.user_id} usersById={usersById} />
                     </h2>
                     <span>{formatTimestamp(reply.created_at)}</span>
                   </header>

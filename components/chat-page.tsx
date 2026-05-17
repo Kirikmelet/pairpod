@@ -11,8 +11,10 @@ import {
   useCurrentUserProfile,
   usePageBundle,
 } from "@/lib/client/page-api";
+import { createHumanFakeChatDirect } from "@/lib/client/fake-chat";
 import { getDmPath, startDirectMessage } from "@/lib/client/dms";
 import { playSfx, useErrorSfx } from "@/lib/client/sfx";
+import { getUserProfilePath } from "@/lib/client/users";
 
 type ChatPageProps = {
   currentUsername?: string;
@@ -42,6 +44,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
   const domainName = getRoomDisplayName(domainUrl);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingPeers, setIsGeneratingPeers] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const seenChatPostIdsRef = useRef<Set<string> | null>(null);
@@ -187,6 +190,45 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     }
   };
 
+  const handleGeneratePeers = async () => {
+    if (!bundle || isGeneratingPeers) {
+      return;
+    }
+
+    setIsGeneratingPeers(true);
+    setSubmitError(null);
+
+    try {
+      if (isExtensionRuntime()) {
+        await createHumanFakeChatDirect({
+          roomId: bundle.room.id,
+          scope: roomScope,
+          title: getChatTitle(bundle),
+          userCount: 3,
+          messageCount: 5,
+        });
+      } else {
+        await postJson("/api/ai/fake-chat", {
+          scope: roomScope,
+          domainUrl,
+          topic: getChatTitle(bundle),
+          userCount: 3,
+          messageCount: 5,
+        });
+      }
+
+      await refresh({ silent: true });
+    } catch (generateError) {
+      setSubmitError(
+        generateError instanceof Error
+          ? generateError.message
+          : "Failed to create AI peers",
+      );
+    } finally {
+      setIsGeneratingPeers(false);
+    }
+  };
+
   return (
     <main className="chat-shell">
       <ChatSceneBackground />
@@ -228,6 +270,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
               {domainName}
             </a>
             <a href={getDmPath("/dms")}>DMs</a>
+            <a href={buildScopedHref("/peers")}>3D Peers</a>
           </nav>
 
           <div className="chat-layout">
@@ -286,6 +329,17 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   </span>
                   Open Posts
                 </a>
+                <button
+                  type="button"
+                  className="chat-side-button"
+                  disabled={!bundle || isGeneratingPeers}
+                  onClick={() => void handleGeneratePeers()}
+                >
+                  <span className="chat-side-icon" aria-hidden="true">
+                    <SparkIcon />
+                  </span>
+                  {isGeneratingPeers ? "Creating..." : "AI peers"}
+                </button>
                 <a href={buildScopedHref("/")} className="chat-side-button">
                   <span className="chat-side-icon" aria-hidden="true">
                     <HomeIcon />
@@ -336,7 +390,6 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                               className={`chat-name chat-name--${pickTone(index)}`}
                             >
                               <DmInlineUser
-                                currentUserId={profile?.id ?? null}
                                 userId={post.user_id}
                                 userName={getDisplayName(post.user_id, usersById)}
                               />
@@ -439,6 +492,20 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   </p>
                 </div>
               </section>
+              <section className="chat-rail-panel">
+                <PanelHeader title="Peer Tools" />
+                <div className="chat-rail-panel__body">
+                  <button
+                    type="button"
+                    className="chat-tool-button"
+                    disabled={!bundle || isGeneratingPeers}
+                    onClick={() => void handleGeneratePeers()}
+                  >
+                    {isGeneratingPeers ? "Creating AI peers..." : "Create AI peer chat"}
+                  </button>
+                  <a href={buildScopedHref("/peers")}>Open 3D peer map</a>
+                </div>
+              </section>
               <RailPanel
                 title="Recent Posts"
                 action={buildScopedHref("/posts")}
@@ -456,6 +523,16 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
       </div>
     </main>
   );
+}
+
+function isExtensionRuntime() {
+  const globalWithExtensionApis = globalThis as typeof globalThis & {
+    browser?: { runtime?: { id?: string } };
+    chrome?: { runtime?: { id?: string } };
+  };
+  const runtime = globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
+
+  return Boolean(runtime?.runtime?.id);
 }
 
 function isRecordWithId(value: unknown): value is { id: string } {
@@ -626,10 +703,10 @@ function DmUserMenu({
   userId: string | null;
   userName: string;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canStartDm = Boolean(userId && userId !== currentUserId);
+  const profileHref = getUserProfilePath(userId);
 
   const handleStartDm = async () => {
     if (!userId || isStarting) {
@@ -651,20 +728,19 @@ function DmUserMenu({
 
   return (
     <div className="dm-user-menu">
-      <button
-        type="button"
-        className="dm-user-menu__trigger"
-        onClick={() => setIsOpen((current) => !current)}
-      >
-        {userName}
+      {profileHref ? (
+        <a className="dm-user-menu__trigger" href={profileHref}>
+          {userName}
+        </a>
+      ) : (
+        <strong>{userName}</strong>
+      )}
+      <button type="button" disabled={!canStartDm || isStarting} onClick={handleStartDm}>
+        {isStarting ? "Opening..." : "DM"}
       </button>
-      {isOpen ? (
+      {error ? (
         <div className="dm-user-menu__popup">
-          <strong>{userName}</strong>
-          <button type="button" disabled={!canStartDm || isStarting} onClick={handleStartDm}>
-            {isStarting ? "Opening..." : canStartDm ? "Start DM" : "DM unavailable"}
-          </button>
-          {error ? <p>{error}</p> : null}
+          <p>{error}</p>
         </div>
       ) : null}
     </div>
@@ -672,46 +748,19 @@ function DmUserMenu({
 }
 
 function DmInlineUser({
-  currentUserId,
   userId,
   userName,
 }: {
-  currentUserId: string | null;
   userId: string | null;
   userName: string;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isStarting, setIsStarting] = useState(false);
-  const canStartDm = Boolean(userId && userId !== currentUserId);
+  const profileHref = getUserProfilePath(userId);
 
-  const handleStartDm = async () => {
-    if (!userId || isStarting) {
-      return;
-    }
+  if (!profileHref) {
+    return <span>{userName}</span>;
+  }
 
-    setIsStarting(true);
-    try {
-      const thread = await startDirectMessage(userId);
-      window.location.href = getDmPath(`/dms/${thread.id}`);
-    } finally {
-      setIsStarting(false);
-    }
-  };
-
-  return (
-    <span className="dm-inline-user">
-      <button type="button" onClick={() => setIsOpen((current) => !current)}>
-        {userName}
-      </button>
-      {isOpen ? (
-        <span className="dm-inline-user__popup">
-          <button type="button" disabled={!canStartDm || isStarting} onClick={handleStartDm}>
-            {isStarting ? "Opening..." : canStartDm ? "Start DM" : "DM unavailable"}
-          </button>
-        </span>
-      ) : null}
-    </span>
-  );
+  return <a href={profileHref}>{userName}</a>;
 }
 
 function PodGlyph() {
@@ -783,6 +832,17 @@ function HomeIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
       <path d="M10 3L3 9h2v8h4v-5h2v5h4V9h2L10 3z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function SparkIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+      <path
+        d="M10 2l1.5 5.2L17 9l-5.5 1.8L10 16l-1.5-5.2L3 9l5.5-1.8L10 2z"
+        fill="currentColor"
+      />
     </svg>
   );
 }

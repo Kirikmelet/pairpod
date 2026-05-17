@@ -15,6 +15,7 @@ import {
   formatTimestamp,
   useCurrentUserProfile,
 } from "@/lib/client/page-api";
+import { getUserProfilePath } from "@/lib/client/users";
 import { createClient } from "@/utils/supabase/client";
 
 type DmPageProps = {
@@ -67,7 +68,14 @@ export function DmPage({ threadId }: DmPageProps) {
         }
       } catch (loadError) {
         if (isMounted) {
-          setError(loadError instanceof Error ? loadError.message : "Could not load DMs.");
+          setThreads([]);
+          setError(
+            threadId
+              ? loadError instanceof Error
+                ? loadError.message
+                : "Could not load DMs."
+              : null,
+          );
         }
       } finally {
         if (isMounted) {
@@ -353,12 +361,38 @@ function DmMessageBubble({
       <img src={message.sender?.avatar_url || DEFAULT_AVATAR_URL} alt="" />
       <div>
         <header>
-          <strong>{isOwnMessage ? "You" : getMemberDisplayName(message.sender)}</strong>
+          {isOwnMessage ? (
+            <strong>You</strong>
+          ) : (
+            <UserProfileLink userId={message.sender?.id ?? null}>
+              {getMemberDisplayName(message.sender)}
+            </UserProfileLink>
+          )}
           <time>{formatTimestamp(message.createdAt)}</time>
         </header>
         <p>{message.content}</p>
       </div>
     </article>
+  );
+}
+
+function UserProfileLink({
+  children,
+  userId,
+}: {
+  children: string;
+  userId: string | null;
+}) {
+  const href = getUserProfilePath(userId);
+
+  if (!href) {
+    return <strong>{children}</strong>;
+  }
+
+  return (
+    <a className="profile-name-link" href={href}>
+      <strong>{children}</strong>
+    </a>
   );
 }
 
