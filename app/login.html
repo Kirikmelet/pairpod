@@ -163,7 +163,7 @@
       </section>
     </main>
 
-    <script>
+  <script>
       // ── Supabase Config ──
       const SUPABASE_URL = 'https://xgfgqzveuyeceupfaebh.supabase.co';
       const SUPABASE_KEY = 'sb_secret_-POLXtHG-ZdoR8y-f50bxg_U7sFieIC';
@@ -241,8 +241,63 @@
         loggedInView.classList.remove('visible');
       }
  
-      // ── Upsert profile into "profiles" table ──
-      async function upsertProfile(userId, email, username, accessToken) {
+      // ── Generate a fallback user ID if Supabase doesn't provide one ──
+      function generateUserId() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+      }
+ 
+      // ── Capture referral URL (the page that sent the user here) ──
+      const referralUrl = document.referrer || new URLSearchParams(window.location.search).get('ref') || null;
+ 
+      // ── Upsert into "users" table ──
+      async function upsertUser(userId, email, username, accessToken, isNewUser = false) {
+        const id = userId || generateUserId();
+        const payload = {
+          id: id,
+          email: email,
+          username: username || null,
+          updated_at: new Date().toISOString(),
+        };
+ 
+        if (isNewUser) {
+          payload.created_at = new Date().toISOString();
+          payload.referral_url = referralUrl;
+        }
+ 
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/users`, {
+            method: 'POST',
+            headers: {
+              ...supabaseHeaders(accessToken),
+              'Prefer': 'resolution=merge-duplicates',
+            },
+            body: JSON.stringify(payload),
+          });
+        } catch (e) {
+          console.warn('Users table upsert failed:', e);
+        }
+ 
+        return id;
+      }
+ 
+      // ── Upsert into "profiles" table ──
+      async function upsertProfile(userId, email, username, accessToken, isNewUser = false) {
+        const id = userId || generateUserId();
+        const payload = {
+          id: id,
+          email: email,
+          username: username || null,
+          updated_at: new Date().toISOString(),
+        };
+ 
+        if (isNewUser) {
+          payload.created_at = new Date().toISOString();
+          payload.referral_url = referralUrl;
+        }
+ 
         try {
           await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
             method: 'POST',
@@ -250,16 +305,13 @@
               ...supabaseHeaders(accessToken),
               'Prefer': 'resolution=merge-duplicates',
             },
-            body: JSON.stringify({
-              id: userId,
-              email: email,
-              username: username || null,
-              updated_at: new Date().toISOString(),
-            }),
+            body: JSON.stringify(payload),
           });
         } catch (e) {
-          console.warn('Profile upsert failed (table may not exist yet):', e);
+          console.warn('Profiles table upsert failed:', e);
         }
+ 
+        return id;
       }
  
       // ── Sign Up (register) ──
@@ -336,7 +388,9 @@
             // Some Supabase projects require email confirmation
             if (data.access_token) {
               saveSession(data);
-              await upsertProfile(data.user.id, email, username, data.access_token);
+              const uid = data.user?.id || null;
+              await upsertUser(uid, email, username, data.access_token, true);
+              await upsertProfile(uid, email, username, data.access_token, true);
               showToast('Account created — you\'re in!', 'success');
               showLoggedIn(email, username);
             } else if (data.id) {
@@ -350,7 +404,8 @@
             const data = await signIn(email, password);
             saveSession(data);
             const uname = data.user?.user_metadata?.username || '';
-            await upsertProfile(data.user.id, email, uname, data.access_token);
+            await upsertUser(data.user.id, email, uname, data.access_token, false);
+            await upsertProfile(data.user.id, email, uname, data.access_token, false);
             showToast('Signed in successfully', 'success');
             showLoggedIn(email, uname);
           }
@@ -392,7 +447,8 @@
             saveSession(session);
             const email = user.email || '';
             const username = user.user_metadata?.full_name || user.user_metadata?.username || '';
-            upsertProfile(user.id, email, username, accessToken);
+            upsertUser(user.id, email, username, accessToken, true);
+            upsertProfile(user.id, email, username, accessToken, true);
             showToast('Signed in with Google', 'success');
             showLoggedIn(email, username);
           })
