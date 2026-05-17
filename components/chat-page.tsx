@@ -107,7 +107,9 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
       await refresh();
     } catch (sendError) {
       setSubmitError(
-        sendError instanceof Error ? sendError.message : "Failed to send message",
+        sendError instanceof Error
+          ? sendError.message
+          : "Failed to send message",
       );
     } finally {
       setIsSubmitting(false);
@@ -118,214 +120,292 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     <main className="chat-shell">
       <ChatSceneBackground />
       <div className="chat-shell__content">
-      <section className="chat-window xp-window chat-window--animate" aria-labelledby="chat-title">
-        <div className="xp-title-bar chat-titlebar">
-          <PodGlyph />
-          <span className="xp-title-text" id="chat-title">
-            3WChat — {getChatTitle(bundle)}
-          </span>
-          <div className="xp-title-controls" aria-hidden="true">
-            <span className="xp-title-btn xp-title-btn--min">_</span>
-            <span className="xp-title-btn xp-title-btn--max">[]</span>
-            <span className="xp-title-btn xp-title-btn--close">x</span>
+        <section
+          className="chat-window xp-window chat-window--animate"
+          aria-labelledby="chat-title"
+        >
+          <div className="xp-title-bar chat-titlebar">
+            <PodGlyph />
+            <span className="xp-title-text" id="chat-title">
+              PairPod - {getChatTitle(bundle)}
+            </span>
+            <div className="xp-title-controls" aria-hidden="true">
+              <span className="xp-title-btn xp-title-btn--min">_</span>
+              <span className="xp-title-btn xp-title-btn--max">[]</span>
+              <span className="xp-title-btn xp-title-btn--close">x</span>
+            </div>
           </div>
-        </div>
 
-        <nav className="chat-menu chat-nav" aria-label="Chat menu">
-          <a href={buildScopedHref("/")}>Room</a>
-          <a href={buildScopedHref("/posts")}>Posts</a>
-          <a href={buildScopedHref("/chat")} className="chat-nav__active">Chat</a>
-          <a href={buildScopedHref("/posts")}>Questions</a>
-          <a href={buildScopedHref("/")}>Help</a>
-        </nav>
+          <nav className="chat-menu chat-nav" aria-label="Chat menu">
+            <a href={buildScopedHref("/")}>Room</a>
+            <a href={buildScopedHref("/posts")}>Posts</a>
+            <a href={buildScopedHref("/chat")} className="chat-nav__active">
+              Chat
+            </a>
+            <a href={buildScopedHref("/posts")}>Questions</a>
+            <a href={buildScopedHref("/")}>Help</a>
+          </nav>
 
-        <div className="chat-layout">
-          <aside className="chat-members" aria-label="Room members">
-            <PanelHeader title={`Members (${authors.length || 1})`} />
-            <div className="chat-members__list">
-              {authors.length > 0 ? (
-                authors.map((member, index) => (
-                  <article className="chat-member" key={member.name}>
-                    <span className={`chat-avatar chat-avatar--${(index % 8) + 1}`}>
-                      {member.name.charAt(0).toUpperCase()}
-                    </span>
+          <div className="chat-layout">
+            <aside className="chat-members" aria-label="Room members">
+              <PanelHeader title={`Members (${authors.length || 1})`} />
+              <div className="chat-members__list">
+                {authors.length > 0 ? (
+                  authors.map((member, index) => (
+                    <article className="chat-member" key={member.name}>
+                      <span
+                        className={`chat-avatar chat-avatar--${(index % 8) + 1}`}
+                      >
+                        {member.name.charAt(0).toUpperCase()}
+                      </span>
+                      <div>
+                        <h2>{member.name}</h2>
+                        <p>
+                          <span
+                            className={`chat-status-dot chat-status-dot--${member.status === "Online" ? "online" : "away"}`}
+                          />
+                          {member.status}
+                        </p>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <article className="chat-member">
+                    <span className="chat-avatar chat-avatar--1">A</span>
                     <div>
-                      <h2>{member.name}</h2>
+                      <h2>Anonymous</h2>
                       <p>
-                        <span className={`chat-status-dot chat-status-dot--${member.status === "Online" ? "online" : "away"}`} />
-                        {member.status}
+                        <span className="chat-status-dot chat-status-dot--away" />
+                        Waiting
                       </p>
                     </div>
                   </article>
-                ))
-              ) : (
-                <article className="chat-member">
-                  <span className="chat-avatar chat-avatar--1">A</span>
-                  <div>
-                    <h2>Anonymous</h2>
-                    <p><span className="chat-status-dot chat-status-dot--away" />Waiting</p>
-                  </div>
-                </article>
-              )}
-            </div>
-            <div className="chat-member-actions">
-              <a href={buildScopedHref("/posts")} className="chat-side-button">
-                <span className="chat-side-icon" aria-hidden="true">
-                  <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-                    <rect x="3" y="5" width="14" height="2" rx="1" fill="currentColor"/>
-                    <rect x="3" y="9" width="10" height="2" rx="1" fill="currentColor"/>
-                    <rect x="3" y="13" width="12" height="2" rx="1" fill="currentColor"/>
-                  </svg>
-                </span>
-                Open Posts
-              </a>
-              <a href={buildScopedHref("/")} className="chat-side-button">
-                <span className="chat-side-icon" aria-hidden="true">
-                  <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-                    <path d="M10 3L3 9h2v8h4v-5h2v5h4V9h2L10 3z" fill="currentColor"/>
-                  </svg>
-                </span>
-                Back to Pod
-              </a>
-            </div>
-          </aside>
+                )}
+              </div>
+              <div className="chat-member-actions">
+                <a
+                  href={buildScopedHref("/posts")}
+                  className="chat-side-button"
+                >
+                  <span className="chat-side-icon" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+                      <rect
+                        x="3"
+                        y="5"
+                        width="14"
+                        height="2"
+                        rx="1"
+                        fill="currentColor"
+                      />
+                      <rect
+                        x="3"
+                        y="9"
+                        width="10"
+                        height="2"
+                        rx="1"
+                        fill="currentColor"
+                      />
+                      <rect
+                        x="3"
+                        y="13"
+                        width="12"
+                        height="2"
+                        rx="1"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </span>
+                  Open Posts
+                </a>
+                <a href={buildScopedHref("/")} className="chat-side-button">
+                  <span className="chat-side-icon" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+                      <path
+                        d="M10 3L3 9h2v8h4v-5h2v5h4V9h2L10 3z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </span>
+                  Back to Pod
+                </a>
+              </div>
+            </aside>
 
-          <section className="chat-main" aria-label="Chat transcript">
-            <PanelHeader title="# chat" />
-            <div className="chat-topic">
-              <p>*** You have joined #chat</p>
-              <p>*** Topic: Shared discussion for {getChatTitle(bundle)}</p>
-              <p>
-                ***{" "}
-                {loading
-                  ? "Loading..."
-                  : `${chatPosts.length} messages and ${bundle?.comments.length ?? 0} comments`}
-              </p>
-            </div>
-
-            {error ? <p className="chat-error">{error}</p> : null}
-            {submitError ? <p className="chat-error">{submitError}</p> : null}
-
-            <div className="chat-transcript">
-              {loading ? (
-                <article className="chat-message">
-                  <div className="chat-message__body">
-                    <p>Loading chat history...</p>
-                  </div>
-                </article>
-              ) : chatPosts.length > 0 ? (
-                chatPosts.map((post, index) => {
-                  const relatedComments = commentsByPost[post.id] ?? [];
-                  const lines = splitContentLines(post.content);
-
-                  return (
-                    <article className="chat-message" key={post.id}>
-                      <span className="chat-message__time">
-                        [{formatTimestamp(post.created_at)}]
-                      </span>
-                      <div className="chat-message__body">
-                        <p>
-                          <strong className={`chat-name chat-name--${pickTone(index)}`}>
-                            {getDisplayName(post.user_id)}:
-                          </strong>{" "}
-                          {lines[0] ?? post.content}
-                        </p>
-                        {lines.slice(1).map((line) => (
-                          <p key={`${post.id}-${line}`}>{line}</p>
-                        ))}
-                        {relatedComments.length > 0 ? (
-                          <a
-                            className="chat-thread"
-                            href={buildScopedHref(`/posts/${post.id}`)}
-                          >
-                            -&gt; {relatedComments.length} replies - View thread
-                          </a>
-                        ) : null}
-                      </div>
-                    </article>
-                  );
-                })
-              ) : (
-                <article className="chat-message">
-                  <div className="chat-message__body">
-                    <p>No chat messages yet. Send the first one below.</p>
-                  </div>
-                </article>
-              )}
-            </div>
-
-            <div className="chat-toolbar" aria-label="Message tools">
-              {["A", "A*", "B", "I", "U", "link", "img", ":)"].map((tool) => (
-                <button type="button" key={tool}>
-                  {tool}
-                </button>
-              ))}
-            </div>
-
-            <form className="chat-composer" onSubmit={(event) => void handleSubmit(event)}>
-              <label className="sr-only" htmlFor="chat-message">
-                Message
-              </label>
-              <textarea
-                id="chat-message"
-                className="chat-composer__input"
-                aria-label="Message"
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                placeholder="Send a message to the room..."
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    if (!isSubmitting && bundle && message.trim()) {
-                      event.currentTarget.form?.requestSubmit();
-                    }
-                  }
-                }}
-              />
-              <button type="submit" className="chat-composer__send" disabled={isSubmitting || !bundle}>
-                {isSubmitting ? "…" : "Send"}
-              </button>
-              <a href={buildScopedHref("/posts")} className="chat-composer__posts" aria-label="Open post stream">
-                <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-                  <rect x="3" y="4" width="14" height="2" rx="1" fill="currentColor"/>
-                  <rect x="3" y="9" width="10" height="2" rx="1" fill="currentColor"/>
-                  <rect x="3" y="14" width="12" height="2" rx="1" fill="currentColor"/>
-                </svg>
-              </a>
-            </form>
-          </section>
-
-          <aside className="chat-rail" aria-label="Room details">
-            <section className="chat-info-card">
-              <PanelHeader title="Room Info" />
-              <div className="chat-info-card__body">
-                <PodRoomIcon />
-                <div>
-                  <h2>{getChatTitle(bundle)}</h2>
-                  <p>Code, collaborate, build.</p>
-                </div>
-                <p className="chat-info-card__meta">
-                  Created: {bundle ? formatTimestamp(bundle.room.created_at) : "Loading..."}
-                </p>
-                <p className="chat-info-card__meta">
-                  {chatPosts.length} chat messages <span className="live-dot" />{" "}
-                  {discussionPosts.length} active threads
+            <section className="chat-main" aria-label="Chat transcript">
+              <PanelHeader title="# chat" />
+              <div className="chat-topic">
+                <p>*** You have joined #chat</p>
+                <p>*** Topic: Shared discussion for {getChatTitle(bundle)}</p>
+                <p>
+                  ***{" "}
+                  {loading
+                    ? "Loading..."
+                    : `${chatPosts.length} messages and ${bundle?.comments.length ?? 0} comments`}
                 </p>
               </div>
+
+              {error ? <p className="chat-error">{error}</p> : null}
+              {submitError ? <p className="chat-error">{submitError}</p> : null}
+
+              <div className="chat-transcript">
+                {loading ? (
+                  <article className="chat-message">
+                    <div className="chat-message__body">
+                      <p>Loading chat history...</p>
+                    </div>
+                  </article>
+                ) : chatPosts.length > 0 ? (
+                  chatPosts.map((post, index) => {
+                    const relatedComments = commentsByPost[post.id] ?? [];
+                    const lines = splitContentLines(post.content);
+
+                    return (
+                      <article className="chat-message" key={post.id}>
+                        <span className="chat-message__time">
+                          [{formatTimestamp(post.created_at)}]
+                        </span>
+                        <div className="chat-message__body">
+                          <p>
+                            <strong
+                              className={`chat-name chat-name--${pickTone(index)}`}
+                            >
+                              {getDisplayName(post.user_id)}:
+                            </strong>{" "}
+                            {lines[0] ?? post.content}
+                          </p>
+                          {lines.slice(1).map((line) => (
+                            <p key={`${post.id}-${line}`}>{line}</p>
+                          ))}
+                          {relatedComments.length > 0 ? (
+                            <a
+                              className="chat-thread"
+                              href={buildScopedHref(`/posts/${post.id}`)}
+                            >
+                              -&gt; {relatedComments.length} replies - View
+                              thread
+                            </a>
+                          ) : null}
+                        </div>
+                      </article>
+                    );
+                  })
+                ) : (
+                  <article className="chat-message">
+                    <div className="chat-message__body">
+                      <p>No chat messages yet. Send the first one below.</p>
+                    </div>
+                  </article>
+                )}
+              </div>
+
+              <div className="chat-toolbar" aria-label="Message tools">
+                {["A", "A*", "B", "I", "U", "link", "img", ":)"].map((tool) => (
+                  <button type="button" key={tool}>
+                    {tool}
+                  </button>
+                ))}
+              </div>
+
+              <form
+                className="chat-composer"
+                onSubmit={(event) => void handleSubmit(event)}
+              >
+                <label className="sr-only" htmlFor="chat-message">
+                  Message
+                </label>
+                <textarea
+                  id="chat-message"
+                  className="chat-composer__input"
+                  aria-label="Message"
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  placeholder="Send a message to the room..."
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      if (!isSubmitting && bundle && message.trim()) {
+                        event.currentTarget.form?.requestSubmit();
+                      }
+                    }
+                  }}
+                />
+                <button
+                  type="submit"
+                  className="chat-composer__send"
+                  disabled={isSubmitting || !bundle}
+                >
+                  {isSubmitting ? "…" : "Send"}
+                </button>
+                <a
+                  href={buildScopedHref("/posts")}
+                  className="chat-composer__posts"
+                  aria-label="Open post stream"
+                >
+                  <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+                    <rect
+                      x="3"
+                      y="4"
+                      width="14"
+                      height="2"
+                      rx="1"
+                      fill="currentColor"
+                    />
+                    <rect
+                      x="3"
+                      y="9"
+                      width="10"
+                      height="2"
+                      rx="1"
+                      fill="currentColor"
+                    />
+                    <rect
+                      x="3"
+                      y="14"
+                      width="12"
+                      height="2"
+                      rx="1"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </a>
+              </form>
             </section>
-            <RailPanel
-              title="Recent Posts"
-              action={buildScopedHref("/posts")}
-              items={discussionPosts}
-            />
-            <CommentPanel
-              title="Recent Activity"
-              action={buildScopedHref("/posts")}
-              items={recentCommentActivity}
-            />
-          </aside>
-        </div>
-      </section>
+
+            <aside className="chat-rail" aria-label="Room details">
+              <section className="chat-info-card">
+                <PanelHeader title="Room Info" />
+                <div className="chat-info-card__body">
+                  <PodRoomIcon />
+                  <div>
+                    <h2>{getChatTitle(bundle)}</h2>
+                    <p>Code, collaborate, build.</p>
+                  </div>
+                  <p className="chat-info-card__meta">
+                    Created:{" "}
+                    {bundle
+                      ? formatTimestamp(bundle.room.created_at)
+                      : "Loading..."}
+                  </p>
+                  <p className="chat-info-card__meta">
+                    {chatPosts.length} chat messages{" "}
+                    <span className="live-dot" /> {discussionPosts.length}{" "}
+                    active threads
+                  </p>
+                </div>
+              </section>
+              <RailPanel
+                title="Recent Posts"
+                action={buildScopedHref("/posts")}
+                items={discussionPosts}
+              />
+              <CommentPanel
+                title="Recent Activity"
+                action={buildScopedHref("/posts")}
+                items={recentCommentActivity}
+              />
+            </aside>
+          </div>
+        </section>
       </div>
     </main>
   );
@@ -342,12 +422,31 @@ function ChatSceneBackground() {
         <div className="cloud cloud-4" />
         <div className="cloud cloud-5" />
       </div>
-      <svg className="hills-svg" viewBox="0 0 1000 500" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        className="hills-svg"
+        viewBox="0 0 1000 500"
+        preserveAspectRatio="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <ellipse cx="650" cy="520" rx="620" ry="340" fill="#3d8e22" />
         <ellipse cx="600" cy="540" rx="540" ry="300" fill="#4aa828" />
         <ellipse cx="560" cy="530" rx="440" ry="260" fill="#5cb838" />
-        <ellipse cx="520" cy="510" rx="320" ry="190" fill="#6ebe44" opacity="0.7" />
-        <ellipse cx="500" cy="500" rx="200" ry="120" fill="#8cd960" opacity="0.45" />
+        <ellipse
+          cx="520"
+          cy="510"
+          rx="320"
+          ry="190"
+          fill="#6ebe44"
+          opacity="0.7"
+        />
+        <ellipse
+          cx="500"
+          cy="500"
+          rx="200"
+          ry="120"
+          fill="#8cd960"
+          opacity="0.45"
+        />
       </svg>
       <div className="ground" />
       <div className="bubbles">
@@ -466,7 +565,12 @@ function CommentPanel({
 
 function PodGlyph() {
   return (
-    <svg className="xp-title-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <svg
+      className="xp-title-icon"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
       <ellipse
         cx="8"
         cy="9.5"

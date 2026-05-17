@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
+import type { Json, TablesInsert } from "@/utils/database.types";
 
 const FALLBACK_URL = "https://example.com";
 
@@ -15,7 +17,7 @@ export type RoomRecord = {
   id: string;
   page_id: string;
   max_users: number;
-  configurations: Record<string, unknown>;
+  configurations: Json;
   created_at: string;
 };
 
@@ -105,6 +107,10 @@ export async function postJson<TResponse>(
   input: RequestInfo | URL,
   body: Record<string, unknown>,
 ) {
+  if (isExtensionRuntime() && typeof input === "string") {
+    return postDirectToSupabase<TResponse>(input, body);
+  }
+
   const response = await fetch(input, {
     method: "POST",
     headers: {
@@ -144,6 +150,12 @@ export function usePageBundle(): UsePageBundleResult {
       const params = new URLSearchParams({ url: currentUrl });
       if (currentTitle) {
         params.set("title", currentTitle);
+      }
+
+      if (isExtensionRuntime()) {
+        const data = await loadOrCreatePageBundle(currentUrl);
+        setBundle(data);
+        return data;
       }
 
       const response = await fetch(`/api/page?${params.toString()}`, {
@@ -195,6 +207,10 @@ export function usePageBundle(): UsePageBundleResult {
         params.set("title", currentTitle);
       }
 
+      if (isExtensionRuntime()) {
+        return `#${pathname}?${params.toString()}`;
+      }
+
       return `${pathname}?${params.toString()}`;
     },
     [currentTitle, currentUrl],
@@ -210,6 +226,268 @@ export function usePageBundle(): UsePageBundleResult {
     refresh,
     buildScopedHref,
   };
+}
+
+async function postDirectToSupabase<TResponse>(
+  input: string,
+  body: Record<string, unknown>,
+) {
+  if (input === "/api/chat") {
+    return (await createPostDirect({
+      roomId: readString(body.roomId),
+      pageId: readString(body.pageId),
+      type: "chat",
+      content: readString(body.message),
+      header: null,
+    })) as TResponse;
+  }
+
+  if (input === "/api/questions" || input === "/api/guides") {
+    const type = input === "/api/questions" ? "question" : "guide";
+    return (await createPostDirect({
+      roomId: readString(body.roomId),
+      pageId: readString(body.pageId),
+      type,
+      content: readString(body.content),
+      header: readNullableString(body.header),
+    })) as TResponse;
+  }
+
+  if (input === "/api/answers") {
+    return (await createCommentDirect({
+      postId: readString(body.postId),
+      content: readString(body.content),
+      replyId: readNullableString(body.replyId),
+    })) as TResponse;
+  }
+
+  throw new Error(`${input} is not available in the extension bundle.`);
+}
+
+async function loadOrCreatePageBundle(url: string): Promise<PageBundle> {
+  const page = await findOrCreatePage(url);
+  const room = await findOrCreateRoom(page.id);
+  const supabase = createClient();
+
+  const { data: postsData, error: postsError } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("room_id", room.id)
+    .order("created_at", { ascending: true });
+
+  if (postsError) {
+    throw postsError;
+  }
+
+  const posts = postsData ?? [];
+  const postIds = posts.map((post) => post.id);
+  let comments: CommentRecord[] = [];
+
+  if (postIds.length > 0) {
+    const { data: commentsData, error: commentsError } = await supabase
+      .from("comments")
+      .select("*")
+      .in("post_id", postIds)
+      .order("created_at", { ascending: true });
+
+    if (commentsError) {
+      throw commentsError;
+    }
+
+    comments = commentsData ?? [];
+  }
+
+  return {
+    page,
+    room,
+    posts,
+    comments,
+  };
+}
+
+async function findOrCreatePage(url: string): Promise<PageRecord> {
+  const supabase = createClient();
+  const { data: existingPages, error: loadError } = await supabase
+    .from("pages")
+    .select("*")
+    .eq("normalized_url", url)
+    .limit(1);
+
+  if (loadError) {
+    throw loadError;
+  }
+
+  if (existingPages?.[0]) {
+    return existingPages[0];
+  }
+
+  const { data: createdPages, error: createError } = await supabase
+    .from("pages")
+    .insert({ normalized_url: url })
+    .select("*")
+    .limit(1);
+
+  if (createError) {
+    const { data: racedPages, error: racedError } = await supabase
+      .from("pages")
+      .select("*")
+      .eq("normalized_url", url)
+      .limit(1);
+
+    if (racedError || !racedPages?.[0]) {
+      throw createError;
+    }
+
+    return racedPages[0];
+  }
+
+  if (!createdPages?.[0]) {
+    throw new Error("Could not create the page record.");
+  }
+
+  return createdPages[0];
+}
+
+async function findOrCreateRoom(pageId: string): Promise<RoomRecord> {
+  const supabase = createClient();
+  const { data: existingRooms, error: loadError } = await supabase
+    .from("rooms")
+    .select("*")
+    .eq("page_id", pageId)
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  if (loadError) {
+    throw loadError;
+  }
+
+  if (existingRooms?.[0]) {
+    return existingRooms[0];
+  }
+
+  const { data: createdRooms, error: createError } = await supabase
+    .from("rooms")
+    .insert({ page_id: pageId })
+    .select("*")
+    .limit(1);
+
+  if (createError) {
+    throw createError;
+  }
+
+  if (!createdRooms?.[0]) {
+    throw new Error("Could not create the room record.");
+  }
+
+  return createdRooms[0];
+}
+
+async function createPostDirect({
+  roomId,
+  pageId,
+  type,
+  content,
+  header,
+}: {
+  roomId: string;
+  pageId: string;
+  type: "chat" | "guide" | "question";
+  content: string;
+  header: string | null;
+}) {
+  const trimmedContent = content.trim();
+  if (!trimmedContent) {
+    throw new Error("content is required");
+  }
+
+  const resolvedRoomId = roomId || (pageId ? (await findOrCreateRoom(pageId)).id : "");
+  if (!resolvedRoomId) {
+    throw new Error("roomId or pageId is required");
+  }
+
+  const supabase = createClient();
+  const payload: TablesInsert<"posts"> = {
+    room_id: resolvedRoomId,
+    type,
+    content: trimmedContent,
+    header: header?.trim() || null,
+    user_id: null,
+  };
+
+  const { data, error } = await supabase
+    .from("posts")
+    .insert(payload)
+    .select("*")
+    .limit(1);
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data?.[0]) {
+    throw new Error("Could not create post.");
+  }
+
+  return data[0];
+}
+
+async function createCommentDirect({
+  postId,
+  content,
+  replyId,
+}: {
+  postId: string;
+  content: string;
+  replyId: string | null;
+}) {
+  const trimmedContent = content.trim();
+  if (!postId || !trimmedContent) {
+    throw new Error("postId and content are required");
+  }
+
+  const supabase = createClient();
+  const payload: TablesInsert<"comments"> = {
+    post_id: postId,
+    content: trimmedContent,
+    reply_id: replyId,
+    user_id: null,
+  };
+
+  const { data, error } = await supabase
+    .from("comments")
+    .insert(payload)
+    .select("*")
+    .limit(1);
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data?.[0]) {
+    throw new Error("Could not create comment.");
+  }
+
+  return data[0];
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readNullableString(value: unknown) {
+  const text = readString(value);
+  return text || null;
+}
+
+function isExtensionRuntime() {
+  const globalWithExtensionApis = globalThis as typeof globalThis & {
+    browser?: { runtime?: { id?: string } };
+    chrome?: { runtime?: { id?: string } };
+  };
+  const runtime =
+    globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
+
+  return Boolean(runtime?.runtime?.id);
 }
 
 function resolveCurrentUrl(searchParams: ReturnType<typeof useSearchParams>) {
