@@ -1,6 +1,9 @@
 "use client";
 
-import { GOOGLE_LOGIN_PATH } from "@/utils/auth-redirect";
+import {
+  GOOGLE_LOGIN_PATH,
+  getExtensionAuthRedirectUrl,
+} from "@/utils/auth-redirect";
 import {
   createClient,
   getSupabaseBrowserAuthConfig,
@@ -81,7 +84,11 @@ export function GoogleSignInButton({
     try {
       const supabase = createClient();
       const { key, storageKey, url } = getSupabaseBrowserAuthConfig();
-      const redirectTo = runtime.identity.getRedirectURL("auth/callback");
+      const redirectTo = getExtensionAuthRedirectUrl();
+      if (!redirectTo) {
+        throw new Error("The extension could not create an auth redirect URL.");
+      }
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {

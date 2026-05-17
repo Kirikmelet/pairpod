@@ -1,6 +1,8 @@
 import 'server-only'
 
-import { getSupabaseAdmin } from '@/lib/server/supabaseAdmin'
+import { cookies } from 'next/headers'
+import { createClient } from '@/utils/supabase/server'
+import type { Json } from '@/utils/database.types'
 
 export type LogEventInput = {
   eventType: string
@@ -26,7 +28,7 @@ export async function logEvent({
       throw new Error('eventType is required')
     }
 
-    const supabase = getSupabaseAdmin()
+    const supabase = createClient(await cookies())
 
     const { error } = await supabase.from('events').insert({
       user_id: userId,
@@ -35,7 +37,7 @@ export async function logEvent({
       post_id: postId,
       comment_id: commentId,
       event_type: eventType,
-      payload,
+      payload: payload as Json,
     })
 
     if (error) {

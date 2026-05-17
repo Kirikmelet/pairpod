@@ -1,7 +1,8 @@
+import { cookies } from 'next/headers'
 import { logEvent } from '@/lib/server/helpers/logEvent'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
 import { createComment } from '@/lib/server/discussions'
-import { getSupabaseAdmin } from '@/lib/server/supabaseAdmin'
+import { createClient } from '@/utils/supabase/server'
 
 type AnswerRequestBody = {
   content?: unknown
@@ -38,7 +39,8 @@ export async function POST(request: Request): Promise<Response> {
     let resolvedPostId = postId || sectionId?.replace(/^post:/, '') || ''
 
     if (!resolvedPostId && replyId) {
-      const { data: parentComment, error: parentError } = await getSupabaseAdmin()
+      const supabase = createClient(await cookies())
+      const { data: parentComment, error: parentError } = await supabase
         .from('comments')
         .select('post_id')
         .eq('id', replyId)

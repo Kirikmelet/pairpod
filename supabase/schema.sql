@@ -13,8 +13,8 @@ drop table if exists rooms;
 drop table if exists pages;
 drop table if exists users;
 
--- Backend writes use SUPABASE_SERVICE_ROLE_KEY through Next.js API routes.
--- RLS stays enabled so clients cannot bypass the backend by writing directly.
+-- Writes use authenticated Supabase sessions from the app, extension, or server routes.
+-- RLS stays enabled so anonymous clients cannot write project data.
 
 create table if not exists users (
   id uuid primary key default gen_random_uuid(),

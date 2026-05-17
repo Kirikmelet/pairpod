@@ -58,7 +58,7 @@ export function HomeChatModule({ user }: HomeChatModuleProps) {
   }, []);
 
   useEffect(() => {
-    if (!room) {
+    if (!room || isExtensionRuntime()) {
       return;
     }
 
@@ -203,25 +203,29 @@ const homeChatAdapter = {
       .select("*")
       .eq("page_id", page.id)
       .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
     if (roomError) {
       throw roomError;
     }
 
-    if (existingRoom) {
-      return existingRoom;
+    if (existingRoom?.[0]) {
+      return existingRoom[0];
     }
 
-    const { data: createdRoom, error: createRoomError } = await supabase
+    const { data: createdRooms, error: createRoomError } = await supabase
       .from("rooms")
       .insert({ page_id: page.id })
       .select("*")
-      .single();
+      .limit(1);
 
     if (createRoomError) {
       throw createRoomError;
+    }
+
+    const createdRoom = createdRooms?.[0];
+    if (!createdRoom) {
+      throw new Error("Could not create the home chat room.");
     }
 
     return createdRoom;
@@ -252,13 +256,18 @@ const homeChatAdapter = {
       .from("posts")
       .insert(payload)
       .select("*")
-      .single();
+      .limit(1);
 
     if (error) {
       throw error;
     }
 
-    return data;
+    const createdPost = data?.[0];
+    if (!createdPost) {
+      throw new Error("Could not send message.");
+    }
+
+    return createdPost;
   },
   subscribeToPosts(roomId: string, onPost: (post: Post) => void) {
     const supabase = createClient();
@@ -284,41 +293,58 @@ const homeChatAdapter = {
 
 async function ensureHomePage(): Promise<Page> {
   const supabase = createClient();
-  const { data: existingPage, error: pageError } = await supabase
+  const { data: existingPages, error: pageError } = await supabase
     .from("pages")
     .select("*")
     .eq("normalized_url", HOME_CHAT_URL)
-    .maybeSingle();
+    .limit(1);
 
   if (pageError) {
     throw pageError;
   }
 
+  const existingPage = existingPages?.[0];
   if (existingPage) {
     return existingPage;
   }
 
-  const { data: createdPage, error: createPageError } = await supabase
+  const { data: createdPages, error: createPageError } = await supabase
     .from("pages")
     .insert({ normalized_url: HOME_CHAT_URL })
     .select("*")
-    .single();
+    .limit(1);
 
   if (createPageError) {
-    const { data: racedPage, error: racedPageError } = await supabase
+    const { data: racedPages, error: racedPageError } = await supabase
       .from("pages")
       .select("*")
       .eq("normalized_url", HOME_CHAT_URL)
-      .single();
+      .limit(1);
 
-    if (racedPageError) {
+    if (racedPageError || !racedPages?.[0]) {
       throw createPageError;
     }
 
-    return racedPage;
+    return racedPages[0];
+  }
+
+  const createdPage = createdPages?.[0];
+  if (!createdPage) {
+    throw new Error("Could not create the home page record.");
   }
 
   return createdPage;
+}
+
+function isExtensionRuntime() {
+  const globalWithExtensionApis = globalThis as typeof globalThis & {
+    browser?: { runtime?: { id?: string } };
+    chrome?: { runtime?: { id?: string } };
+  };
+  const runtime =
+    globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
+
+  return Boolean(runtime?.runtime?.id);
 }
 
 function mergePosts(existing: Post[], incoming: Post[]) {

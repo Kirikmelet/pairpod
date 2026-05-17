@@ -17,7 +17,7 @@ type SidebarItem = {
 };
 
 export function PostStreamPage() {
-  const { bundle, commentsBySection, loading, error, refresh, buildScopedHref } =
+  const { bundle, commentsByPost, loading, error, refresh, buildScopedHref } =
     usePageBundle();
   const [mode, setMode] = useState<"question" | "guide">("question");
   const [header, setHeader] = useState("");
@@ -26,19 +26,29 @@ export function PostStreamPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const posts = useMemo(
-    () => (bundle?.posts ?? []).filter((post) => post.type !== "chat").slice().reverse(),
+    () =>
+      (bundle?.posts ?? [])
+        .filter((post) => post.type !== "chat")
+        .slice()
+        .reverse(),
     [bundle?.posts],
   );
 
   const hotThreads: SidebarItem[] = posts.slice(0, 3).map((post) => ({
     title: post.header || post.content,
-    meta: `${getCommentCount(commentsBySection, post.id)} replies`,
+    meta: `${getCommentCount(commentsByPost, post.id)} replies`,
   }));
 
   const roomStats: SidebarItem[] = [
     { title: `${posts.length} posts`, meta: "current room" },
-    { title: `${bundle?.comments.length ?? 0} comments`, meta: "across all threads" },
-    { title: `${bundle?.room.max_users ?? 50} max users`, meta: "room capacity" },
+    {
+      title: `${bundle?.comments.length ?? 0} comments`,
+      meta: "across all threads",
+    },
+    {
+      title: `${bundle?.room.max_users ?? 50} max users`,
+      meta: "room capacity",
+    },
   ];
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -65,7 +75,9 @@ export function PostStreamPage() {
       await refresh();
     } catch (createError) {
       setSubmitError(
-        createError instanceof Error ? createError.message : `Failed to create ${mode}`,
+        createError instanceof Error
+          ? createError.message
+          : `Failed to create ${mode}`,
       );
     } finally {
       setIsSubmitting(false);
@@ -74,7 +86,7 @@ export function PostStreamPage() {
 
   return (
     <PostShell
-      title={`3WPosts - ${getPageTitle(bundle)}`}
+      title={`PairPod - ${getPageTitle(bundle)}`}
       labelledBy="post-stream-title"
       chatHref={buildScopedHref("/chat")}
       postsHref={buildScopedHref("/posts")}
@@ -105,13 +117,18 @@ export function PostStreamPage() {
             <button type="button">Following</button>
           </div>
 
-          {error ? <p className="status-note status-note--error">{error}</p> : null}
+          {error ? (
+            <p className="status-note status-note--error">{error}</p>
+          ) : null}
           {loading ? <p className="status-note">Loading posts...</p> : null}
 
           <div className="post-list">
             {posts.length > 0 ? (
               posts.map((post, index) => (
-                <article className={`post-card post-card--${pickTone(index)}`} key={post.id}>
+                <article
+                  className={`post-card post-card--${pickTone(index)}`}
+                  key={post.id}
+                >
                   <div className="post-votes">
                     <button type="button">+</button>
                     <strong>{post.likes}</strong>
@@ -126,7 +143,8 @@ export function PostStreamPage() {
                         </a>
                       </h2>
                       <p>
-                        posted by <strong>{getDisplayName(post.user_id)}</strong> -{" "}
+                        posted by{" "}
+                        <strong>{getDisplayName(post.user_id)}</strong> -{" "}
                         {formatTimestamp(post.created_at)}
                       </p>
                     </header>
@@ -134,7 +152,7 @@ export function PostStreamPage() {
                     <footer>
                       <a href={buildScopedHref("/chat")}>Continue in #chat</a>
                       <a href={buildScopedHref(`/posts/${post.id}`)}>
-                        {getCommentCount(commentsBySection, post.id)} replies
+                        {getCommentCount(commentsByPost, post.id)} replies
                       </a>
                       <button type="button">Save</button>
                     </footer>
@@ -167,7 +185,7 @@ export function PostStreamPage() {
 }
 
 export function PostDetailPage({ postId }: { postId: string }) {
-  const { bundle, commentsBySection, loading, error, refresh, buildScopedHref } =
+  const { bundle, commentsByPost, loading, error, refresh, buildScopedHref } =
     usePageBundle();
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -178,7 +196,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
     [bundle?.posts, postId],
   );
 
-  const comments = commentsBySection[`post:${postId}`] ?? [];
+  const comments = commentsByPost[postId] ?? [];
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -199,7 +217,9 @@ export function PostDetailPage({ postId }: { postId: string }) {
       await refresh();
     } catch (createError) {
       setSubmitError(
-        createError instanceof Error ? createError.message : "Failed to create answer",
+        createError instanceof Error
+          ? createError.message
+          : "Failed to create answer",
       );
     } finally {
       setIsSubmitting(false);
@@ -209,7 +229,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
   if (loading) {
     return (
       <PostShell
-        title="3WPosts - Loading"
+        title="PairPod - Loading"
         labelledBy="post-detail-title"
         chatHref={buildScopedHref("/chat")}
         postsHref={buildScopedHref("/posts")}
@@ -223,7 +243,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
   if (error) {
     return (
       <PostShell
-        title="3WPosts - Error"
+        title="PairPod - Error"
         labelledBy="post-detail-title"
         chatHref={buildScopedHref("/chat")}
         postsHref={buildScopedHref("/posts")}
@@ -237,7 +257,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
   if (!post) {
     return (
       <PostShell
-        title="3WPosts - Missing Post"
+        title="PairPod - Missing Post"
         labelledBy="post-detail-title"
         chatHref={buildScopedHref("/chat")}
         postsHref={buildScopedHref("/posts")}
@@ -252,7 +272,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
 
   return (
     <PostShell
-      title={`3WPosts - ${post.header || "Thread"}`}
+      title={`PairPod - ${post.header || "Thread"}`}
       labelledBy="post-detail-title"
       chatHref={buildScopedHref("/chat")}
       postsHref={buildScopedHref("/posts")}
@@ -261,7 +281,9 @@ export function PostDetailPage({ postId }: { postId: string }) {
       <div className="post-detail-layout">
         <section className="post-detail-main">
           <PanelHeader title="Full Post" />
-          <article className={`post-card post-card--full post-card--${pickTone(0)}`}>
+          <article
+            className={`post-card post-card--full post-card--${pickTone(0)}`}
+          >
             <div className="post-votes">
               <button type="button">+</button>
               <strong>{post.likes}</strong>
@@ -270,7 +292,9 @@ export function PostDetailPage({ postId }: { postId: string }) {
             <div className="post-card__body">
               <header>
                 <span className="post-tag">{post.type}</span>
-                <h1 id="post-detail-title">{post.header || truncate(post.content)}</h1>
+                <h1 id="post-detail-title">
+                  {post.header || truncate(post.content)}
+                </h1>
                 <p>
                   posted by <strong>{getDisplayName(post.user_id)}</strong> -{" "}
                   {formatTimestamp(post.created_at)}
@@ -289,7 +313,11 @@ export function PostDetailPage({ postId }: { postId: string }) {
             <div className="post-comments__list">
               {comments.length > 0 ? (
                 comments.map((comment, index) => (
-                  <CommentCard comment={comment} key={comment.id} tone={pickTone(index)} />
+                  <CommentCard
+                    comment={comment}
+                    key={comment.id}
+                    tone={pickTone(index)}
+                  />
                 ))
               ) : (
                 <article className="post-comment post-comment--blue">
@@ -304,7 +332,10 @@ export function PostDetailPage({ postId }: { postId: string }) {
               )}
             </div>
 
-            <form className="post-compose" onSubmit={(event) => void handleSubmit(event)}>
+            <form
+              className="post-compose"
+              onSubmit={(event) => void handleSubmit(event)}
+            >
               <div className="post-compose-field">
                 <span className="post-compose-label">Reply</span>
                 <textarea
@@ -317,7 +348,11 @@ export function PostDetailPage({ postId }: { postId: string }) {
               {submitError ? (
                 <p className="status-note status-note--error">{submitError}</p>
               ) : null}
-              <button type="submit" className="post-compose-submit" disabled={isSubmitting}>
+              <button
+                type="submit"
+                className="post-compose-submit"
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? "Posting..." : "Post Reply"}
               </button>
             </form>
@@ -338,10 +373,10 @@ export function PostDetailPage({ postId }: { postId: string }) {
 }
 
 function getCommentCount(
-  commentsBySection: Record<string, CommentRecord[]>,
+  commentsByPost: Record<string, CommentRecord[]>,
   postId: string,
 ) {
-  return commentsBySection[`post:${postId}`]?.length ?? 0;
+  return commentsByPost[postId]?.length ?? 0;
 }
 
 function getPageTitle(bundle: ReturnType<typeof usePageBundle>["bundle"]) {
@@ -383,7 +418,10 @@ function PostShell({
     <main className="post-shell">
       <PostSceneBackground />
       <div className="post-shell__content">
-        <section className="post-window xp-window post-window--animate" aria-labelledby={labelledBy}>
+        <section
+          className="post-window xp-window post-window--animate"
+          aria-labelledby={labelledBy}
+        >
           <div className="xp-title-bar chat-titlebar">
             <PodGlyph />
             <span className="xp-title-text">{title}</span>
@@ -427,8 +465,22 @@ function PostSceneBackground() {
         <ellipse cx="650" cy="520" rx="620" ry="340" fill="#3d8e22" />
         <ellipse cx="600" cy="540" rx="540" ry="300" fill="#4aa828" />
         <ellipse cx="560" cy="530" rx="440" ry="260" fill="#5cb838" />
-        <ellipse cx="520" cy="510" rx="320" ry="190" fill="#6ebe44" opacity="0.7" />
-        <ellipse cx="500" cy="500" rx="200" ry="120" fill="#8cd960" opacity="0.45" />
+        <ellipse
+          cx="520"
+          cy="510"
+          rx="320"
+          ry="190"
+          fill="#6ebe44"
+          opacity="0.7"
+        />
+        <ellipse
+          cx="500"
+          cy="500"
+          rx="200"
+          ry="120"
+          fill="#8cd960"
+          opacity="0.45"
+        />
       </svg>
       <div className="ground" />
       <div className="bubbles">
@@ -476,7 +528,9 @@ function ComposePanel({
           <select
             className="post-compose-input"
             value={mode}
-            onChange={(event) => onModeChange(event.target.value as "question" | "guide")}
+            onChange={(event) =>
+              onModeChange(event.target.value as "question" | "guide")
+            }
           >
             <option value="question">Question</option>
             <option value="guide">Guide</option>
@@ -501,8 +555,14 @@ function ComposePanel({
             placeholder="Ask a question, share a guide, or start a thread..."
           />
         </div>
-        {error ? <p className="status-note status-note--error">{error}</p> : null}
-        <button type="submit" className="post-compose-submit" disabled={isSubmitting}>
+        {error ? (
+          <p className="status-note status-note--error">{error}</p>
+        ) : null}
+        <button
+          type="submit"
+          className="post-compose-submit"
+          disabled={isSubmitting}
+        >
           {isSubmitting ? "Posting..." : `Post ${mode}`}
         </button>
       </form>
@@ -533,8 +593,18 @@ function PostSidebar({
 }) {
   return (
     <>
-      <SidePanel title="Hot Threads" action="View all threads" href={postsHref} items={hotThreads} />
-      <SidePanel title="Room Stats" action="Full activity" href={postsHref} items={roomStats} />
+      <SidePanel
+        title="Hot Threads"
+        action="View all threads"
+        href={postsHref}
+        items={hotThreads}
+      />
+      <SidePanel
+        title="Room Stats"
+        action="Full activity"
+        href={postsHref}
+        items={roomStats}
+      />
       <section className="post-shortcuts">
         <PanelHeader title="Connected Views" />
         <a href={chatHref}># chat stream</a>
@@ -618,12 +688,38 @@ function SidePanel({
 
 function PodGlyph() {
   return (
-    <svg className="xp-title-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <ellipse cx="8" cy="9.5" rx="6" ry="5.5" fill="#6ebe44" stroke="#3d8e22" strokeWidth="0.8" />
+    <svg
+      className="xp-title-icon"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <ellipse
+        cx="8"
+        cy="9.5"
+        rx="6"
+        ry="5.5"
+        fill="#6ebe44"
+        stroke="#3d8e22"
+        strokeWidth="0.8"
+      />
       <circle cx="6.4" cy="9" r="1.4" fill="#1a2a44" />
       <circle cx="9.6" cy="9" r="1.4" fill="#1a2a44" />
-      <path d="M6 12c1.2 1 2.8 1 4 0" stroke="#2d5018" strokeWidth="1" strokeLinecap="round" />
-      <line x1="8" y1="4" x2="8" y2="1.5" stroke="#3a7820" strokeWidth="1.5" strokeLinecap="round" />
+      <path
+        d="M6 12c1.2 1 2.8 1 4 0"
+        stroke="#2d5018"
+        strokeWidth="1"
+        strokeLinecap="round"
+      />
+      <line
+        x1="8"
+        y1="4"
+        x2="8"
+        y2="1.5"
+        stroke="#3a7820"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
       <circle cx="6.5" cy="1.5" r="1.5" fill="#8cd960" />
     </svg>
   );

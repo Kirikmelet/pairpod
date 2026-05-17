@@ -19,7 +19,7 @@ type Member = {
 };
 
 export function ChatPage({ currentUsername }: ChatPageProps) {
-  const { bundle, commentsBySection, loading, error, refresh, buildScopedHref } =
+  const { bundle, commentsByPost, loading, error, refresh, buildScopedHref } =
     usePageBundle();
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -198,7 +198,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                 </article>
               ) : chatPosts.length > 0 ? (
                 chatPosts.map((post, index) => {
-                  const relatedComments = commentsBySection[`post:${post.id}`] ?? [];
+                  const relatedComments = commentsByPost[post.id] ?? [];
                   const lines = splitContentLines(post.content);
 
                   return (

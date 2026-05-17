@@ -1,9 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
 import type { Database } from "../database.types";
 import { getSupabasePublicConfigOrNull } from "./config";
-
-type AppDatabase = Omit<Database, "__InternalSupabase">;
 
 export const updateSession = async (request: NextRequest) => {
   let supabaseResponse = NextResponse.next({
@@ -20,7 +19,7 @@ export const updateSession = async (request: NextRequest) => {
     return supabaseResponse;
   }
 
-  const supabase = createServerClient<AppDatabase>(config.url, config.key, {
+  const supabase = createServerClient<Database>(config.url, config.key, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -37,7 +36,7 @@ export const updateSession = async (request: NextRequest) => {
         );
       },
     },
-  });
+  }) as unknown as SupabaseClient<Database>;
 
   await supabase.auth.getUser();
 
