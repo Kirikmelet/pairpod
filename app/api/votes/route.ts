@@ -18,6 +18,17 @@ type VoteRow = {
   likes: number;
 };
 
+type VoteRpcClient = {
+  rpc(
+    fn: "increment_post_likes",
+    args: { p_post_id: string; p_delta: number },
+  ): Promise<{ data: VoteRow[] | null; error: Error | null }>;
+  rpc(
+    fn: "increment_comment_likes",
+    args: { p_comment_id: string; p_delta: number },
+  ): Promise<{ data: VoteRow[] | null; error: Error | null }>;
+};
+
 export async function POST(request: Request): Promise<Response> {
   let body: VoteRequestBody;
 
@@ -102,29 +113,23 @@ async function updatePostVote(
   id: string,
   delta: 1 | -1,
 ) {
-  const { data: existing, error: loadError } = await supabase
-    .from("posts")
-    .select("id,likes")
-    .eq("id", id)
-    .single<VoteRow>();
-
-  if (loadError) {
-    throw new Error(`Failed to load post: ${loadError.message}`);
-  }
-
-  const nextLikes = Math.max(0, existing.likes + delta);
-  const { data, error } = await supabase
-    .from("posts")
-    .update({ likes: nextLikes })
-    .eq("id", id)
-    .select("id,likes")
-    .single<VoteRow>();
+  const { data, error } = await (
+    supabase as unknown as VoteRpcClient
+  ).rpc("increment_post_likes", {
+    p_post_id: id,
+    p_delta: delta,
+  });
 
   if (error) {
     throw new Error(`Failed to update post vote: ${error.message}`);
   }
 
-  return data;
+  const row = data?.[0];
+  if (!row) {
+    throw new Error("Could not update post vote.");
+  }
+
+  return row;
 }
 
 async function updateCommentVote(
@@ -132,29 +137,23 @@ async function updateCommentVote(
   id: string,
   delta: 1 | -1,
 ) {
-  const { data: existing, error: loadError } = await supabase
-    .from("comments")
-    .select("id,likes")
-    .eq("id", id)
-    .single<VoteRow>();
-
-  if (loadError) {
-    throw new Error(`Failed to load comment: ${loadError.message}`);
-  }
-
-  const nextLikes = Math.max(0, existing.likes + delta);
-  const { data, error } = await supabase
-    .from("comments")
-    .update({ likes: nextLikes })
-    .eq("id", id)
-    .select("id,likes")
-    .single<VoteRow>();
+  const { data, error } = await (
+    supabase as unknown as VoteRpcClient
+  ).rpc("increment_comment_likes", {
+    p_comment_id: id,
+    p_delta: delta,
+  });
 
   if (error) {
     throw new Error(`Failed to update comment vote: ${error.message}`);
   }
 
-  return data;
+  const row = data?.[0];
+  if (!row) {
+    throw new Error("Could not update comment vote.");
+  }
+
+  return row;
 }
 
 function readTarget(value: unknown): VoteTarget | null {
