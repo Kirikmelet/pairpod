@@ -7,7 +7,7 @@ import { createClient } from "@/utils/supabase/client";
 import type { Tables, TablesInsert } from "@/utils/database.types";
 
 type Page = Tables<"pages">;
-type Post = Tables<"posts">;
+type Chat = Tables<"chat">;
 type Room = Tables<"rooms">;
 
 type HomeChatModuleProps = {
@@ -21,7 +21,7 @@ export function HomeChatModule({ user }: HomeChatModuleProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<Chat[]>([]);
   const [room, setRoom] = useState<Room | null>(null);
   const [sentPostIds, setSentPostIds] = useState<Set<string>>(() => new Set());
   const transcriptRef = useRef<HTMLDivElement | null>(null);
@@ -34,7 +34,7 @@ export function HomeChatModule({ user }: HomeChatModuleProps) {
     void (async () => {
       try {
         const nextRoom = await homeChatAdapter.ensureRoom();
-        const nextPosts = await homeChatAdapter.listPosts(nextRoom.id);
+        const nextPosts = await homeChatAdapter.listPosts(nextRoom.page_id);
         if (isActive) {
           setRoom(nextRoom);
           setPosts(nextPosts);
@@ -65,7 +65,7 @@ export function HomeChatModule({ user }: HomeChatModuleProps) {
       return;
     }
 
-    const unsubscribe = homeChatAdapter.subscribeToPosts(room.id, (post) => {
+    const unsubscribe = homeChatAdapter.subscribeToPosts(room.page_id, (post) => {
       setPosts((current) => mergePosts(current, [post]));
     });
 
@@ -81,7 +81,7 @@ export function HomeChatModule({ user }: HomeChatModuleProps) {
 
   useEffect(() => {
     const knownIds = seenPostIdsRef.current;
-    const nextIds = new Set(posts.map((post) => post.id));
+    const nextIds = new Set(posts.map((post) => post.chat_id));
 
     if (!knownIds) {
       seenPostIdsRef.current = nextIds;
@@ -89,7 +89,7 @@ export function HomeChatModule({ user }: HomeChatModuleProps) {
     }
 
     const hasRemoteIncomingMessage = posts.some(
-      (post) => !knownIds.has(post.id) && !sentPostIds.has(post.id),
+      (post) => !knownIds.has(post.chat_id) && !sentPostIds.has(post.chat_id),
     );
 
     seenPostIdsRef.current = nextIds;
@@ -109,8 +109,8 @@ export function HomeChatModule({ user }: HomeChatModuleProps) {
     setError(null);
 
     try {
-      const post = await homeChatAdapter.sendPost(room.id, content);
-      setSentPostIds((current) => new Set([...current, post.id]));
+      const post = await homeChatAdapter.sendPost(room.page_id, content);
+      setSentPostIds((current) => new Set([...current, post.chat_id]));
       setPosts((current) => mergePosts(current, [post]));
       setDraft("");
     } catch (sendError) {
@@ -143,10 +143,10 @@ export function HomeChatModule({ user }: HomeChatModuleProps) {
           ) : posts.length > 0 ? (
             posts.map((post) => (
               <ChatMessage
-                key={post.id}
+                key={post.chat_id}
                 post={post}
                 isCurrentUser={
-                  post.user_id === user.id || sentPostIds.has(post.id)
+                  post.user_id === user.id || sentPostIds.has(post.chat_id)
                 }
               />
             ))
@@ -191,7 +191,7 @@ function ChatMessage({
   post,
   isCurrentUser,
 }: {
-  post: Post;
+  post: Chat;
   isCurrentUser: boolean;
 }) {
   const createdAt = new Date(post.created_at);
@@ -210,7 +210,7 @@ function ChatMessage({
           <strong className={`chat-name chat-name--${isCurrentUser ? "blue" : "green"}`}>
             {isCurrentUser ? "You" : "Peer"}:
           </strong>{" "}
-          {post.content}
+          {post.body}
         </p>
       </div>
     </article>
@@ -256,7 +256,7 @@ const homeChatAdapter = {
   async listPosts(roomId: string) {
     const supabase = createClient();
     const { data, error } = await supabase
-      .from("posts")
+      .from("chat")
       .select("*")
       .eq("room_id", roomId)
       .order("created_at", { ascending: true });
@@ -269,14 +269,13 @@ const homeChatAdapter = {
   },
   async sendPost(roomId: string, content: string) {
     const supabase = createClient();
-    const payload: TablesInsert<"posts"> = {
+    const payload: TablesInsert<"chat"> = {
       room_id: roomId,
-      content,
-      type: "chat",
+      body: content,
       user_id: null,
     };
     const { data, error } = await supabase
-      .from("posts")
+      .from("chat")
       .insert(payload)
       .select("*")
       .limit(1);
@@ -292,7 +291,7 @@ const homeChatAdapter = {
 
     return createdPost;
   },
-  subscribeToPosts(roomId: string, onPost: (post: Post) => void) {
+  subscribeToPosts(roomId: string, onPost: (post: Chat) => void) {
     const supabase = createClient();
     const channel = supabase
       .channel(`home-chat:${roomId}`)
@@ -301,10 +300,10 @@ const homeChatAdapter = {
         {
           event: "INSERT",
           schema: "public",
-          table: "posts",
+          table: "chat",
           filter: `room_id=eq.${roomId}`,
         },
-        (payload) => onPost(payload.new as Post),
+        (payload) => onPost(payload.new as Chat),
       )
       .subscribe();
 
@@ -370,10 +369,10 @@ function isExtensionRuntime() {
   return Boolean(runtime?.runtime?.id);
 }
 
-function mergePosts(existing: Post[], incoming: Post[]) {
-  const byId = new Map(existing.map((post) => [post.id, post]));
+function mergePosts(existing: Chat[], incoming: Chat[]) {
+  const byId = new Map(existing.map((post) => [post.chat_id, post]));
   for (const post of incoming) {
-    byId.set(post.id, post);
+    byId.set(post.chat_id, post);
   }
   return [...byId.values()].sort((a, b) =>
     a.created_at.localeCompare(b.created_at),

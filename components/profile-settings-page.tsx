@@ -25,6 +25,7 @@ type UserProfileRow = {
   configurations: Json;
   display_name: string | null;
   avatar_url: string | null;
+  clothing_url: string | null;
   updated_at: string;
 };
 
@@ -33,6 +34,7 @@ type Character3dConfig = {
   accent: string;
   head: string;
   style: "pod" | "runner" | "bot";
+  clothingImageUrl?: string | null;
 };
 
 type ProfileConfiguration = {
@@ -49,8 +51,9 @@ const DEFAULT_CHARACTER_3D: Character3dConfig = {
 const DEFAULT_AVATAR_URL =
   "https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png";
 const AVATAR_BUCKET = "profile_pictures";
+const CLOTHING_BUCKET = "character_clothing";
 const USER_PROFILE_COLUMNS =
-  "id,auth_user_id,email,username,configurations,display_name,avatar_url,updated_at";
+  "id,auth_user_id,email,username,configurations,display_name,avatar_url,clothing_url,updated_at";
 
 export function ProfileSettingsPage({
   variant = "page",
@@ -67,6 +70,7 @@ export function ProfileSettingsPage({
   const [characterAccent, setCharacterAccent] = useState(DEFAULT_CHARACTER_3D.accent);
   const [characterHead, setCharacterHead] = useState(DEFAULT_CHARACTER_3D.head);
   const [characterStyle, setCharacterStyle] = useState<Character3dConfig["style"]>(DEFAULT_CHARACTER_3D.style);
+  const [characterClothingImageUrl, setCharacterClothingImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -89,6 +93,9 @@ export function ProfileSettingsPage({
     setCharacterAccent(configuration.character3d.accent);
     setCharacterHead(configuration.character3d.head);
     setCharacterStyle(configuration.character3d.style);
+    setCharacterClothingImageUrl(
+      nextProfile.clothing_url ?? configuration.character3d.clothingImageUrl ?? null,
+    );
   }
 
   useEffect(() => {
@@ -218,6 +225,46 @@ export function ProfileSettingsPage({
     }
   };
 
+  const handleClothingChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file || !profile) {
+      return;
+    }
+
+    if (file.type !== "image/png") {
+      setError("Please upload a PNG file for clothing.");
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
+    setStatus(null);
+
+    try {
+      const resized = await resizePngToSquare(file, 256);
+      const clothingUrl = await uploadCharacterClothing(resized);
+      const nextProfile = await updateProfile({
+        clothingUrl,
+        character3d: {
+          body: characterBody,
+          accent: characterAccent,
+          head: characterHead,
+          style: characterStyle,
+        },
+      });
+      hydrateForm(nextProfile);
+      setStatus("3D clothing updated.");
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error ? uploadError.message : "Could not upload clothing.",
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <main className={`app-scene profile-scene ${isPopup ? "profile-scene--popup" : ""}`}>
       <ProfileBackground />
@@ -332,6 +379,7 @@ export function ProfileSettingsPage({
                     accent={characterAccent}
                     head={characterHead}
                     style={characterStyle}
+                    clothingImageUrl={characterClothingImageUrl}
                   />
                 </div>
                 <div className="avatar-creator__controls">
@@ -370,6 +418,29 @@ export function ProfileSettingsPage({
                       <option value="bot">Bot</option>
                     </select>
                   </label>
+                  {canUseFilePicker ? (
+                    <label>
+                      <span>Clothing PNG</span>
+                      <input
+                        type="file"
+                        accept="image/png"
+                        onChange={(event) => void handleClothingChange(event)}
+                        disabled={!profile || uploading || saving}
+                      />
+                    </label>
+                  ) : (
+                    <label>
+                      <span>Clothing PNG</span>
+                      <a
+                        className="profile-upload-link"
+                        href={nav.fullProfileHref}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open editor
+                      </a>
+                    </label>
+                  )}
                 </div>
                 <button
                   className="profile-save-button avatar-creator__save"
@@ -443,7 +514,17 @@ function CharacterPreview({
   accent,
   head,
   style,
+  clothingImageUrl,
 }: Character3dConfig) {
+  const clothingStyle = clothingImageUrl
+    ? {
+        backgroundColor: body,
+        backgroundImage: `url("${clothingImageUrl}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : { backgroundColor: body };
+
   return (
     <div className={`character-preview character-preview--${style}`}>
       <span className="character-preview__antenna" style={{ backgroundColor: accent }} />
@@ -451,7 +532,7 @@ function CharacterPreview({
         <i style={{ backgroundColor: accent }} />
         <i style={{ backgroundColor: accent }} />
       </span>
-      <span className="character-preview__body" style={{ backgroundColor: body }} />
+      <span className="character-preview__body" style={clothingStyle} />
       <span className="character-preview__ring" style={{ borderColor: accent }} />
     </div>
   );
@@ -501,6 +582,7 @@ async function updateProfile(patch: {
   username?: string | null;
   displayName?: string | null;
   avatarUrl?: string | null;
+  clothingUrl?: string | null;
   character3d?: Character3dConfig;
 }) {
   if (shouldUseDirectProfileAccess()) {
@@ -534,6 +616,27 @@ async function uploadAvatar(file: Blob) {
   return toUserProfileRow(response);
 }
 
+async function uploadCharacterClothing(file: Blob) {
+  await assertPngBlobSize(file, 256, "Clothing");
+
+  const { supabase, user } = await getAuthenticatedDirectProfileClient();
+  const storagePath = `${user.id}/clothing.png`;
+  const { error: uploadError } = await supabase.storage
+    .from(CLOTHING_BUCKET)
+    .upload(storagePath, file, {
+      cacheControl: "3600",
+      contentType: "image/png",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw new Error(`Could not upload clothing: ${uploadError.message}`);
+  }
+
+  const { data } = supabase.storage.from(CLOTHING_BUCKET).getPublicUrl(storagePath);
+  return `${data.publicUrl}?v=${Date.now()}`;
+}
+
 function shouldUseDirectProfileAccess() {
   return Boolean(getExtensionRuntime()?.runtime?.id) && !getRemoteApiUrl("/api/profile");
 }
@@ -547,6 +650,7 @@ async function updateProfileDirect(patch: {
   username?: string | null;
   displayName?: string | null;
   avatarUrl?: string | null;
+  clothingUrl?: string | null;
   character3d?: Character3dConfig;
 }) {
   const { supabase, user } = await getAuthenticatedDirectProfileClient();
@@ -573,8 +677,20 @@ async function updateProfileDirect(patch: {
     nextPatch.avatar_url = patch.avatarUrl || profile.avatar_url || DEFAULT_AVATAR_URL;
   }
 
+  if (Object.prototype.hasOwnProperty.call(patch, "clothingUrl")) {
+    nextPatch.clothing_url = normalizeImageUrl(patch.clothingUrl) ?? null;
+    nextConfiguration.character3d = {
+      ...nextConfiguration.character3d,
+      clothingImageUrl: null,
+    };
+    nextPatch.configurations = nextConfiguration;
+  }
+
   if (patch.character3d) {
-    nextConfiguration.character3d = normalizeCharacter3d(patch.character3d);
+    nextConfiguration.character3d = {
+      ...normalizeCharacter3d(patch.character3d),
+      clothingImageUrl: null,
+    };
     nextPatch.configurations = nextConfiguration;
   }
 
@@ -597,7 +713,7 @@ async function updateProfileDirect(patch: {
 }
 
 async function uploadAvatarDirect(file: Blob) {
-  await assertPngBlobSize(file, 128);
+  await assertPngBlobSize(file, 128, "Avatar");
 
   const { supabase, user } = await getAuthenticatedDirectProfileClient();
   const storagePath = `${user.id}/avatar.png`;
@@ -676,6 +792,7 @@ async function ensureDirectProfile(
       username: normalizeUsernameForProfile(readMetadataString(user.user_metadata?.username)),
       display_name: displayName,
       avatar_url: DEFAULT_AVATAR_URL,
+      clothing_url: null,
       configurations: {
         displayName: displayName ?? "",
         character3d: DEFAULT_CHARACTER_3D,
@@ -716,6 +833,7 @@ async function syncDirectProfileSeed(
       email: user.email ?? profile.email,
       display_name: profile.display_name || displayName,
       avatar_url: avatarUrl,
+      clothing_url: profile.clothing_url ?? configurations.character3d.clothingImageUrl ?? null,
       configurations,
       updated_at: new Date().toISOString(),
     })
@@ -776,6 +894,7 @@ type ProfileApiResponse = {
   username: string | null;
   displayName: string | null;
   avatarUrl: string;
+  clothingUrl: string | null;
   character3d?: Character3dConfig;
 };
 
@@ -791,6 +910,7 @@ function toUserProfileRow(profile: ProfileApiResponse): UserProfileRow {
     },
     display_name: profile.displayName,
     avatar_url: profile.avatarUrl || DEFAULT_AVATAR_URL,
+    clothing_url: profile.clothingUrl ?? null,
     updated_at: new Date().toISOString(),
   };
 }
@@ -966,12 +1086,15 @@ async function blobToDataUrl(blob: Blob) {
 }
 
 async function resizePngToAvatar(file: File) {
+  return await resizePngToSquare(file, 128);
+}
+
+async function resizePngToSquare(file: File, size: number) {
   const imageUrl = URL.createObjectURL(file);
 
   try {
     const image = await loadImage(imageUrl);
     const canvas = document.createElement("canvas");
-    const size = 128;
     canvas.width = size;
     canvas.height = size;
 
@@ -1032,11 +1155,25 @@ function normalizeCharacter3d(value: unknown): Character3dConfig {
     accent: normalizeColor(candidate.accent) ?? DEFAULT_CHARACTER_3D.accent,
     head: normalizeColor(candidate.head) ?? DEFAULT_CHARACTER_3D.head,
     style: candidate.style === "runner" || candidate.style === "bot" ? candidate.style : "pod",
+    clothingImageUrl: normalizeImageUrl(candidate.clothingImageUrl),
   };
 }
 
 function normalizeColor(value: unknown) {
   return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value) ? value : null;
+}
+
+function normalizeImageUrl(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeOptionalText(value: string) {
@@ -1104,7 +1241,7 @@ function stripCacheBuster(value: string) {
   return value.split("?")[0];
 }
 
-async function assertPngBlobSize(file: Blob, expectedSize: number) {
+async function assertPngBlobSize(file: Blob, expectedSize: number, label = "PNG") {
   const arrayBuffer = await file.arrayBuffer();
   const view = new DataView(arrayBuffer);
   const signature = new Uint8Array(arrayBuffer.slice(0, 8));
@@ -1112,14 +1249,14 @@ async function assertPngBlobSize(file: Blob, expectedSize: number) {
   const isPng = pngSignature.every((byte, index) => signature[index] === byte);
 
   if (!isPng || arrayBuffer.byteLength < 24) {
-    throw new Error("Avatar must be a valid PNG image.");
+    throw new Error(`${label} must be a valid PNG image.`);
   }
 
   const width = view.getUint32(16);
   const height = view.getUint32(20);
 
   if (width !== expectedSize || height !== expectedSize) {
-    throw new Error(`Avatar PNG must be exactly ${expectedSize}x${expectedSize} pixels.`);
+    throw new Error(`${label} PNG must be exactly ${expectedSize}x${expectedSize} pixels.`);
   }
 }
 

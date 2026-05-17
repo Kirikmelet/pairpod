@@ -30,6 +30,16 @@ export type RoomRecord = {
   created_at: string;
 };
 
+export type PageRouteRecord = {
+  id: string;
+  page_id: string;
+  path: string;
+  label: string | null;
+  source: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type PostRecord = {
   id: string;
   room_id: string;
@@ -38,6 +48,14 @@ export type PostRecord = {
   header: string | null;
   content: string;
   likes: number;
+  user_id: string | null;
+  created_at: string;
+};
+
+export type ChatRecord = {
+  chat_id: string;
+  room_id: string;
+  body: string | null;
   user_id: string | null;
   created_at: string;
 };
@@ -60,6 +78,7 @@ export type UserProfileRecord = {
   configurations: Json;
   display_name?: string | null;
   avatar_url: string | null;
+  clothing_url?: string | null;
   updated_at?: string | null;
   created_at?: string | null;
 };
@@ -79,6 +98,8 @@ export type CommentVoteRecord = {
 export type PageBundle = {
   page: PageRecord;
   room: RoomRecord;
+  routes: PageRouteRecord[];
+  chats: ChatRecord[];
   posts: PostRecord[];
   comments: CommentRecord[];
   users: UserProfileRecord[];
@@ -165,7 +186,7 @@ type VoteRpcClient = {
 };
 
 const USER_PROFILE_COLUMNS =
-  "id,auth_user_id,email,username,configurations,display_name,avatar_url,updated_at";
+  "id,auth_user_id,email,username,configurations,display_name,avatar_url,clothing_url,updated_at";
 export const DEFAULT_AVATAR_URL =
   "https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png";
 
@@ -292,11 +313,19 @@ export async function updatePostLikes(post: PostRecord, delta: 1 | -1) {
 
 async function updatePostLikesDirect(post: PostRecord, delta: 1 | -1) {
   const supabase = createClient();
-  await updatePostLikesViaRpc(
-    supabase as unknown as VoteRpcClient,
-    post.id,
-    delta,
-  );
+  try {
+    await updatePostLikesViaRpc(
+      supabase as unknown as VoteRpcClient,
+      post.id,
+      delta,
+    );
+  } catch (rpcError) {
+    if (!isExtensionRuntime()) {
+      throw rpcError;
+    }
+
+    await updatePostLikesViaTables(post, delta, rpcError);
+  }
 }
 
 async function updatePostLikesViaRpc(
@@ -346,11 +375,19 @@ export async function updateCommentLikes(comment: CommentRecord, delta: 1 | -1) 
 
 async function updateCommentLikesDirect(comment: CommentRecord, delta: 1 | -1) {
   const supabase = createClient();
-  await updateCommentLikesViaRpc(
-    supabase as unknown as VoteRpcClient,
-    comment.id,
-    delta,
-  );
+  try {
+    await updateCommentLikesViaRpc(
+      supabase as unknown as VoteRpcClient,
+      comment.id,
+      delta,
+    );
+  } catch (rpcError) {
+    if (!isExtensionRuntime()) {
+      throw rpcError;
+    }
+
+    await updateCommentLikesViaTables(comment, delta, rpcError);
+  }
 }
 
 async function updateCommentLikesViaRpc(
@@ -419,6 +456,147 @@ async function updateVoteThroughApi(
   if (!response.ok || !payload.ok) {
     throw new Error(payload.ok ? "Failed to update vote" : payload.error);
   }
+}
+
+async function updatePostLikesViaTables(
+  post: PostRecord,
+  delta: 1 | -1,
+  rpcError?: unknown,
+) {
+  const authUserId = await getCurrentAuthUserId();
+  if (!authUserId) {
+    throw new Error("You must be signed in to vote.");
+  }
+
+  const supabase = createClient() as any;
+  const previousValue = await loadExistingVoteValue(
+    supabase,
+    "post_votes",
+    "post_id",
+    post.id,
+    authUserId,
+  );
+  if (previousValue === delta) {
+    throw new Error(
+      delta === 1
+        ? "You already upvoted this post."
+        : "You already downvoted this post.",
+    );
+  }
+
+  const scoreDelta = previousValue === null ? delta : delta - previousValue;
+  const voteError = await upsertVoteValue(
+    supabase,
+    "post_votes",
+    { post_id: post.id, user_id: authUserId, value: delta },
+    "post_id,user_id",
+  );
+  if (voteError) {
+    console.warn("Could not persist post vote row from extension.", voteError);
+  }
+
+  const nextLikes = Math.max(0, post.likes + scoreDelta);
+  const { error: updateError } = await supabase
+    .from("posts")
+    .update({ likes: nextLikes })
+    .eq("id", post.id);
+
+  if (updateError) {
+    const directMessage =
+      rpcError instanceof Error ? ` Supabase RPC said: ${rpcError.message}` : "";
+    throw new Error(`Could not update post vote.${directMessage} Table update said: ${updateError.message}`);
+  }
+}
+
+async function updateCommentLikesViaTables(
+  comment: CommentRecord,
+  delta: 1 | -1,
+  rpcError?: unknown,
+) {
+  const authUserId = await getCurrentAuthUserId();
+  if (!authUserId) {
+    throw new Error("You must be signed in to vote.");
+  }
+
+  const supabase = createClient() as any;
+  const previousValue = await loadExistingVoteValue(
+    supabase,
+    "comment_votes",
+    "comment_id",
+    comment.id,
+    authUserId,
+  );
+  if (previousValue === delta) {
+    throw new Error(
+      delta === 1
+        ? "You already liked this reply."
+        : "You already disliked this reply.",
+    );
+  }
+
+  const scoreDelta = previousValue === null ? delta : delta - previousValue;
+  const voteError = await upsertVoteValue(
+    supabase,
+    "comment_votes",
+    { comment_id: comment.id, user_id: authUserId, value: delta },
+    "comment_id,user_id",
+  );
+  if (voteError) {
+    console.warn("Could not persist comment vote row from extension.", voteError);
+  }
+
+  const nextLikes = Math.max(0, comment.likes + scoreDelta);
+  const { error: updateError } = await supabase
+    .from("comments")
+    .update({ likes: nextLikes })
+    .eq("id", comment.id);
+
+  if (updateError) {
+    const directMessage =
+      rpcError instanceof Error ? ` Supabase RPC said: ${rpcError.message}` : "";
+    throw new Error(`Could not update reply vote.${directMessage} Table update said: ${updateError.message}`);
+  }
+}
+
+async function loadExistingVoteValue(
+  supabase: any,
+  table: "post_votes" | "comment_votes",
+  targetColumn: "post_id" | "comment_id",
+  targetId: string,
+  userId: string,
+) {
+  const { data, error } = await supabase
+    .from(table)
+    .select("value")
+    .eq(targetColumn, targetId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn(`Could not load ${table} row from extension.`, error);
+    return null;
+  }
+
+  return data?.value === 1 || data?.value === -1 ? data.value : null;
+}
+
+async function upsertVoteValue(
+  supabase: any,
+  table: "post_votes" | "comment_votes",
+  row: Record<string, string | number>,
+  onConflict: string,
+) {
+  const { error } = await supabase
+    .from(table)
+    .upsert(
+      {
+        ...row,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict },
+    );
+
+  return error;
 }
 
 function getRemoteApiUrl(pathname: string) {
@@ -548,6 +726,26 @@ export function usePageBundle(): UsePageBundleResult {
           schema: "public",
           table: "posts",
           filter: `room_id=eq.${roomId}`,
+        },
+        scheduleRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat",
+          filter: `room_id=eq.${bundle.page.id}`,
+        },
+        scheduleRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "page_routes",
+          filter: `page_id=eq.${bundle.page.id}`,
         },
         scheduleRefresh,
       )
@@ -767,12 +965,9 @@ async function postDirectToSupabase<TResponse>(
   body: Record<string, unknown>,
 ) {
   if (input === "/api/chat") {
-    return (await createPostDirect({
-      roomId: readString(body.roomId),
+    return (await createChatDirect({
       pageId: readString(body.pageId),
-      type: "chat",
-      content: readString(body.message),
-      header: null,
+      body: readString(body.message),
     })) as TResponse;
   }
 
@@ -801,19 +996,43 @@ async function postDirectToSupabase<TResponse>(
 async function loadOrCreatePageBundle(url: string): Promise<PageBundle> {
   const page = await findOrCreatePage(normalizePageUrl(url));
   const room = await findOrCreateRoom(page.id);
+  await seedPageRoutesDirect(page.id, url, []);
   const supabase = createClient();
 
-  const { data: postsData, error: postsError } = await supabase
-    .from("posts")
-    .select("*")
-    .eq("room_id", room.id)
-    .order("created_at", { ascending: true });
+  const [routesResult, chatsResult, postsResult] = await Promise.all([
+    supabase
+      .from("page_routes")
+      .select("*")
+      .eq("page_id", page.id)
+      .order("created_at", { ascending: true })
+      .returns<PageRouteRecord[]>(),
+    supabase
+      .from("chat")
+      .select("*")
+      .eq("room_id", page.id)
+      .order("created_at", { ascending: true })
+      .returns<ChatRecord[]>(),
+    supabase
+      .from("posts")
+      .select("*")
+      .eq("room_id", room.id)
+      .order("created_at", { ascending: true }),
+  ]);
 
-  if (postsError) {
-    throw postsError;
+  if (chatsResult.error) {
+    throw chatsResult.error;
   }
 
-  const posts = postsData ?? [];
+  if (routesResult.error) {
+    throw routesResult.error;
+  }
+
+  if (postsResult.error) {
+    throw postsResult.error;
+  }
+
+  const chats = chatsResult.data ?? [];
+  const posts = postsResult.data ?? [];
   const postIds = posts.map((post) => post.id);
   let comments: CommentRecord[] = [];
 
@@ -831,11 +1050,13 @@ async function loadOrCreatePageBundle(url: string): Promise<PageBundle> {
     comments = commentsData ?? [];
   }
 
-  const users = await loadProfilesForRecords(posts, comments);
+  const users = await loadProfilesForRecords(posts, comments, chats);
 
   return {
     page,
     room,
+    routes: routesResult.data ?? [],
+    chats,
     posts,
     comments,
     users,
@@ -1092,6 +1313,124 @@ async function findOrCreateRoom(pageId: string): Promise<RoomRecord> {
   return createdRooms[0];
 }
 
+async function seedPageRoutesDirect(pageId: string, url: string, paths: string[]) {
+  const routes = buildRouteSeedRows(pageId, url, paths);
+  if (routes.length === 0) {
+    return;
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("page_routes")
+    .upsert(routes, { onConflict: "page_id,path" });
+
+  if (error) {
+    console.warn("Could not seed page route doors.", error);
+  }
+}
+
+function buildRouteSeedRows(pageId: string, url: string, paths: string[]) {
+  const baseUrl = parseRouteUrl(url);
+  if (!baseUrl || baseUrl.hostname === "global.pairpod.local") {
+    return [];
+  }
+
+  const routes = new Map<string, { path: string; label: string; source: string }>();
+  const addRoute = (path: string, source: string) => {
+    const normalized = normalizeRoutePath(path);
+    if (!normalized || routes.has(normalized)) {
+      return;
+    }
+
+    routes.set(normalized, {
+      path: normalized,
+      label: normalized === "/" ? "/" : normalized.replace(/^\//, ""),
+      source,
+    });
+  };
+
+  addRoute("/", "site-root");
+  addRoute(`${baseUrl.pathname}${baseUrl.search}`, "current-page");
+
+  const segments = baseUrl.pathname.split("/").filter(Boolean);
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    addRoute(`/${segments.slice(0, index + 1).join("/")}`, "parent-route");
+  }
+
+  for (const path of paths) {
+    addRoute(path, "post-section");
+  }
+
+  const now = new Date().toISOString();
+  return [...routes.values()].slice(0, 12).map((route) => ({
+    page_id: pageId,
+    path: route.path,
+    label: route.label,
+    source: route.source,
+    updated_at: now,
+  }));
+}
+
+function parseRouteUrl(value: string) {
+  try {
+    return new URL(/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(value) ? value : `https://${value}`);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeRoutePath(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = parseRouteUrl(trimmed);
+  const routeText = parsed ? `${parsed.pathname}${parsed.search}` : trimmed;
+  const [pathPart, searchPart = ""] = routeText.split("?");
+  const path = `/${pathPart.replace(/^\/+/, "").replace(/\/+$/, "")}`;
+  const normalizedPath = path === "/" ? "/" : path;
+  return `${normalizedPath}${searchPart ? `?${searchPart}` : ""}`;
+}
+
+async function createChatDirect({
+  pageId,
+  body,
+}: {
+  pageId: string;
+  body: string;
+}) {
+  const trimmedBody = body.trim();
+  if (!pageId || !trimmedBody) {
+    throw new Error("pageId and message are required");
+  }
+
+  const supabase = createClient();
+  const currentUser = await ensureCurrentUserProfile();
+  const payload: TablesInsert<"chat"> = {
+    room_id: pageId,
+    body: trimmedBody,
+    user_id: currentUser?.id ?? null,
+  };
+
+  const { data, error } = await supabase
+    .from("chat")
+    .insert(payload)
+    .select("*")
+    .limit(1)
+    .returns<ChatRecord[]>();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data?.[0]) {
+    throw new Error("Could not create chat message.");
+  }
+
+  return data[0];
+}
+
 async function createPostDirect({
   roomId,
   pageId,
@@ -1101,7 +1440,7 @@ async function createPostDirect({
 }: {
   roomId: string;
   pageId: string;
-  type: "chat" | "guide" | "question";
+  type: "guide" | "question";
   content: string;
   header: string | null;
 }) {
@@ -1185,8 +1524,15 @@ async function createCommentDirect({
 async function loadProfilesForRecords(
   posts: PostRecord[],
   comments: CommentRecord[],
+  chats: ChatRecord[] = [],
 ) {
   const userIds = new Set<string>();
+
+  for (const chat of chats) {
+    if (chat.user_id) {
+      userIds.add(chat.user_id);
+    }
+  }
 
   for (const post of posts) {
     if (post.user_id) {

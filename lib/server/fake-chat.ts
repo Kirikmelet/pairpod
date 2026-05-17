@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createPost, type CreatedPost } from "@/lib/server/discussions";
+import { createChatMessage, type CreatedChat } from "@/lib/server/discussions";
 import { logEvent } from "@/lib/server/helpers/logEvent";
 import { normalizeUrl } from "@/lib/server/helpers/normalizeUrl";
 import {
@@ -48,7 +48,7 @@ export type FakeChatResult = {
   room: RoomRow;
   generated: FakeChatPlan;
   users: Tables<"users">[];
-  posts: CreatedPost[];
+  chats: CreatedChat[];
 };
 
 const GLOBAL_ROOM_URL = "https://global.pairpod.local/";
@@ -77,7 +77,7 @@ export async function createFakeChatFromMistral(
       room,
       generated,
       users: [],
-      posts: [],
+      chats: [],
     };
   }
 
@@ -88,27 +88,25 @@ export async function createFakeChatFromMistral(
       users[index],
     ]),
   );
-  const posts: CreatedPost[] = [];
+  const chats: CreatedChat[] = [];
 
   for (const message of generated.messages) {
     const fakeUser = usersByKey.get(message.speaker) ?? users[0] ?? null;
-    const post = await createPost({
-      roomId: room.id,
+    const chat = await createChatMessage({
+      pageId: page.id,
       userId: fakeUser?.id ?? null,
-      type: "chat",
       content: message.body,
-      sectionId: "ai-fake-chat",
     });
 
-    posts.push(post);
+    chats.push(chat);
 
     await logEvent({
       eventType: "ai.fake_chat.message.created",
       pageId: page.id,
       roomId: room.id,
-      postId: post.id,
       userId: fakeUser?.id ?? null,
       payload: {
+        chatId: chat.chat_id,
         provider: "mistral",
         scope,
         speaker: message.speaker,
@@ -122,7 +120,7 @@ export async function createFakeChatFromMistral(
     room,
     generated,
     users,
-    posts,
+    chats,
   };
 }
 
@@ -157,6 +155,7 @@ async function generateFakeChatPlan({
             `Room URL: ${targetUrl}.`,
             topic?.trim() ? `Topic: ${topic.trim()}.` : "Topic: casual collaboration.",
             "Schema: {\"users\":[{\"key\":\"short_stable_key\",\"displayName\":\"Name\",\"username\":\"lowercase_username\",\"bio\":\"short persona\"}],\"messages\":[{\"speaker\":\"matching_user_key\",\"body\":\"one concise chat message\"}]}",
+            "Give every user a 2000s to early-2010s internet display name or handle, like AIM/MSN/forum/Xanga era names. Examples of the vibe: xXPixelAngelXx, sk8rByte, neon_ninja_07, LimeWireLarry, sceneQueen42. Usernames must stay lowercase with letters, numbers, underscores, or hyphens.",
             "Messages should sound like different real teammates: specific, casual, short, and a little opinionated.",
             "Never claim to be a real person. Avoid generic AI disclaimers.",
           ].join("\n"),
@@ -180,28 +179,40 @@ function buildFallbackFakeChatPlan(
 ): FakeChatPlan {
   const seedUsers: FakeChatUserPlan[] = [
     {
-      key: "maya",
-      displayName: "Maya Chen",
-      username: "maya_packet",
-      bio: "Practical builder who spots edge cases.",
+      key: "pixel_angel",
+      displayName: "xXPixelAngelXx",
+      username: "xxpixelangelxx",
+      bio: "Forum-era UI tinkerer who spots edge cases.",
     },
     {
-      key: "noah",
-      displayName: "Noah Patel",
-      username: "noah_mesh",
-      bio: "Systems thinker who likes tight plans.",
+      key: "sk8r_byte",
+      displayName: "sk8rByte92",
+      username: "sk8rbyte92",
+      bio: "Early-2010s systems nerd with a taste for concise plans.",
     },
     {
-      key: "iris",
-      displayName: "Iris Morgan",
-      username: "iris_signal",
-      bio: "Design-minded teammate who cares about flow.",
+      key: "neon_ninja",
+      displayName: "neon_ninja_07",
+      username: "neon_ninja_07",
+      bio: "Old-school forum regular who cares about flow.",
     },
     {
-      key: "sam",
-      displayName: "Sam Rivera",
-      username: "sam_sync",
-      bio: "Calm debugger with a bias for small fixes.",
+      key: "limewire_larry",
+      displayName: "LimeWireLarry",
+      username: "limewirelarry",
+      bio: "Calm debugger with a suspiciously specific 2008 vibe.",
+    },
+    {
+      key: "scene_queen",
+      displayName: "sceneQueen42",
+      username: "scenequeen42",
+      bio: "Xanga-coded product thinker who notices empty states.",
+    },
+    {
+      key: "dialup_druid",
+      displayName: "DialUp_Druid",
+      username: "dialup_druid",
+      bio: "Patient helper who treats small polish like real work.",
     },
   ].slice(0, userCount);
   const room = scope === "global" ? "Global" : targetUrl;

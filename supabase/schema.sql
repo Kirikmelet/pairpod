@@ -30,6 +30,7 @@ create table if not exists users (
   username text unique,
   display_name text,
   avatar_url text default 'https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png',
+  clothing_url text,
   email text,
   password text,
   url text,
@@ -41,6 +42,7 @@ create table if not exists users (
 alter table users add column if not exists display_name text;
 alter table users add column if not exists avatar_url text;
 alter table users alter column avatar_url set default 'https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png';
+alter table users add column if not exists clothing_url text;
 alter table users add column if not exists password text;
 alter table users add column if not exists updated_at timestamptz not null default now();
 alter table users add column if not exists auth_user_id uuid;
@@ -66,6 +68,17 @@ create table if not exists pages (
   id uuid primary key default gen_random_uuid(),
   normalized_url text not null unique,
   created_at timestamptz not null default now()
+);
+
+create table if not exists page_routes (
+  id uuid primary key default gen_random_uuid(),
+  page_id uuid not null references pages(id) on delete cascade,
+  path text not null,
+  label text,
+  source text not null default 'discovered',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (page_id, path)
 );
 
 create table if not exists chat (
@@ -171,6 +184,7 @@ create table if not exists dm_messages (
 
 alter table users enable row level security;
 alter table pages enable row level security;
+alter table page_routes enable row level security;
 alter table chat enable row level security;
 alter table rooms enable row level security;
 alter table posts enable row level security;
@@ -184,6 +198,7 @@ alter table dm_thread_reads enable row level security;
 alter table dm_messages enable row level security;
 
 create index if not exists idx_chat_room_id on chat(room_id);
+create index if not exists idx_page_routes_page_id on page_routes(page_id);
 create index if not exists idx_chat_user_id on chat(user_id);
 create index if not exists idx_chat_created_at on chat(created_at);
 create index if not exists idx_rooms_page_id on rooms(page_id);
@@ -239,6 +254,87 @@ begin
       for select
       to public
       using (bucket_id = 'profile_pictures');
+  end if;
+end
+$$;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'character_clothing',
+  'character_clothing',
+  true,
+  2097152,
+  array['image/png']::text[]
+)
+on conflict (id) do update
+set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'public can read character clothing'
+  ) then
+    create policy "public can read character clothing"
+      on storage.objects
+      for select
+      to public
+      using (bucket_id = 'character_clothing');
+  end if;
+end
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'authenticated users can insert own character clothing'
+  ) then
+    create policy "authenticated users can insert own character clothing"
+      on storage.objects
+      for insert
+      to authenticated
+      with check (
+        bucket_id = 'character_clothing'
+        and (storage.foldername(name))[1] = auth.uid()::text
+        and name = auth.uid()::text || '/clothing.png'
+      );
+  end if;
+end
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'authenticated users can update own character clothing'
+  ) then
+    create policy "authenticated users can update own character clothing"
+      on storage.objects
+      for update
+      to authenticated
+      using (
+        bucket_id = 'character_clothing'
+        and (storage.foldername(name))[1] = auth.uid()::text
+        and name = auth.uid()::text || '/clothing.png'
+      )
+      with check (
+        bucket_id = 'character_clothing'
+        and (storage.foldername(name))[1] = auth.uid()::text
+        and name = auth.uid()::text || '/clothing.png'
+      );
   end if;
 end
 $$;
@@ -351,6 +447,7 @@ grant select, insert, update, delete on table users to authenticated;
 grant select, insert, update, delete on table pages to authenticated;
 grant select, insert, update, delete on table chat to authenticated;
 grant select, insert, update, delete on table rooms to authenticated;
+grant select, insert, update, delete on table page_routes to authenticated;
 grant select, insert, update, delete on table posts to authenticated;
 grant select, insert, update, delete on table comments to authenticated;
 grant select, insert, update, delete on table post_votes to authenticated;
@@ -365,6 +462,8 @@ drop policy if exists "authenticated users can read users" on users;
 drop policy if exists "authenticated users can write users" on users;
 drop policy if exists "authenticated users can read pages" on pages;
 drop policy if exists "authenticated users can write pages" on pages;
+drop policy if exists "authenticated users can read page routes" on page_routes;
+drop policy if exists "authenticated users can write page routes" on page_routes;
 drop policy if exists "authenticated users can read chat" on chat;
 drop policy if exists "authenticated users can write chat" on chat;
 drop policy if exists "authenticated users can read rooms" on rooms;
@@ -407,6 +506,17 @@ create policy "authenticated users can read pages"
 
 create policy "authenticated users can write pages"
   on pages for all
+  to authenticated
+  using (true)
+  with check (true);
+
+create policy "authenticated users can read page routes"
+  on page_routes for select
+  to authenticated
+  using (true);
+
+create policy "authenticated users can write page routes"
+  on page_routes for all
   to authenticated
   using (true)
   with check (true);
@@ -601,32 +711,43 @@ security definer
 set search_path = public
 as $$
 declare
-  v_user_id uuid := auth.uid();
+  v_auth_user_id uuid := auth.uid();
+  v_user_id uuid;
   v_next_value integer := case when p_delta >= 0 then 1 else -1 end;
   v_previous_value integer;
   v_score_delta integer := 0;
 begin
-  if v_user_id is null then
+  if v_auth_user_id is null then
     raise exception 'You must be signed in to vote';
   end if;
 
-  insert into users (id)
-  values (v_user_id)
-  on conflict (id) do nothing;
+  select app_users.id
+    into v_user_id
+    from public.users as app_users
+    where app_users.auth_user_id = v_auth_user_id
+       or app_users.id = v_auth_user_id
+    order by app_users.auth_user_id is null
+    limit 1;
+
+  if v_user_id is null then
+    insert into public.users (auth_user_id)
+    values (v_auth_user_id)
+    returning users.id into v_user_id;
+  end if;
 
   select post_votes.value
     into v_previous_value
-    from post_votes
+    from public.post_votes as post_votes
     where post_votes.post_id = p_post_id
       and post_votes.user_id = v_user_id
     for update;
 
   if v_previous_value is null then
-    insert into post_votes (post_id, user_id, value)
+    insert into public.post_votes (post_id, user_id, value)
     values (p_post_id, v_user_id, v_next_value);
     v_score_delta := v_next_value;
   elsif v_previous_value <> v_next_value then
-    update post_votes
+    update public.post_votes as post_votes
     set value = v_next_value,
         updated_at = now()
     where post_votes.post_id = p_post_id
@@ -635,10 +756,10 @@ begin
   end if;
 
   return query
-    update posts
-    set likes = greatest(0, posts.likes + v_score_delta)
-    where posts.id = p_post_id
-    returning posts.id, posts.likes;
+    update public.posts as updated_post
+    set likes = greatest(0, updated_post.likes + v_score_delta)
+    where updated_post.id = p_post_id
+    returning updated_post.id as id, updated_post.likes as likes;
 end;
 $$;
 
@@ -652,32 +773,43 @@ security definer
 set search_path = public
 as $$
 declare
-  v_user_id uuid := auth.uid();
+  v_auth_user_id uuid := auth.uid();
+  v_user_id uuid;
   v_next_value integer := case when p_delta >= 0 then 1 else -1 end;
   v_previous_value integer;
   v_score_delta integer := 0;
 begin
-  if v_user_id is null then
+  if v_auth_user_id is null then
     raise exception 'You must be signed in to vote';
   end if;
 
-  insert into users (id)
-  values (v_user_id)
-  on conflict (id) do nothing;
+  select app_users.id
+    into v_user_id
+    from public.users as app_users
+    where app_users.auth_user_id = v_auth_user_id
+       or app_users.id = v_auth_user_id
+    order by app_users.auth_user_id is null
+    limit 1;
+
+  if v_user_id is null then
+    insert into public.users (auth_user_id)
+    values (v_auth_user_id)
+    returning users.id into v_user_id;
+  end if;
 
   select comment_votes.value
     into v_previous_value
-    from comment_votes
+    from public.comment_votes as comment_votes
     where comment_votes.comment_id = p_comment_id
       and comment_votes.user_id = v_user_id
     for update;
 
   if v_previous_value is null then
-    insert into comment_votes (comment_id, user_id, value)
+    insert into public.comment_votes (comment_id, user_id, value)
     values (p_comment_id, v_user_id, v_next_value);
     v_score_delta := v_next_value;
   elsif v_previous_value <> v_next_value then
-    update comment_votes
+    update public.comment_votes as comment_votes
     set value = v_next_value,
         updated_at = now()
     where comment_votes.comment_id = p_comment_id
@@ -686,10 +818,10 @@ begin
   end if;
 
   return query
-    update comments
-    set likes = greatest(0, comments.likes + v_score_delta)
-    where comments.id = p_comment_id
-    returning comments.id, comments.likes;
+    update public.comments as updated_comment
+    set likes = greatest(0, updated_comment.likes + v_score_delta)
+    where updated_comment.id = p_comment_id
+    returning updated_comment.id as id, updated_comment.likes as likes;
 end;
 $$;
 

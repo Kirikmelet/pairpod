@@ -72,7 +72,7 @@ export async function POST(request: Request): Promise<Response> {
           displayName: fakeUser.display_name,
           avatarUrl: fakeUser.avatar_url,
         })),
-        posts: data.posts,
+        chats: data.chats,
       },
       dryRun ? 200 : 201,
     );

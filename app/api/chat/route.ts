@@ -1,7 +1,7 @@
 import { logEvent } from '@/lib/server/helpers/logEvent'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
 import { resolveAuthenticatedProfileIdOrFallback } from '@/lib/server/profile'
-import { createPost } from '@/lib/server/discussions'
+import { createChatMessage } from '@/lib/server/discussions'
 import { findOrCreateDefaultRoom } from '@/lib/server/pages'
 
 type ChatRequestBody = {
@@ -33,25 +33,27 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const resolvedRoomId = roomId || (await findOrCreateDefaultRoom(pageId)).id
+    const resolvedPageId = pageId || ''
     const resolvedUserId = await resolveAuthenticatedProfileIdOrFallback(requestUserId)
 
-    const data = await createPost({
-      roomId: resolvedRoomId,
+    if (!resolvedPageId) {
+      return jsonError('pageId is required for chat messages', 400)
+    }
+
+    const data = await createChatMessage({
+      pageId: resolvedPageId,
       userId: resolvedUserId,
-      type: 'chat',
       content: message,
-      sectionId,
     })
 
     await logEvent({
       eventType: 'chat.message.created',
       pageId: pageId || null,
       roomId: resolvedRoomId,
-      postId: data.id,
       userId: resolvedUserId,
       payload: {
-        type: data.type,
-        sectionId: data.section_id,
+        chatId: data.chat_id,
+        sectionId,
       },
     })
 

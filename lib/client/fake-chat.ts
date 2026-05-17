@@ -5,7 +5,7 @@ import type { Tables, TablesInsert } from "@/utils/database.types";
 import { DEFAULT_AVATAR_URL } from "@/lib/client/page-api";
 
 type FakeChatDirectInput = {
-  roomId: string;
+  pageId: string;
   scope: "global" | "domain";
   title: string;
   messageCount?: number;
@@ -20,29 +20,39 @@ type FakeUserPlan = {
 
 const PERSONAS: FakeUserPlan[] = [
   {
-    displayName: "Maya Chen",
-    username: "maya_packet",
-    bio: "Practical builder who notices edge cases early.",
+    displayName: "xXPixelAngelXx",
+    username: "xxpixelangelxx",
+    bio: "Forum-era UI tinkerer who notices edge cases early.",
   },
   {
-    displayName: "Noah Patel",
-    username: "noah_mesh",
-    bio: "Systems-minded teammate who likes concise plans.",
+    displayName: "sk8rByte92",
+    username: "sk8rbyte92",
+    bio: "Early-2010s systems-minded teammate who likes concise plans.",
   },
   {
-    displayName: "Iris Morgan",
-    username: "iris_signal",
-    bio: "Design-aware peer who turns vague ideas into UI.",
+    displayName: "neon_ninja_07",
+    username: "neon_ninja_07",
+    bio: "Old-school forum regular who turns vague ideas into UI.",
   },
   {
-    displayName: "Sam Rivera",
-    username: "sam_sync",
-    bio: "Calm debugging presence with a taste for small fixes.",
+    displayName: "LimeWireLarry",
+    username: "limewirelarry",
+    bio: "Calm debugging presence with a suspiciously specific 2008 vibe.",
+  },
+  {
+    displayName: "sceneQueen42",
+    username: "scenequeen42",
+    bio: "Xanga-coded product thinker who notices empty states.",
+  },
+  {
+    displayName: "DialUp_Druid",
+    username: "dialup_druid",
+    bio: "Patient helper who treats small polish like real work.",
   },
 ];
 
 export async function createHumanFakeChatDirect({
-  roomId,
+  pageId,
   scope,
   title,
   messageCount = 5,
@@ -78,29 +88,25 @@ export async function createHumanFakeChatDirect({
 
   const createdUsers = users ?? [];
   const messages = buildHumanMessages(scope, title, clamp(messageCount, 1, 10));
-  const posts = messages.map((content, index) => ({
-    room_id: roomId,
-    type: "chat",
-    section_id: "ai-fake-chat",
-    header: null,
-    content,
-    likes: 0,
+  const chats = messages.map((body, index) => ({
+    room_id: pageId,
+    body,
     user_id: createdUsers[index % createdUsers.length]?.id ?? null,
-  })) satisfies TablesInsert<"posts">[];
+  })) satisfies TablesInsert<"chat">[];
 
-  const { data: createdPosts, error: postError } = await supabase
-    .from("posts")
-    .insert(posts)
+  const { data: createdChats, error: chatError } = await supabase
+    .from("chat")
+    .insert(chats)
     .select("*")
-    .returns<Tables<"posts">[]>();
+    .returns<Tables<"chat">[]>();
 
-  if (postError) {
-    throw new Error(`Could not create AI messages: ${postError.message}`);
+  if (chatError) {
+    throw new Error(`Could not create AI messages: ${chatError.message}`);
   }
 
   return {
     users: createdUsers,
-    posts: createdPosts ?? [],
+    chats: createdChats ?? [],
   };
 }
 

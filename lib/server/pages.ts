@@ -18,6 +18,16 @@ export type RoomRow = {
   created_at: string
 }
 
+export type PageRouteRow = {
+  id: string
+  page_id: string
+  path: string
+  label: string | null
+  source: string
+  created_at: string
+  updated_at: string
+}
+
 export type AuthorProfile = {
   id: string
   username: string | null
@@ -40,6 +50,14 @@ export type PostRow = {
 
 type PostRecord = Omit<PostRow, 'author'>
 
+export type ChatRow = {
+  chat_id: string
+  room_id: string
+  body: string | null
+  user_id: string | null
+  created_at: string
+}
+
 export type CommentRow = {
   id: string
   post_id: string
@@ -57,17 +75,20 @@ type CommentRecord = Omit<CommentRow, 'author' | 'section_id'>
 export type PageBundle = {
   page: PageRow
   room: RoomRow
+  routes: PageRouteRow[]
+  chats: ChatRow[]
   posts: PostRow[]
   comments: CommentRow[]
   users: UserProfileRow[]
 }
 
 const USER_PROFILE_COLUMNS =
-  'id,auth_user_id,email,username,configurations,avatar_url,display_name,updated_at,created_at,url'
+  'id,auth_user_id,email,username,configurations,avatar_url,clothing_url,display_name,updated_at,created_at,url'
 
 export async function loadOrCreatePageRoom(url: string): Promise<PageBundle> {
   const page = await findOrCreatePage(url)
   const room = await findOrCreateDefaultRoom(page.id)
+  await seedPageRoutes(page.id, url, [])
 
   return getPageBundle(page.id, room.id)
 }
@@ -143,9 +164,21 @@ export async function findOrCreateDefaultRoom(pageId: string): Promise<RoomRow> 
 export async function getPageBundle(pageId: string, roomId: string): Promise<PageBundle> {
   const supabase = getSupabaseAdmin()
 
-  const [pageResult, roomResult, postsResult] = await Promise.all([
+  const [pageResult, roomResult, routesResult, chatsResult, postsResult] = await Promise.all([
     supabase.from('pages').select('*').eq('id', pageId).single<PageRow>(),
     supabase.from('rooms').select('*').eq('id', roomId).single<RoomRow>(),
+    supabase
+      .from('page_routes')
+      .select('*')
+      .eq('page_id', pageId)
+      .order('created_at', { ascending: true })
+      .returns<PageRouteRow[]>(),
+    supabase
+      .from('chat')
+      .select('*')
+      .eq('room_id', pageId)
+      .order('created_at', { ascending: true })
+      .returns<ChatRow[]>(),
     supabase
       .from('posts')
       .select('*')
@@ -162,10 +195,19 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
     throw new Error(`Failed to load room: ${roomResult.error.message}`)
   }
 
+  if (routesResult.error) {
+    throw new Error(`Failed to load routes: ${routesResult.error.message}`)
+  }
+
   if (postsResult.error) {
     throw new Error(`Failed to load posts: ${postsResult.error.message}`)
   }
 
+  if (chatsResult.error) {
+    throw new Error(`Failed to load chat: ${chatsResult.error.message}`)
+  }
+
+  const chats = chatsResult.data ?? []
   const posts = postsResult.data ?? []
   const postIds = posts.map((post) => post.id)
 
@@ -191,7 +233,7 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
       })) ?? []
   }
 
-  const userIds = [...posts, ...comments]
+  const userIds = [...chats, ...posts, ...comments]
     .map((entry) => entry.user_id)
     .filter((userId): userId is string => Boolean(userId))
   const [authorById, users] = await Promise.all([
@@ -212,10 +254,92 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
   return {
     page: pageResult.data,
     room: roomResult.data,
+    routes: routesResult.data ?? [],
+    chats,
     posts: enrichedPosts,
     comments: enrichedComments,
     users,
   }
+}
+
+async function seedPageRoutes(pageId: string, url: string, paths: string[]) {
+  const routes = buildRouteSeedRows(pageId, url, paths)
+  if (routes.length === 0) {
+    return
+  }
+
+  const supabase = getSupabaseAdmin()
+  const { error } = await supabase
+    .from('page_routes')
+    .upsert(routes, { onConflict: 'page_id,path' })
+
+  if (error) {
+    throw new Error(`Failed to seed page routes: ${error.message}`)
+  }
+}
+
+function buildRouteSeedRows(pageId: string, url: string, paths: string[]) {
+  const baseUrl = parseRouteUrl(url)
+  if (!baseUrl || baseUrl.hostname === 'global.pairpod.local') {
+    return []
+  }
+
+  const routes = new Map<string, { path: string; label: string; source: string }>()
+  const addRoute = (path: string, source: string) => {
+    const normalized = normalizeRoutePath(path)
+    if (!normalized || routes.has(normalized)) {
+      return
+    }
+
+    routes.set(normalized, {
+      path: normalized,
+      label: normalized === '/' ? '/' : normalized.replace(/^\//, ''),
+      source,
+    })
+  }
+
+  addRoute('/', 'site-root')
+  addRoute(`${baseUrl.pathname}${baseUrl.search}`, 'current-page')
+
+  const segments = baseUrl.pathname.split('/').filter(Boolean)
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    addRoute(`/${segments.slice(0, index + 1).join('/')}`, 'parent-route')
+  }
+
+  for (const path of paths) {
+    addRoute(path, 'post-section')
+  }
+
+  const now = new Date().toISOString()
+  return [...routes.values()].slice(0, 12).map((route) => ({
+    page_id: pageId,
+    path: route.path,
+    label: route.label,
+    source: route.source,
+    updated_at: now,
+  }))
+}
+
+function parseRouteUrl(value: string) {
+  try {
+    return new URL(/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(value) ? value : `https://${value}`)
+  } catch {
+    return null
+  }
+}
+
+function normalizeRoutePath(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  const parsed = parseRouteUrl(trimmed)
+  const routeText = parsed ? `${parsed.pathname}${parsed.search}` : trimmed
+  const [pathPart, searchPart = ''] = routeText.split('?')
+  const path = `/${pathPart.replace(/^\/+/, '').replace(/\/+$/, '')}`
+  const normalizedPath = path === '/' ? '/' : path
+  return `${normalizedPath}${searchPart ? `?${searchPart}` : ''}`
 }
 
 async function getAuthorProfilesById(userIds: string[]): Promise<Map<string, AuthorProfile>> {

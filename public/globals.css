@@ -2777,7 +2777,7 @@ body {
   position: relative;
   isolation: isolate;
   min-height: 100dvh;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 .post-shell__content {
@@ -2786,13 +2786,14 @@ body {
   min-height: 100dvh;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   padding: var(--space-md);
 }
 
 .post-window {
-  width: min(100%, 1380px);
-  min-height: min(calc(100dvh - 16px), 900px);
+  width: min(100%, 1280px);
+  height: min(820px, calc(100dvh - 32px));
+  min-height: min(680px, calc(100dvh - 32px));
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   border-radius: var(--radius-sm);
@@ -2808,9 +2809,10 @@ body {
 .post-layout {
   min-height: 0;
   display: grid;
-  grid-template-columns: 285px minmax(520px, 1fr) 300px;
+  grid-template-columns: 280px minmax(480px, 1fr) 280px;
   gap: var(--space-sm);
   padding: var(--space-sm);
+  overflow: hidden;
 }
 
 .post-compose-panel,
@@ -2824,7 +2826,10 @@ body {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   border: 1px solid var(--xp-body-border);
+  border-radius: var(--radius-md);
   background: linear-gradient(180deg, rgba(255,255,255,0.90), rgba(236,242,248,0.96));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.74), 0 2px 8px rgba(0,50,120,0.08);
+  overflow: hidden;
 }
 
 .post-compose {
@@ -2928,7 +2933,7 @@ textarea.post-compose-input {
   margin: 0 var(--space-lg) var(--space-lg);
   padding: var(--space-md);
   border: 1.5px solid var(--cube-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--cube-bg);
   box-shadow: var(--shadow-cube);
   position: relative;
@@ -2969,7 +2974,40 @@ textarea.post-compose-input {
 }
 
 .post-stream {
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.post-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 52px;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid rgba(88, 136, 200, 0.18);
+  background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(229,239,249,0.94));
+  overflow-x: auto;
+}
+
+.post-tab {
+  min-height: 32px;
+  padding: 0 var(--space-md);
+  border: 1.5px solid rgba(88, 136, 200, 0.34);
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.82);
+  color: var(--text-mid);
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-extrabold);
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 1px 4px rgba(0,40,100,0.10);
+}
+
+.post-tab--active {
+  background: linear-gradient(180deg, var(--accent-blue-light), var(--accent-blue));
+  border-color: #0042c8;
+  color: white;
+  text-shadow: 0 1px 1px rgba(0,0,80,0.22);
 }
 
 .post-filterbar {
@@ -3014,20 +3052,20 @@ textarea.post-compose-input {
   overflow: auto;
   display: grid;
   align-content: start;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   padding: var(--space-md);
-  background: linear-gradient(180deg, rgba(255,255,255,0.88), rgba(236,242,248,0.75));
+  background: linear-gradient(180deg, rgba(249,252,255,0.94), rgba(236,244,252,0.84));
 }
 
 .post-card {
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr);
-  gap: var(--space-md);
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: var(--space-sm);
   padding: var(--space-md);
-  border: 1.5px solid rgba(80,120,190,0.32);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(255,255,255,0.88), rgba(236,245,255,0.76));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.90), 0 2px 8px rgba(0,50,120,0.10);
+  border: 1.5px solid rgba(80,120,190,0.30);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(242,248,255,0.92));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.92), 0 2px 8px rgba(0,50,120,0.08);
   transition: box-shadow var(--dur-normal) var(--ease-smooth), transform var(--dur-normal) var(--ease-smooth);
 }
 .post-card:hover {
@@ -3036,31 +3074,41 @@ textarea.post-compose-input {
 }
 
 .post-card--green {
-  border-color: rgba(60,150,70,0.42);
-  background: linear-gradient(180deg, rgba(255,255,255,0.84), rgba(235,250,236,0.74));
+  border-left: 4px solid rgba(69, 181, 76, 0.72);
 }
 
 .post-card--orange {
-  border-color: rgba(235,120,50,0.42);
-  background: linear-gradient(180deg, rgba(255,255,255,0.84), rgba(255,240,229,0.76));
+  border-left: 4px solid rgba(239, 139, 55, 0.72);
 }
 
 .post-card--purple {
-  border-color: rgba(120,90,220,0.42);
-  background: linear-gradient(180deg, rgba(255,255,255,0.84), rgba(240,236,255,0.76));
+  border-left: 4px solid rgba(116, 96, 219, 0.72);
+}
+
+.post-card--pink {
+  border-left: 4px solid rgba(218, 92, 149, 0.72);
+}
+
+.post-card--blue {
+  border-left: 4px solid rgba(48, 121, 230, 0.72);
+}
+
+.post-card--brown {
+  border-left: 4px solid rgba(160, 128, 82, 0.72);
 }
 
 .post-votes {
   display: grid;
   justify-items: center;
-  align-content: start;
-  gap: var(--space-xs);
+  align-content: center;
+  gap: 2px;
   color: var(--accent-blue);
+  padding-top: 2px;
 }
 
 .post-votes button {
-  width: 38px;
-  height: 30px;
+  width: 34px;
+  height: 26px;
   border: 1.5px solid var(--cube-border);
   border-radius: var(--radius-md);
   background: var(--cube-bg);
@@ -3072,10 +3120,23 @@ textarea.post-compose-input {
   box-shadow: var(--shadow-cube);
   transition: all var(--dur-fast) var(--ease-smooth);
 }
+.post-votes button[aria-pressed="true"],
+.post-votes button:disabled {
+  background: linear-gradient(180deg, var(--accent-blue-light), var(--accent-blue));
+  border-color: #0042c8;
+  color: white;
+  cursor: default;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 1px 4px rgba(0,80,200,0.22);
+}
 .post-votes button:hover {
   background: var(--cube-bg-hover);
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
+}
+.post-votes button[aria-pressed="true"]:hover,
+.post-votes button:disabled:hover {
+  background: linear-gradient(180deg, var(--accent-blue-light), var(--accent-blue));
+  transform: none;
 }
 .post-votes button:active {
   transform: translateY(0);
@@ -3083,7 +3144,7 @@ textarea.post-compose-input {
 
 .post-votes strong {
   font-family: var(--font-display);
-  font-size: var(--fs-xl);
+  font-size: var(--fs-lg);
   color: var(--text-dark);
 }
 
@@ -3108,11 +3169,26 @@ textarea.post-compose-input {
   text-transform: uppercase;
 }
 
+.post-section-tag {
+  display: inline-block;
+  margin-left: var(--space-xs);
+  margin-bottom: var(--space-xs);
+  padding: 2px 8px;
+  border: 1px solid rgba(80,120,190,0.22);
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.82);
+  color: var(--text-mid);
+  font-family: var(--font-body);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+}
+
 .post-card h2 {
   color: #001ebd;
   font-family: var(--font-display);
   font-size: var(--fs-xl);
-  line-height: 1.1;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
 }
 
 .post-card h1 {
@@ -3136,7 +3212,8 @@ textarea.post-compose-input {
   color: var(--text-mid);
   font-family: var(--font-body);
   font-size: var(--fs-md);
-  line-height: 1.5;
+  line-height: 1.48;
+  overflow-wrap: anywhere;
 }
 
 .post-card footer {
@@ -3185,6 +3262,7 @@ textarea.post-compose-input {
   display: grid;
   align-content: start;
   gap: var(--space-sm);
+  min-height: 0;
 }
 
 .post-shortcuts {
@@ -4530,6 +4608,15 @@ textarea.post-compose-input {
 }
 
 @media (max-width: 1120px) {
+  .post-shell__content {
+    align-items: flex-start;
+  }
+
+  .post-window {
+    height: calc(100dvh - 24px);
+    min-height: 0;
+  }
+
   .post-layout {
     grid-template-columns: 260px minmax(0, 1fr);
   }

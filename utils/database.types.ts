@@ -356,6 +356,44 @@ export type Database = {
         }
         Relationships: []
       }
+      page_routes: {
+        Row: {
+          created_at: string
+          id: string
+          label: string | null
+          page_id: string
+          path: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          page_id: string
+          path: string
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          page_id?: string
+          path?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_routes_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           content: string
@@ -443,6 +481,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           auth_user_id: string | null
+          clothing_url: string | null
           configurations: Json
           created_at: string
           display_name: string | null
@@ -456,6 +495,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           auth_user_id?: string | null
+          clothing_url?: string | null
           configurations?: Json
           created_at?: string
           display_name?: string | null
@@ -469,6 +509,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           auth_user_id?: string | null
+          clothing_url?: string | null
           configurations?: Json
           created_at?: string
           display_name?: string | null

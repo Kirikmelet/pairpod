@@ -100,6 +100,7 @@ body {
   width: 100%;
   min-height: 100vh;
   padding: var(--space-xs);
+  align-items: stretch;
 }
 
 .extension-app .chat-layout,
@@ -296,7 +297,8 @@ body {
   height: 100%;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 1px 6px rgba(0,50,120,0.12);
 }
 
 .extension-app .post-filterbar {
@@ -321,11 +323,23 @@ body {
   min-height: 0;
   height: 100%;
   overflow: auto;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   padding: var(--space-sm);
-  scroll-snap-type: y mandatory;
-  scroll-padding: var(--space-sm);
-  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(236,242,248,0.86));
+  scroll-snap-type: none;
+  background: linear-gradient(180deg, rgba(249,252,255,0.94), rgba(236,244,252,0.86));
+}
+
+.extension-app .post-tabs {
+  min-height: 34px;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  overflow-x: auto;
+}
+
+.extension-app .post-tab {
+  min-height: 24px;
+  padding: 0 var(--space-sm);
+  font-size: var(--fs-xs);
 }
 
 .extension-app .post-compose-strip {
@@ -382,33 +396,36 @@ body {
 }
 
 .extension-app .post-card {
-  grid-template-columns: 1fr;
-  justify-items: center;
-  align-content: center;
-  text-align: center;
-  gap: var(--space-sm);
+  grid-template-columns: 42px minmax(0, 1fr);
+  justify-items: stretch;
+  align-content: start;
+  text-align: left;
+  gap: var(--space-xs);
   padding: var(--space-sm);
-  min-height: 300px;
-  scroll-snap-align: start;
-  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(232,244,255,0.92));
-  border-color: rgba(50,110,200,0.48);
+  min-height: 138px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.97), rgba(242,248,255,0.92));
+  border-color: rgba(80,120,190,0.36);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.90), 0 1px 6px rgba(0,50,120,0.10);
 }
 
 .extension-app .post-votes {
-  display: flex;
+  display: grid;
   align-items: center;
   justify-content: center;
+  align-content: start;
 }
 
 .extension-app .post-card__body {
   width: 100%;
-  justify-items: center;
+  justify-items: stretch;
+  min-width: 0;
 }
 
 .extension-app .post-votes button {
-  width: 30px;
-  height: 26px;
-  font-size: var(--fs-lg);
+  width: 28px;
+  height: 24px;
+  font-size: var(--fs-md);
 }
 
 .extension-app .post-votes strong {
@@ -417,6 +434,8 @@ body {
 
 .extension-app .post-card h2 {
   font-size: var(--fs-lg);
+  line-height: 1.12;
+  overflow-wrap: anywhere;
 }
 
 .extension-app .post-card header p,
@@ -426,9 +445,17 @@ body {
   font-size: var(--fs-xs);
 }
 
+.extension-app .post-card__body > p {
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .extension-app .post-card footer {
-  justify-content: center;
-  gap: var(--space-sm);
+  justify-content: flex-start;
+  gap: var(--space-xs) var(--space-sm);
   flex-wrap: wrap;
 }
 

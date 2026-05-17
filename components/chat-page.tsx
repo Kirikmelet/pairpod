@@ -7,6 +7,7 @@ import {
   getRoomDisplayName,
   postJson,
   splitContentLines,
+  type ChatRecord,
   type UserProfileRecord,
   useCurrentUserProfile,
   usePageBundle,
@@ -31,7 +32,6 @@ type Member = {
 export function ChatPage({ currentUsername }: ChatPageProps) {
   const {
     bundle,
-    commentsByPost,
     usersById,
     loading,
     error,
@@ -54,17 +54,13 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
   useErrorSfx(error);
   useErrorSfx(submitError);
 
-  const chatPosts = useMemo(
-    () => (bundle?.posts ?? []).filter((post) => post.type === "chat"),
-    [bundle?.posts],
+  const chatMessages = useMemo(
+    () => bundle?.chats ?? [],
+    [bundle?.chats],
   );
 
   const discussionPosts = useMemo(
-    () =>
-      (bundle?.posts ?? [])
-        .filter((post) => post.type !== "chat")
-        .slice(-3)
-        .reverse(),
+    () => (bundle?.posts ?? []).slice(-3).reverse(),
     [bundle?.posts],
   );
 
@@ -80,6 +76,24 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
       });
     }
 
+    for (const chat of bundle?.chats ?? []) {
+      const authorProfile = chat.user_id ? usersById[chat.user_id] : null;
+      const fallbackName = getDisplayName(chat.user_id, usersById);
+      const name =
+        currentUsername?.trim() && fallbackName === "Anonymous"
+          ? currentUsername
+          : fallbackName;
+
+      if (!values.has(name)) {
+        values.set(name, {
+          id: chat.user_id,
+          avatarUrl: authorProfile?.avatar_url ?? null,
+          name,
+          status: "Online",
+        });
+      }
+    }
+
     for (const post of bundle?.posts ?? []) {
       const authorProfile = post.user_id ? usersById[post.user_id] : null;
       const fallbackName = getDisplayName(post.user_id, usersById);
@@ -93,7 +107,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
           id: post.user_id,
           avatarUrl: authorProfile?.avatar_url ?? null,
           name,
-          status: post.type === "chat" ? "Online" : "Away",
+          status: "Away",
         });
       }
     }
@@ -117,7 +131,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     }
 
     return [...values.values()].slice(0, 8);
-  }, [bundle?.comments, bundle?.posts, currentUsername, usersById]);
+  }, [bundle?.chats, bundle?.comments, bundle?.posts, currentUsername, usersById]);
 
   const recentCommentActivity = useMemo(
     () => (bundle?.comments ?? []).slice(-4).reverse(),
@@ -134,22 +148,22 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
       top: transcript.scrollHeight,
       behavior: "smooth",
     });
-  }, [chatPosts.length]);
+  }, [chatMessages.length]);
 
   useEffect(() => {
     const knownIds = seenChatPostIdsRef.current;
-    const nextIds = new Set(chatPosts.map((post) => post.id));
+    const nextIds = new Set(chatMessages.map((chat) => chat.chat_id));
 
     if (!knownIds) {
       seenChatPostIdsRef.current = nextIds;
       return;
     }
 
-    const hasRemoteIncomingMessage = chatPosts.some(
-      (post) =>
-        !knownIds.has(post.id) &&
-        !sentChatPostIdsRef.current.has(post.id) &&
-        (!currentProfile?.id || post.user_id !== currentProfile.id),
+    const hasRemoteIncomingMessage = chatMessages.some(
+      (chat) =>
+        !knownIds.has(chat.chat_id) &&
+        !sentChatPostIdsRef.current.has(chat.chat_id) &&
+        (!currentProfile?.id || chat.user_id !== currentProfile.id),
     );
 
     seenChatPostIdsRef.current = nextIds;
@@ -157,7 +171,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     if (hasRemoteIncomingMessage) {
       playSfx("im");
     }
-  }, [chatPosts, currentProfile?.id]);
+  }, [chatMessages, currentProfile?.id]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -170,13 +184,13 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     setSubmitError(null);
 
     try {
-      const createdPost = await postJson("/api/chat", {
+      const createdChat = await postJson("/api/chat", {
         roomId: bundle.room.id,
         pageId: bundle.page.id,
         message: message.trim(),
       });
-      if (isRecordWithId(createdPost)) {
-        sentChatPostIdsRef.current.add(createdPost.id);
+      if (isChatRecordWithId(createdChat)) {
+        sentChatPostIdsRef.current.add(createdChat.chat_id);
       }
       setMessage("");
       await refresh({ silent: true });
@@ -202,7 +216,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     try {
       if (isExtensionRuntime()) {
         await createHumanFakeChatDirect({
-          roomId: bundle.room.id,
+          pageId: bundle.page.id,
           scope: roomScope,
           title: getChatTitle(bundle),
           userCount: 3,
@@ -362,7 +376,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   ***{" "}
                   {loading
                     ? "Loading..."
-                    : `${chatPosts.length} messages and ${
+                    : `${chatMessages.length} messages and ${
                         bundle?.comments.length ?? 0
                       } comments`}
                 </p>
@@ -378,15 +392,14 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                       <p>Loading chat history...</p>
                     </div>
                   </article>
-                ) : chatPosts.length > 0 ? (
-                  chatPosts.map((post, index) => {
-                    const relatedComments = commentsByPost[post.id] ?? [];
-                    const lines = splitContentLines(post.content);
+                ) : chatMessages.length > 0 ? (
+                  chatMessages.map((chat, index) => {
+                    const lines = splitContentLines(chat.body ?? "");
 
                     return (
-                      <article className="chat-message" key={post.id}>
+                      <article className="chat-message" key={chat.chat_id}>
                         <span className="chat-message__time">
-                          [{formatTimestamp(post.created_at)}]
+                          [{formatTimestamp(chat.created_at)}]
                         </span>
                         <div className="chat-message__body">
                           <p>
@@ -394,25 +407,16 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                               className={`chat-name chat-name--${pickTone(index)}`}
                             >
                               <DmInlineUser
-                                userId={post.user_id}
-                                userName={getDisplayName(post.user_id, usersById)}
+                                userId={chat.user_id}
+                                userName={getDisplayName(chat.user_id, usersById)}
                               />
                               :
                             </strong>{" "}
-                            {lines[0] ?? post.content}
+                            {lines[0] ?? chat.body}
                           </p>
                           {lines.slice(1).map((line) => (
-                            <p key={`${post.id}-${line}`}>{line}</p>
+                            <p key={`${chat.chat_id}-${line}`}>{line}</p>
                           ))}
-                          {relatedComments.length > 0 ? (
-                            <a
-                              className="chat-thread"
-                              href={buildScopedHref(`/posts/${post.id}`)}
-                            >
-                              -&gt; {relatedComments.length} replies - View
-                              thread
-                            </a>
-                          ) : null}
                         </div>
                       </article>
                     );
@@ -490,7 +494,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                       : "Loading..."}
                   </p>
                   <p className="chat-info-card__meta">
-                    {chatPosts.length} chat messages{" "}
+                    {chatMessages.length} chat messages{" "}
                     <span className="live-dot" /> {discussionPosts.length}{" "}
                     active threads
                   </p>
@@ -539,12 +543,12 @@ function isExtensionRuntime() {
   return Boolean(runtime?.runtime?.id);
 }
 
-function isRecordWithId(value: unknown): value is { id: string } {
+function isChatRecordWithId(value: unknown): value is Pick<ChatRecord, "chat_id"> {
   return (
     value !== null &&
     typeof value === "object" &&
-    "id" in value &&
-    typeof value.id === "string"
+    "chat_id" in value &&
+    typeof value.chat_id === "string"
   );
 }
 

@@ -71,11 +71,7 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
 
   /* -- derived data ------------------------------------------------ */
   const posts = useMemo(
-    () =>
-      (bundle?.posts ?? [])
-        .filter((post) => post.type !== "chat")
-        .slice()
-        .reverse(),
+    () => (bundle?.posts ?? []).slice().reverse(),
     [bundle?.posts],
   );
 
@@ -190,6 +186,8 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
 
         {/* ---------- compose strip (popup mode) ---------- */}
         <section className="post-stream" aria-label="Post feed">
+          <PanelHeader title="Post Stream" />
+
           {isPopup ? (
             <form
               className="post-compose-strip"
@@ -769,39 +767,109 @@ function PostShell({
 
   return (
     <main className={`post-shell ${isPopup ? "post-shell--popup" : ""}`}>
-      <section
-        className={`post-window xp-window post-window--animate ${
-          isPopup ? "post-window--popup" : ""
-        }`}
-        aria-labelledby={labelledBy}
-      >
-        <div className="xp-title-bar">
-          <span className="xp-title-bar__text">{title}</span>
-          <span className="xp-title-bar__controls">_ [] x</span>
-        </div>
+      <PostSceneBackground />
+      <div className="post-shell__content">
+        <section
+          className={`post-window xp-window post-window--animate ${
+            isPopup ? "post-window--popup" : ""
+          }`}
+          aria-labelledby={labelledBy}
+        >
+          <div className="xp-title-bar chat-titlebar">
+            <PostTitleIcon />
+            <span className="xp-title-text" id={labelledBy}>
+              {title}
+            </span>
+            <div className="xp-title-controls" aria-hidden="true">
+              <span className="xp-title-btn xp-title-btn--min">_</span>
+              <span className="xp-title-btn xp-title-btn--max">[]</span>
+              <span className="xp-title-btn xp-title-btn--close">x</span>
+            </div>
+          </div>
 
-        <nav className="chat-nav" aria-label="Section navigation">
-          <a href={chatHref}>&rarr; Chat</a>
-          <a href={podsHref}>Pods</a>
-          <a href={postsHref}>Posts</a>
-          <a href={chatHref.replace("/chat", "/peers").replace("#/chat", "#/peers")}>3D Peers</a>
-          <a
-            href={globalHref}
-            className={roomScope === "global" ? "chat-nav__active" : ""}
-          >
-            Global
-          </a>
-          <a
-            href={domainHref}
-            className={roomScope === "domain" ? "chat-nav__active" : ""}
-          >
-            {domainName}
-          </a>
-        </nav>
+          <nav className="chat-menu chat-nav" aria-label="Section navigation">
+            <a href={podsHref}>Room</a>
+            <a href={chatHref}>Chat</a>
+            <a href={postsHref} className="chat-nav__active">
+              Posts
+            </a>
+            <a href={chatHref.replace("/chat", "/peers").replace("#/chat", "#/peers")}>
+              3D Peers
+            </a>
+            <a
+              href={globalHref}
+              className={roomScope === "global" ? "chat-nav__active" : ""}
+            >
+              Global
+            </a>
+            <a
+              href={domainHref}
+              className={roomScope === "domain" ? "chat-nav__active" : ""}
+            >
+              {domainName}
+            </a>
+          </nav>
 
-        {children}
-      </section>
+          {children}
+        </section>
+      </div>
     </main>
+  );
+}
+
+function PostSceneBackground() {
+  return (
+    <div className="app-background" aria-hidden="true">
+      <div className="sky" />
+      <div className="clouds">
+        <div className="cloud cloud-1" />
+        <div className="cloud cloud-2" />
+        <div className="cloud cloud-3" />
+        <div className="cloud cloud-4" />
+        <div className="cloud cloud-5" />
+      </div>
+      <svg
+        className="hills-svg"
+        viewBox="0 0 1000 500"
+        preserveAspectRatio="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <ellipse cx="650" cy="520" rx="620" ry="340" fill="#3d8e22" />
+        <ellipse cx="600" cy="540" rx="540" ry="300" fill="#4aa828" />
+        <ellipse cx="560" cy="530" rx="440" ry="260" fill="#5cb838" />
+        <ellipse cx="520" cy="510" rx="320" ry="190" fill="#6ebe44" opacity="0.7" />
+        <ellipse cx="500" cy="500" rx="200" ry="120" fill="#8cd960" opacity="0.45" />
+      </svg>
+      <div className="ground" />
+      <div className="bubbles">
+        <div className="bubble bubble-1" />
+        <div className="bubble bubble-2" />
+        <div className="bubble bubble-3" />
+        <div className="bubble bubble-4" />
+        <div className="bubble bubble-5" />
+      </div>
+    </div>
+  );
+}
+
+function PostTitleIcon() {
+  return (
+    <svg
+      className="xp-title-icon post-title-icon"
+      viewBox="0 0 32 32"
+      role="img"
+      aria-label="Posts"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <ellipse cx="16" cy="18" rx="12" ry="11" fill="#6ebe44" stroke="#2d7018" strokeWidth="1.8" />
+      <path d="M14 8c1.2-3 4-4.8 7.6-4.8-1.2 3.1-3.7 4.8-7.6 4.8z" fill="#8cd960" stroke="#2d7018" strokeWidth="1.2" />
+      <line x1="16" y1="9" x2="16" y2="4.5" stroke="#2d7018" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="11.5" cy="17" r="3.3" fill="white" />
+      <circle cx="20.5" cy="17" r="3.3" fill="white" />
+      <circle cx="12.2" cy="17.4" r="1.4" fill="#1a2a44" />
+      <circle cx="21.2" cy="17.4" r="1.4" fill="#1a2a44" />
+      <path d="M11.5 23c2.9 2.3 6.1 2.3 9 0" stroke="#2d5018" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
   );
 }
 

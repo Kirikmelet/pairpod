@@ -2,7 +2,7 @@ import 'server-only'
 
 import { getSupabaseAdmin } from '@/lib/server/supabaseAdmin'
 
-const ALLOWED_POST_TYPES = ['chat', 'question', 'guide'] as const
+const ALLOWED_POST_TYPES = ['question', 'guide'] as const
 
 export type AllowedPostType = (typeof ALLOWED_POST_TYPES)[number]
 
@@ -20,6 +20,14 @@ export type CreateCommentInput = {
   userId?: string | null
   content: string
   replyId?: string | null
+}
+
+export type CreatedChat = {
+  chat_id: string
+  room_id: string
+  body: string | null
+  user_id: string | null
+  created_at: string
 }
 
 export type CreatedPost = {
@@ -43,6 +51,45 @@ export type CreatedComment = {
   user_id: string | null
   created_at: string
   section_id: string | null
+}
+
+export async function createChatMessage({
+  pageId,
+  userId = null,
+  content,
+}: {
+  pageId: string
+  userId?: string | null
+  content: string
+}): Promise<CreatedChat> {
+  const trimmedPageId = pageId.trim()
+  const trimmedContent = content.trim()
+  const trimmedUserId = userId?.trim() || null
+
+  if (!trimmedPageId) {
+    throw new Error('pageId is required')
+  }
+
+  if (!trimmedContent) {
+    throw new Error('content is required')
+  }
+
+  const supabase = getSupabaseAdmin()
+  const { data, error } = await supabase
+    .from('chat')
+    .insert({
+      room_id: trimmedPageId,
+      user_id: trimmedUserId,
+      body: trimmedContent,
+    })
+    .select('*')
+    .single<CreatedChat>()
+
+  if (error) {
+    throw new Error(`Failed to create chat message: ${error.message}`)
+  }
+
+  return data
 }
 
 export async function createPost({

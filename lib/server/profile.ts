@@ -13,7 +13,7 @@ import { createClient } from '@/utils/supabase/server'
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,24}$/
 const USER_PROFILE_COLUMNS =
-  'id,auth_user_id,email,username,configurations,avatar_url,display_name,updated_at,created_at,url'
+  'id,auth_user_id,email,username,configurations,avatar_url,clothing_url,display_name,updated_at,created_at,url'
 
 export const DEFAULT_AVATAR_URL =
   'https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png'
@@ -26,6 +26,7 @@ export type ProfileResponse = {
   username: string | null
   displayName: string | null
   avatarUrl: string
+  clothingUrl: string | null
   character3d: Character3dConfig
 }
 
@@ -44,6 +45,7 @@ export type ProfileUpdateInput = {
   username?: string | null
   displayName?: string | null
   avatarUrl?: string | null
+  clothingUrl?: string | null
   character3d?: Partial<Character3dConfig>
 }
 
@@ -52,6 +54,7 @@ export type Character3dConfig = {
   accent: string
   head: string
   style: 'pod' | 'runner' | 'bot'
+  clothingImageUrl?: string | null
 }
 
 const DEFAULT_CHARACTER_3D: Character3dConfig = {
@@ -281,6 +284,10 @@ export function toProfileResponse(profile: UserProfileRow): ProfileResponse {
     displayName:
       normalizeOptionalText(profile.display_name) ?? configuration.displayName ?? null,
     avatarUrl: normalizeOptionalText(profile.avatar_url) ?? DEFAULT_AVATAR_URL,
+    clothingUrl:
+      normalizeOptionalText(profile.clothing_url) ??
+      configuration.character3d.clothingImageUrl ??
+      null,
     character3d: configuration.character3d,
   }
 }
@@ -323,8 +330,20 @@ async function updateUserProfileInternal(
     updates.avatar_url = normalizeAvatarUrl(input.avatarUrl, true)
   }
 
+  if (Object.prototype.hasOwnProperty.call(input, 'clothingUrl')) {
+    updates.clothing_url = normalizeAvatarUrl(input.clothingUrl, true)
+    nextConfiguration.character3d = {
+      ...nextConfiguration.character3d,
+      clothingImageUrl: undefined,
+    }
+  }
+
   if (input.character3d) {
-    nextConfiguration.character3d = normalizeCharacter3d(input.character3d)
+    const normalizedCharacter = normalizeCharacter3d(input.character3d)
+    nextConfiguration.character3d = {
+      ...normalizedCharacter,
+      clothingImageUrl: undefined,
+    }
   }
 
   updates.configurations = nextConfiguration
@@ -568,11 +587,25 @@ function normalizeCharacter3d(value: unknown): Character3dConfig {
     accent: normalizeColor(candidate.accent) ?? DEFAULT_CHARACTER_3D.accent,
     head: normalizeColor(candidate.head) ?? DEFAULT_CHARACTER_3D.head,
     style: candidate.style === 'runner' || candidate.style === 'bot' ? candidate.style : 'pod',
+    clothingImageUrl: normalizeImageUrl(candidate.clothingImageUrl),
   }
 }
 
 function normalizeColor(value: unknown) {
   return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : null
+}
+
+function normalizeImageUrl(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return null
+  }
+
+  try {
+    const url = new URL(value.trim())
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null
+  } catch {
+    return null
+  }
 }
 
 function isUniqueViolation(error: unknown, matchers: string[]) {

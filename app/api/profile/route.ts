@@ -13,6 +13,7 @@ type ProfilePatchBody = {
   username?: unknown
   displayName?: unknown
   avatarUrl?: unknown
+  clothingUrl?: unknown
   character3d?: unknown
 }
 
@@ -65,6 +66,7 @@ export async function PATCH(request: Request): Promise<Response> {
       username: readNullableString(body.username),
       displayName: readNullableString(body.displayName),
       avatarUrl: readNullableString(body.avatarUrl),
+      clothingUrl: readNullableString(body.clothingUrl),
       character3d: readCharacter3d(body.character3d),
     })
 
@@ -117,9 +119,23 @@ function readCharacter3d(value: unknown) {
     accent: readColor(source.accent),
     head: readColor(source.head),
     style,
+    clothingImageUrl: readImageUrl(source.clothingImageUrl),
   }
 }
 
 function readColor(value: unknown) {
   return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : undefined
+}
+
+function readImageUrl(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return undefined
+  }
+
+  try {
+    const url = new URL(value.trim())
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : undefined
+  } catch {
+    return undefined
+  }
 }
