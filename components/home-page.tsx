@@ -19,6 +19,12 @@ type HomePageProps = {
   onOpenApp?: () => void;
 };
 
+type ExtensionRuntime = {
+  runtime?: {
+    getURL?: (path: string) => string;
+  };
+};
+
 export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
@@ -101,6 +107,15 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   }
 
   if (!user) {
+    if (isPopup) {
+      redirectToStaticLogin();
+      return (
+        <AppShell isPopup={isPopup} title="Uncommon Hacks - Sign in">
+          <p className="status-note">Opening sign in...</p>
+        </AppShell>
+      );
+    }
+
     return (
       <AppShell isPopup={isPopup} title="Uncommon Hacks - Sign in">
         <AuthForm
@@ -117,6 +132,28 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   }
 
   return <ExtensionPopupApp user={user} onSignOut={() => void handleSignOut()} />;
+}
+
+function redirectToStaticLogin() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const runtime = getExtensionRuntime();
+  const loginUrl = runtime?.runtime?.getURL?.("login.html") ?? "login.html";
+
+  if (!window.location.href.endsWith("/login.html")) {
+    window.location.replace(loginUrl);
+  }
+}
+
+function getExtensionRuntime() {
+  const globalWithRuntime = globalThis as typeof globalThis & {
+    browser?: ExtensionRuntime;
+    chrome?: ExtensionRuntime;
+  };
+
+  return globalWithRuntime.browser ?? globalWithRuntime.chrome ?? null;
 }
 
 function ExtensionPopupApp({
