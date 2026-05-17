@@ -3,7 +3,8 @@ import "server-only";
 import { cookies } from "next/headers";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { ensureUserProfile, loadUserProfiles, type UserProfileRow } from "@/lib/server/profile";
+import { ensureUserProfile, type UserProfileRow } from "@/lib/server/profile";
+import { getSupabaseAdmin } from "@/lib/server/supabaseAdmin";
 import type { Database, Tables, TablesInsert, TablesUpdate } from "@/utils/database.types";
 import { getSupabasePublicConfig } from "@/utils/supabase/config";
 import { createClient } from "@/utils/supabase/server";
@@ -177,7 +178,8 @@ export async function listThreadMessages(request: Request | undefined, threadId:
     throw new Error(`Failed to load DM messages: ${messagesError.message}`);
   }
 
-  const senderProfiles = await loadUserProfiles(
+  const senderProfiles = await loadDmProfilesById(
+    supabase,
     (messages ?? [])
       .map((message) => message.sender_id)
       .filter((senderId): senderId is string => Boolean(senderId)),
@@ -251,11 +253,12 @@ export async function createThreadMessage(
 }
 
 async function requireDmContext(request?: Request) {
-  const { supabase, user } = await createAuthenticatedRouteClient(request);
+  const { user } = await createAuthenticatedRouteClient(request);
   if (!user) {
     throw new AuthRequiredError();
   }
 
+  const supabase = getSupabaseAdmin();
   const profile = await ensureUserProfile(supabase, user);
   return { supabase, user, profile };
 }
@@ -472,7 +475,7 @@ async function loadThreadSummariesByIds(
   const members = membersResult.data ?? [];
   const messages = messagesResult.data ?? [];
   const memberUserIds = [...new Set(members.map((member) => member.user_id))];
-  const profiles = await loadUserProfiles(memberUserIds);
+  const profiles = await loadDmProfilesById(supabase, memberUserIds);
   const profilesById = new Map(profiles.map((loadedProfile) => [loadedProfile.id, loadedProfile]));
 
   const membersByThreadId = new Map<string, DmThreadMemberRow[]>();
@@ -529,4 +532,28 @@ function toLatestMessagePreview(message: DmMessageRow | null) {
 function readBearerToken(authorization: string | null) {
   const match = authorization?.match(/^Bearer\s+(.+)$/i);
   return match?.[1]?.trim() || null;
+}
+
+async function loadDmProfilesById(
+  supabase: SupabaseClient<Database>,
+  userIds: string[],
+) {
+  const uniqueUserIds = [...new Set(userIds.map((userId) => userId.trim()).filter(Boolean))];
+  if (uniqueUserIds.length === 0) {
+    return [] as UserProfileRow[];
+  }
+
+  const { data, error } = await supabase
+    .from("users")
+    .select(
+      "id,auth_user_id,email,username,configurations,avatar_url,display_name,updated_at,created_at,url",
+    )
+    .in("id", uniqueUserIds)
+    .returns<UserProfileRow[]>();
+
+  if (error) {
+    throw new Error(`Failed to load DM profiles: ${error.message}`);
+  }
+
+  return data ?? [];
 }

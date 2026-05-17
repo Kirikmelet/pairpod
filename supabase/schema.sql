@@ -409,105 +409,10 @@ create policy "authenticated users can write events"
   using (true)
   with check (true);
 
-create policy "authenticated members can read dm_threads"
-  on dm_threads for select
-  to authenticated
-  using (
-    exists (
-      select 1
-      from dm_thread_members m
-      join users u on u.id = m.user_id
-      where m.thread_id = dm_threads.id
-        and u.auth_user_id = auth.uid()
-    )
-  );
-
-create policy "authenticated users can create dm_threads"
-  on dm_threads for insert
-  to authenticated
-  with check (
-    exists (
-      select 1
-      from users u
-      where u.id = dm_threads.created_by
-        and u.auth_user_id = auth.uid()
-    )
-  );
-
-create policy "authenticated members can update dm_threads"
-  on dm_threads for update
-  to authenticated
-  using (
-    exists (
-      select 1
-      from dm_thread_members m
-      join users u on u.id = m.user_id
-      where m.thread_id = dm_threads.id
-        and u.auth_user_id = auth.uid()
-    )
-  )
-  with check (
-    exists (
-      select 1
-      from dm_thread_members m
-      join users u on u.id = m.user_id
-      where m.thread_id = dm_threads.id
-        and u.auth_user_id = auth.uid()
-    )
-  );
-
-create policy "authenticated members can read dm_thread_members"
-  on dm_thread_members for select
-  to authenticated
-  using (
-    exists (
-      select 1
-      from dm_thread_members self_member
-      join users u on u.id = self_member.user_id
-      where self_member.thread_id = dm_thread_members.thread_id
-        and u.auth_user_id = auth.uid()
-    )
-  );
-
-create policy "thread creators can insert dm_thread_members"
-  on dm_thread_members for insert
-  to authenticated
-  with check (
-    exists (
-      select 1
-      from dm_threads t
-      join users u on u.id = t.created_by
-      where t.id = dm_thread_members.thread_id
-        and u.auth_user_id = auth.uid()
-    )
-  );
-
-create policy "authenticated members can read dm_messages"
-  on dm_messages for select
-  to authenticated
-  using (
-    exists (
-      select 1
-      from dm_thread_members m
-      join users u on u.id = m.user_id
-      where m.thread_id = dm_messages.thread_id
-        and u.auth_user_id = auth.uid()
-    )
-  );
-
-create policy "authenticated members can insert dm_messages"
-  on dm_messages for insert
-  to authenticated
-  with check (
-    exists (
-      select 1
-      from users sender
-      join dm_thread_members m on m.user_id = sender.id
-      where sender.id = dm_messages.sender_id
-        and sender.auth_user_id = auth.uid()
-        and m.thread_id = dm_messages.thread_id
-    )
-  );
+-- DM routes authenticate the request and enforce membership server-side.
+-- Leave RLS enabled on DM tables without browser-facing policies so direct
+-- client access stays blocked by default and server-side service role access
+-- can perform the necessary membership checks explicitly.
 
 create or replace function public.increment_post_likes(
   p_post_id uuid,
