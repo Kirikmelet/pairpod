@@ -19,10 +19,19 @@ export type FakeChatScope = "global" | "domain";
 export type CreateFakeChatInput = {
   scope: FakeChatScope;
   domainUrl?: string | null;
+  latestMessage?: string | null;
+  recentMessages?: FakeChatContextMessage[];
+  reservedNames?: string[];
   topic?: string | null;
   messageCount?: number;
   userCount?: number;
   dryRun?: boolean;
+};
+
+export type FakeChatContextMessage = {
+  author: string;
+  body: string;
+  isAi: boolean;
 };
 
 export type FakeChatUserPlan = {
@@ -65,6 +74,9 @@ export async function createFakeChatFromMistral(
   const generated = await generateFakeChatPlan({
     scope,
     targetUrl: page.normalized_url,
+    latestMessage: input.latestMessage,
+    recentMessages: input.recentMessages ?? [],
+    reservedNames: input.reservedNames ?? [],
     topic: input.topic,
     userCount: clampInt(input.userCount, 2, MAX_FAKE_USERS, 3),
     messageCount: clampInt(input.messageCount, 1, MAX_FAKE_MESSAGES, 5),
@@ -128,18 +140,28 @@ async function generateFakeChatPlan({
   scope,
   targetUrl,
   topic,
+  latestMessage,
+  recentMessages,
+  reservedNames,
   userCount,
   messageCount,
 }: {
   scope: FakeChatScope;
   targetUrl: string;
   topic?: string | null;
+  latestMessage?: string | null;
+  recentMessages?: FakeChatContextMessage[];
+  reservedNames?: string[];
   userCount: number;
   messageCount: number;
 }) {
+  const trimmedLatestMessage = latestMessage?.trim();
+  const transcript = formatRecentTranscript(recentMessages ?? []);
+  const reservedNameText = formatReservedNames(reservedNames ?? []);
+  const generationSeed = randomSuffix();
   try {
     const content = await createMistralChatCompletion({
-      temperature: 0.85,
+      temperature: 1.08,
       maxTokens: 1000,
       messages: [
         {
@@ -151,12 +173,29 @@ async function generateFakeChatPlan({
           role: "user",
           content: [
             `Create ${userCount} fake chat users and ${messageCount} chat messages.`,
+            `Randomness seed: ${generationSeed}. Make this run noticeably different from prior runs.`,
             `Room scope: ${scope}.`,
             `Room URL: ${targetUrl}.`,
             topic?.trim() ? `Topic: ${topic.trim()}.` : "Topic: casual collaboration.",
+            trimmedLatestMessage
+              ? `Latest human message to respond to: ${trimmedLatestMessage}`
+              : "No latest human message was provided; seed casual room activity.",
+            transcript
+              ? `Recent room transcript, oldest to newest:\n${transcript}`
+              : "Recent room transcript: unavailable.",
+            reservedNameText
+              ? `Reserved names/usernames already used by humans or existing bots. Do not use these for AI users: ${reservedNameText}`
+              : "No reserved names were provided.",
             "Schema: {\"users\":[{\"key\":\"short_stable_key\",\"displayName\":\"Name\",\"username\":\"lowercase_username\",\"bio\":\"short persona\"}],\"messages\":[{\"speaker\":\"matching_user_key\",\"body\":\"one concise chat message\"}]}",
             "Give every user a 2000s to early-2010s internet display name or handle, like AIM/MSN/forum/Xanga/Myspace era names. Examples of the vibe: xXPixelAngelXx, sk8rByte, neon_ninja_07, LimeWireLarry, sceneQueen42, RawrKitty99, oOAquaMuffinOo. Usernames must stay lowercase with letters, numbers, underscores, or hyphens.",
+            "AI display names and usernames must be unique and must not match or closely copy any reserved name.",
             "Messages should sound era-appropriate and casual: short, lowercase is okay, occasional lol/ngl/imo/idk/brb/yknow is okay, but do not overdo it.",
+            "Avoid repeating sentence openings across messages. Mix reactions, questions, tiny jokes, disagreement, and practical suggestions.",
+            "Use varied punctuation and cadence: some fragments, some full sentences, some quick one-liners. Do not make every message start with lol/ngl/imo/same/wait.",
+            trimmedLatestMessage
+              ? "Each message must respond to the latest human message. Be relevant to what they asked, suggested, complained about, or joked about. Do not ignore it."
+              : "Keep messages relevant to the room topic and recent transcript.",
+            "If recent AI users spoke, later AI messages may agree, disagree, riff on, or answer those AI messages too. Maintain conversational continuity across AI and human turns.",
             "Make the users sound like different real teammates in a chat room, not like polished assistants.",
             "Never claim to be a real person. Avoid generic AI disclaimers.",
           ].join("\n"),
@@ -164,10 +203,10 @@ async function generateFakeChatPlan({
       ],
     });
 
-    return normalizeFakeChatPlan(parseJsonObject(content), userCount, messageCount);
+    return normalizeFakeChatPlan(parseJsonObject(content), userCount, messageCount, reservedNames ?? []);
   } catch (error) {
     console.warn("Mistral fake chat generation fell back to local text.", error);
-    return buildFallbackFakeChatPlan(scope, targetUrl, topic, userCount, messageCount);
+    return buildFallbackFakeChatPlan(scope, targetUrl, topic, latestMessage, recentMessages, reservedNames, userCount, messageCount);
   }
 }
 
@@ -175,13 +214,24 @@ function buildFallbackFakeChatPlan(
   scope: FakeChatScope,
   targetUrl: string,
   topic: string | null | undefined,
+  latestMessage: string | null | undefined,
+  recentMessages: FakeChatContextMessage[] | undefined,
+  reservedNames: string[] | undefined,
   userCount: number,
   messageCount: number,
 ): FakeChatPlan {
-  const seedUsers = createRetroFakeUsers(userCount);
+  const seedUsers = createRetroFakeUsers(userCount, reservedNames);
   const room = scope === "global" ? "Global" : targetUrl;
   const subject = topic?.trim() || room;
-  const seedMessages = [
+  const replySubject = latestMessage?.trim();
+  const lastAi = [...(recentMessages ?? [])].reverse().find((message) => message.isAi);
+  const lastAny = [...(recentMessages ?? [])].reverse().find((message) => message.body.trim());
+  const responseSeeds = replySubject
+    ? buildContextualFallbackMessages(replySubject, room, lastAi, messageCount)
+    : lastAi
+      ? buildContextualFallbackMessages(lastAi.body, room, lastAny, messageCount)
+    : null;
+  const seedMessages = pickMany([
     `lol wait ${subject} having its own chat is actually kinda sick`,
     "brb but my take is the posts need to stay chill and easy to skim",
     "ngl the tiny room vibe works better when ppl just drop quick notes",
@@ -192,25 +242,124 @@ function buildFallbackFakeChatPlan(
     "idk maybe keep the AI ppl useful but not TOO chatty yknow",
     "same, fewer decent msgs > a wall of random noise",
     "if someone joins later they should instantly get what happened here",
-  ];
+    "wait did anyone else have flashbacks to phpbb sidebars or is that just me",
+    "tiny take: fewer buttons, stronger labels, everybody wins",
+    `for ${room}, i'd pin the useful bit and let the rest be messy chat`,
+    "lol the best version is like a forum thread and an aim room had a baby",
+    "i'm weirdly into it, just needs less ceremony around posting",
+    "honestly if replies feel fast this whole thing gets way stickier",
+    "not to be dramatic but the room needs one obvious 'what happened' summary",
+    "the vibe is good, just don't let it become dashboard soup",
+    "counterpoint: a little chaos is fine if the important stuff is easy to find",
+    "this would slap harder if the first action felt instant",
+    "ok but can we keep it slightly cursed in a charming way",
+    "i'd make the room feel alive without making it yap constantly",
+    ...buildProceduralFallbackMessages(subject, room, messageCount * 4),
+  ], messageCount);
 
   return {
     users: seedUsers,
-    messages: seedMessages.slice(0, messageCount).map((body, index) => ({
+    messages: (responseSeeds ?? seedMessages).map((body, index) => ({
       speaker: seedUsers[index % seedUsers.length]?.key ?? seedUsers[0].key,
       body,
     })),
   };
 }
 
-function createRetroFakeUsers(count: number): FakeChatUserPlan[] {
-  const used = new Set<string>();
+function buildContextualFallbackMessages(
+  latestMessage: string,
+  room: string,
+  previous?: FakeChatContextMessage,
+  count = 5,
+) {
+  const topic = latestMessage.length > 84
+    ? `${latestMessage.slice(0, 81)}...`
+    : latestMessage;
+  const previousText = previous?.body
+    ? ` and ${previous.author} was just saying "${previous.body.slice(0, 64)}"`
+    : "";
+
+  return pickMany([
+    `lol yeah, on "${topic}"${previousText} — i'd keep that thread going and test the obvious path first`,
+    `ngl that makes sense for ${room}. i'd check whether it breaks in the extension and web app separately`,
+    `imo the key bit is "${topic}" — if that part feels good, the rest can be polished after`,
+    `same, i'd turn that into one tiny task so it doesn't sprawl`,
+    `wait that's actually a good point. ${room} should react to that without making you refresh`,
+    `lol i read "${topic}" as basically a flow problem, not a content problem`,
+    `i'd try the tiniest version first: one action, one result, no mystery meat`,
+    `real talk, if "${topic}" is the pain point then the ui should answer that immediately`,
+    `kinda agree, but i'd watch for the part where ${room} gets too noisy`,
+    `that sounds fixable tbh. make it obvious, then make it cute after`,
+    `same energy as old forum mods saying "search first" but like, friendlier`,
+    `if ${previous?.author ?? "someone"} is right, the next move is probably less chrome and more signal`,
+    `i'd push back a tiny bit: "${topic}" might need context, not another button`,
+    `honestly i'd test that with one confused friend and trust the face they make`,
+    `that could be a fun default, as long as it doesn't hijack the room`,
+    ...buildProceduralContextMessages(topic, room, previous, count * 4),
+  ], count);
+}
+
+function buildProceduralFallbackMessages(subject: string, room: string, count: number) {
+  return Array.from({ length: count }, () => {
+    const opener = sample(FALLBACK_OPENERS);
+    const action = sample(FALLBACK_ACTIONS);
+    const object = sample(FALLBACK_OBJECTS);
+    const closer = sample(FALLBACK_CLOSERS);
+    const target = Math.random() > 0.45 ? room : subject;
+    return `${opener} ${action} ${object} for ${target}${closer}`;
+  });
+}
+
+function buildProceduralContextMessages(
+  topic: string,
+  room: string,
+  previous: FakeChatContextMessage | undefined,
+  count: number,
+) {
+  return Array.from({ length: count }, () => {
+    const opener = sample(CONTEXT_OPENERS);
+    const angle = sample(CONTEXT_ANGLES);
+    const closer = sample(CONTEXT_CLOSERS);
+    const previousNudge =
+      previous && Math.random() > 0.55
+        ? ` also ${previous.author} kinda set that up already`
+        : "";
+    return `${opener} "${topic}" ${angle} in ${room}${previousNudge}${closer}`;
+  });
+}
+
+function formatRecentTranscript(messages: FakeChatContextMessage[]) {
+  return messages
+    .slice(-10)
+    .map((message) => {
+      const author = message.author.trim().slice(0, 48) || "Someone";
+      const body = message.body.trim().replace(/\s+/g, " ").slice(0, 280);
+      const kind = message.isAi ? "AI" : "human";
+      return body ? `- ${author} (${kind}): ${body}` : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function formatReservedNames(names: string[]) {
+  return names
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .slice(0, 40)
+    .join(", ");
+}
+
+function createRetroFakeUsers(
+  count: number,
+  reservedNames: string[] = [],
+): FakeChatUserPlan[] {
+  const used = new Set(reservedNames.map(normalizeReservedName).filter(Boolean));
   return Array.from({ length: count }, (_, index) => {
     let handle = buildRetroHandle();
-    while (used.has(slugify(handle))) {
+    while (used.has(normalizeReservedName(handle))) {
       handle = buildRetroHandle();
     }
-    used.add(slugify(handle));
+    used.add(normalizeReservedName(handle));
 
     return {
       key: `retro_${index}_${randomSuffix()}`,
@@ -314,8 +463,98 @@ const RETRO_BIOS = [
   "Patient helper who says lol and still gives useful notes.",
 ];
 
+const FALLBACK_OPENERS = [
+  "lowkey",
+  "tiny thought:",
+  "ok hear me out,",
+  "not gonna lie,",
+  "my forum-brain says",
+  "quick vibe check:",
+  "imo",
+  "lol honestly",
+];
+
+const FALLBACK_ACTIONS = [
+  "make",
+  "keep",
+  "try",
+  "ship",
+  "pin",
+  "simplify",
+  "test",
+  "rename",
+];
+
+const FALLBACK_OBJECTS = [
+  "the first action obvious",
+  "the reply flow snappier",
+  "one weird little status line",
+  "the useful posts easier to skim",
+  "the room history less buried",
+  "the chat a little more human",
+  "the buttons less mysterious",
+  "the empty state less sad",
+];
+
+const FALLBACK_CLOSERS = [
+  "",
+  " and call it a day",
+  " before adding more stuff",
+  " so ppl don't bounce",
+  " like it's 2009 but usable",
+  " tbh",
+  " yknow?",
+];
+
+const CONTEXT_OPENERS = [
+  "yeah,",
+  "hmm,",
+  "i'd read",
+  "the way i see",
+  "wild take but",
+  "same-ish,",
+  "counterpoint:",
+  "that sounds like",
+];
+
+const CONTEXT_ANGLES = [
+  "as a navigation problem",
+  "as a trust issue",
+  "as a speed bump",
+  "as the thing users will notice first",
+  "as something that needs one clear next step",
+  "as a reason to trim the ui",
+  "as a reason to make the chat react faster",
+  "as a tiny polish pass, not a whole rewrite",
+];
+
+const CONTEXT_CLOSERS = [
+  "",
+  " imo",
+  " lol",
+  " if that makes sense",
+  " before it gets too dashboard-y",
+  " and then watch what breaks",
+  " with one friend testing it",
+];
+
 function sample(values: string[]) {
   return values[Math.floor(Math.random() * values.length)] ?? values[0];
+}
+
+function pickMany(values: string[], count: number) {
+  const remaining = [...values];
+  const picked: string[] = [];
+
+  while (picked.length < count && remaining.length > 0) {
+    const index = Math.floor(Math.random() * remaining.length);
+    const [value] = remaining.splice(index, 1);
+    if (value) {
+      picked.push(value);
+    }
+  }
+
+  return picked;
 }
 
 async function createFakeUsers(users: FakeChatUserPlan[]) {
@@ -365,13 +604,15 @@ function normalizeFakeChatPlan(
   value: unknown,
   userCount: number,
   messageCount: number,
+  reservedNames: string[] = [],
 ): FakeChatPlan {
   if (!isRecord(value)) {
     throw new Error("Mistral fake chat output was not a JSON object.");
   }
 
+  const usedNames = new Set(reservedNames.map(normalizeReservedName).filter(Boolean));
   const users = Array.isArray(value.users)
-    ? value.users.slice(0, userCount).map(readFakeUserPlan)
+    ? value.users.slice(0, userCount).map((user, index) => readFakeUserPlan(user, usedNames, index))
     : [];
 
   if (users.length === 0) {
@@ -392,16 +633,30 @@ function normalizeFakeChatPlan(
   return { users, messages };
 }
 
-function readFakeUserPlan(value: unknown): FakeChatUserPlan {
+function readFakeUserPlan(
+  value: unknown,
+  usedNames: Set<string>,
+  index: number,
+): FakeChatUserPlan {
   if (!isRecord(value)) {
     throw new Error("Fake user entry must be an object.");
   }
 
-  const displayName = readNonEmptyString(value.displayName, "displayName");
-  const key = slugify(readNonEmptyString(value.key, "key")).slice(0, 32);
-  const username = slugify(
+  let displayName = readNonEmptyString(value.displayName, "displayName").slice(0, 80);
+  let username = slugify(
     typeof value.username === "string" ? value.username : displayName,
   ).slice(0, 24);
+  const displayKey = normalizeReservedName(displayName);
+  const usernameKey = normalizeReservedName(username);
+  if (usedNames.has(displayKey) || usedNames.has(usernameKey)) {
+    const replacement = createRetroFakeUsers(1, [...usedNames])[0];
+    displayName = replacement.displayName;
+    username = replacement.username;
+  }
+  usedNames.add(normalizeReservedName(displayName));
+  usedNames.add(normalizeReservedName(username));
+
+  const key = slugify(readNonEmptyString(value.key, "key")).slice(0, 32);
   const bio =
     typeof value.bio === "string" && value.bio.trim()
       ? value.bio.trim().slice(0, 160)
@@ -409,7 +664,7 @@ function readFakeUserPlan(value: unknown): FakeChatUserPlan {
 
   return {
     key: key || username || `bot_${randomSuffix()}`,
-    displayName: displayName.slice(0, 80),
+    displayName,
     username: username || `bot_${randomSuffix()}`,
     bio,
   };
@@ -473,6 +728,10 @@ function readNonEmptyString(value: unknown, field: string) {
 function buildUniqueBotUsername(username: string) {
   const base = slugify(username).slice(0, 18) || "pairpod_bot";
   return `${base}_${randomSuffix()}`;
+}
+
+function normalizeReservedName(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function slugify(value: string) {

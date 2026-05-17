@@ -2405,6 +2405,12 @@ body {
 
 .chat-name {
   font-weight: var(--fw-extrabold);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.65);
+}
+
+.chat-name a {
+  color: inherit;
+  text-decoration-color: currentColor;
 }
 
 .chat-name--purple { color: #4d25c3 }

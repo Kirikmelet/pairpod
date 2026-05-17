@@ -490,15 +490,16 @@ function UserProfileLink({
 }
 
 const AI_ASSISTANT_MESSAGES_KEY = "pairpod.aiAssistantMessages";
+const AI_ASSISTANT_DEFAULT_CREATED_AT = "2026-01-01T00:00:00.000Z";
 
 function createAiAssistantThreadSummary(currentUserId: string | null): DmThreadSummary {
   const messages = readAiAssistantMessages();
   const latestMessage = messages.at(-1);
   return {
     id: AI_ASSISTANT_THREAD_ID,
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: latestMessage?.createdAt ?? new Date().toISOString(),
-    readAt: new Date().toISOString(),
+    createdAt: AI_ASSISTANT_DEFAULT_CREATED_AT,
+    updatedAt: latestMessage?.createdAt ?? AI_ASSISTANT_DEFAULT_CREATED_AT,
+    readAt: AI_ASSISTANT_DEFAULT_CREATED_AT,
     members: currentUserId
       ? [
           {
@@ -520,7 +521,7 @@ function createAiAssistantThreadSummary(currentUserId: string | null): DmThreadS
       : {
           id: "pairpod-ai-welcome",
           content: "Ask me about PairPod, this room, or what to build next.",
-          createdAt: new Date().toISOString(),
+          createdAt: AI_ASSISTANT_DEFAULT_CREATED_AT,
           senderId: AI_ASSISTANT_PROFILE.id,
         },
   };
@@ -576,7 +577,7 @@ function getDefaultAiAssistantMessages(): DmMessage[] {
       id: "pairpod-ai-welcome",
       threadId: AI_ASSISTANT_THREAD_ID,
       content: "Hey, I am the pinned PairPod assistant. Ask me about the room, posts, schema, or extension flow.",
-      createdAt: new Date().toISOString(),
+      createdAt: AI_ASSISTANT_DEFAULT_CREATED_AT,
       sender: AI_ASSISTANT_PROFILE,
     },
   ];

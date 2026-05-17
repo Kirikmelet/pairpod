@@ -593,11 +593,24 @@ create policy "authenticated users can read post votes"
   to authenticated
   using (true);
 
+create or replace function public.current_app_user_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select users.id
+  from public.users
+  where users.auth_user_id = auth.uid()
+  limit 1
+$$;
+
 create policy "authenticated users can write own post votes"
   on post_votes for all
   to authenticated
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  using (user_id = public.current_app_user_id())
+  with check (user_id = public.current_app_user_id());
 
 create policy "authenticated users can read comment votes"
   on comment_votes for select
@@ -607,8 +620,8 @@ create policy "authenticated users can read comment votes"
 create policy "authenticated users can write own comment votes"
   on comment_votes for all
   to authenticated
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  using (user_id = public.current_app_user_id())
+  with check (user_id = public.current_app_user_id());
 
 create policy "authenticated users can read events"
   on events for select
@@ -736,7 +749,7 @@ as $$
 declare
   v_auth_user_id uuid := auth.uid();
   v_user_id uuid;
-  v_next_value integer := case when p_delta >= 0 then 1 else -1 end;
+  v_next_value integer := case when p_delta > 0 then 1 when p_delta < 0 then -1 else null end;
   v_previous_value integer;
   v_score_delta integer := 0;
 begin
@@ -765,7 +778,14 @@ begin
       and post_votes.user_id = v_user_id
     for update;
 
-  if v_previous_value is null then
+  if v_next_value is null then
+    if v_previous_value is not null then
+      delete from public.post_votes as post_votes
+      where post_votes.post_id = p_post_id
+        and post_votes.user_id = v_user_id;
+      v_score_delta := -v_previous_value;
+    end if;
+  elsif v_previous_value is null then
     insert into public.post_votes (post_id, user_id, value)
     values (p_post_id, v_user_id, v_next_value);
     v_score_delta := v_next_value;
@@ -780,7 +800,7 @@ begin
 
   return query
     update public.posts as updated_post
-    set likes = greatest(0, updated_post.likes + v_score_delta)
+    set likes = updated_post.likes + v_score_delta
     where updated_post.id = p_post_id
     returning updated_post.id as id, updated_post.likes as likes;
 end;
@@ -798,7 +818,7 @@ as $$
 declare
   v_auth_user_id uuid := auth.uid();
   v_user_id uuid;
-  v_next_value integer := case when p_delta >= 0 then 1 else -1 end;
+  v_next_value integer := case when p_delta > 0 then 1 when p_delta < 0 then -1 else null end;
   v_previous_value integer;
   v_score_delta integer := 0;
 begin
@@ -827,7 +847,14 @@ begin
       and comment_votes.user_id = v_user_id
     for update;
 
-  if v_previous_value is null then
+  if v_next_value is null then
+    if v_previous_value is not null then
+      delete from public.comment_votes as comment_votes
+      where comment_votes.comment_id = p_comment_id
+        and comment_votes.user_id = v_user_id;
+      v_score_delta := -v_previous_value;
+    end if;
+  elsif v_previous_value is null then
     insert into public.comment_votes (comment_id, user_id, value)
     values (p_comment_id, v_user_id, v_next_value);
     v_score_delta := v_next_value;
@@ -842,7 +869,7 @@ begin
 
   return query
     update public.comments as updated_comment
-    set likes = greatest(0, updated_comment.likes + v_score_delta)
+    set likes = updated_comment.likes + v_score_delta
     where updated_comment.id = p_comment_id
     returning updated_comment.id as id, updated_comment.likes as likes;
 end;

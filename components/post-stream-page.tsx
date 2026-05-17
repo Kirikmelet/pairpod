@@ -36,6 +36,8 @@ type ReplyTarget = {
   label: string;
 };
 
+type VoteDelta = 1 | -1 | 0;
+
 /* ------------------------------------------------------------------ */
 /*  PostStreamPage                                                     */
 /* ------------------------------------------------------------------ */
@@ -137,17 +139,10 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
 
   const handlePostVote = async (post: PostRecord, delta: 1 | -1) => {
     setVoteError(null);
-    if (currentPostVotesById?.[post.id] === delta) {
-      setVoteError(
-        delta === 1
-          ? "You already upvoted this post."
-          : "You already downvoted this post.",
-      );
-      return;
-    }
+    const nextDelta: VoteDelta = currentPostVotesById?.[post.id] === delta ? 0 : delta;
 
     try {
-      await updatePostLikes(post, delta);
+      await updatePostLikes(post, nextDelta);
       await refresh({ silent: true });
     } catch (voteFailure) {
       setVoteError(
@@ -338,7 +333,7 @@ function PostCard({
         <button
           type="button"
           aria-pressed={voteValue === 1}
-          disabled={voteValue === 1}
+          title={voteValue === 1 ? "Remove upvote" : "Upvote"}
           onClick={() => onVote(post, 1)}
         >
           +
@@ -347,7 +342,7 @@ function PostCard({
         <button
           type="button"
           aria-pressed={voteValue === -1}
-          disabled={voteValue === -1}
+          title={voteValue === -1 ? "Remove downvote" : "Downvote"}
           onClick={() => onVote(post, -1)}
         >
           -
@@ -472,17 +467,11 @@ export function PostDetailPage({ postId }: { postId: string }) {
 
   const handlePostVote = async (postToUpdate: PostRecord, delta: 1 | -1) => {
     setVoteError(null);
-    if (currentPostVotesById?.[postToUpdate.id] === delta) {
-      setVoteError(
-        delta === 1
-          ? "You already upvoted this post."
-          : "You already downvoted this post.",
-      );
-      return;
-    }
+    const nextDelta: VoteDelta =
+      currentPostVotesById?.[postToUpdate.id] === delta ? 0 : delta;
 
     try {
-      await updatePostLikes(postToUpdate, delta);
+      await updatePostLikes(postToUpdate, nextDelta);
       await refresh({ silent: true });
     } catch (voteFailure) {
       setVoteError(
@@ -562,7 +551,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
               <button
                 type="button"
                 aria-pressed={currentPostVotesById?.[post.id] === 1}
-                disabled={currentPostVotesById?.[post.id] === 1}
+                title={currentPostVotesById?.[post.id] === 1 ? "Remove upvote" : "Upvote"}
                 onClick={() => void handlePostVote(post, 1)}
               >
                 +
@@ -571,7 +560,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
               <button
                 type="button"
                 aria-pressed={currentPostVotesById?.[post.id] === -1}
-                disabled={currentPostVotesById?.[post.id] === -1}
+                title={currentPostVotesById?.[post.id] === -1 ? "Remove downvote" : "Downvote"}
                 onClick={() => void handlePostVote(post, -1)}
               >
                 -
@@ -1067,17 +1056,11 @@ function CommentCard({
     delta: 1 | -1,
   ) => {
     setVoteError(null);
-    if (currentCommentVotesById?.[commentToUpdate.id] === delta) {
-      setVoteError(
-        delta === 1
-          ? "You already liked this reply."
-          : "You already disliked this reply.",
-      );
-      return;
-    }
+    const nextDelta: VoteDelta =
+      currentCommentVotesById?.[commentToUpdate.id] === delta ? 0 : delta;
 
     try {
-      await updateCommentLikes(commentToUpdate, delta);
+      await updateCommentLikes(commentToUpdate, nextDelta);
       await refresh({ silent: true });
     } catch (voteFailure) {
       setVoteError(
@@ -1113,7 +1096,7 @@ function CommentCard({
           <button
             type="button"
             aria-pressed={currentCommentVotesById?.[comment.id] === 1}
-            disabled={currentCommentVotesById?.[comment.id] === 1}
+            title={currentCommentVotesById?.[comment.id] === 1 ? "Remove like" : "Like"}
             onClick={() => void handleCommentVote(comment, 1)}
           >
             Like
@@ -1122,7 +1105,7 @@ function CommentCard({
           <button
             type="button"
             aria-pressed={currentCommentVotesById?.[comment.id] === -1}
-            disabled={currentCommentVotesById?.[comment.id] === -1}
+            title={currentCommentVotesById?.[comment.id] === -1 ? "Remove dislike" : "Dislike"}
             onClick={() => void handleCommentVote(comment, -1)}
           >
             Dislike
@@ -1171,7 +1154,7 @@ function CommentCard({
                     <button
                       type="button"
                       aria-pressed={currentCommentVotesById?.[reply.id] === 1}
-                      disabled={currentCommentVotesById?.[reply.id] === 1}
+                      title={currentCommentVotesById?.[reply.id] === 1 ? "Remove like" : "Like"}
                       onClick={() => void handleCommentVote(reply, 1)}
                     >
                       Like
@@ -1180,7 +1163,7 @@ function CommentCard({
                     <button
                       type="button"
                       aria-pressed={currentCommentVotesById?.[reply.id] === -1}
-                      disabled={currentCommentVotesById?.[reply.id] === -1}
+                      title={currentCommentVotesById?.[reply.id] === -1 ? "Remove dislike" : "Dislike"}
                       onClick={() => void handleCommentVote(reply, -1)}
                     >
                       Dislike

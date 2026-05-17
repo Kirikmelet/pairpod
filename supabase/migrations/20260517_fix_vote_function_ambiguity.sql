@@ -10,7 +10,7 @@ as $$
 declare
   v_auth_user_id uuid := auth.uid();
   v_user_id uuid;
-  v_next_value integer := case when p_delta >= 0 then 1 else -1 end;
+  v_next_value integer := case when p_delta > 0 then 1 when p_delta < 0 then -1 else null end;
   v_previous_value integer;
   v_score_delta integer := 0;
 begin
@@ -39,7 +39,14 @@ begin
       and post_votes.user_id = v_user_id
     for update;
 
-  if v_previous_value is null then
+  if v_next_value is null then
+    if v_previous_value is not null then
+      delete from public.post_votes as post_votes
+      where post_votes.post_id = p_post_id
+        and post_votes.user_id = v_user_id;
+      v_score_delta := -v_previous_value;
+    end if;
+  elsif v_previous_value is null then
     insert into public.post_votes (post_id, user_id, value)
     values (p_post_id, v_user_id, v_next_value);
     v_score_delta := v_next_value;
@@ -54,7 +61,7 @@ begin
 
   return query
     update public.posts as updated_post
-    set likes = greatest(0, updated_post.likes + v_score_delta)
+    set likes = updated_post.likes + v_score_delta
     where updated_post.id = p_post_id
     returning updated_post.id as id, updated_post.likes as likes;
 end;
@@ -72,7 +79,7 @@ as $$
 declare
   v_auth_user_id uuid := auth.uid();
   v_user_id uuid;
-  v_next_value integer := case when p_delta >= 0 then 1 else -1 end;
+  v_next_value integer := case when p_delta > 0 then 1 when p_delta < 0 then -1 else null end;
   v_previous_value integer;
   v_score_delta integer := 0;
 begin
@@ -101,7 +108,14 @@ begin
       and comment_votes.user_id = v_user_id
     for update;
 
-  if v_previous_value is null then
+  if v_next_value is null then
+    if v_previous_value is not null then
+      delete from public.comment_votes as comment_votes
+      where comment_votes.comment_id = p_comment_id
+        and comment_votes.user_id = v_user_id;
+      v_score_delta := -v_previous_value;
+    end if;
+  elsif v_previous_value is null then
     insert into public.comment_votes (comment_id, user_id, value)
     values (p_comment_id, v_user_id, v_next_value);
     v_score_delta := v_next_value;
@@ -116,7 +130,7 @@ begin
 
   return query
     update public.comments as updated_comment
-    set likes = greatest(0, updated_comment.likes + v_score_delta)
+    set likes = updated_comment.likes + v_score_delta
     where updated_comment.id = p_comment_id
     returning updated_comment.id as id, updated_comment.likes as likes;
 end;

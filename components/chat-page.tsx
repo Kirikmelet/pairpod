@@ -18,8 +18,14 @@ import { DmNotificationBadge } from "@/components/dm-notification-badge";
 import { getDmPath, startDirectMessage } from "@/lib/client/dms";
 import { playSfx, useErrorSfx } from "@/lib/client/sfx";
 import { getUserProfilePath } from "@/lib/client/users";
+import { createClient } from "@/utils/supabase/client";
 
 type TextFormat = "bold" | "italic" | "underline";
+type AiChatContextMessage = {
+  author: string;
+  body: string;
+  isAi: boolean;
+};
 
 type ChatPageProps = {
   currentUsername?: string;
@@ -47,6 +53,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
   const { profile } = useCurrentUserProfile();
   const domainName = getRoomDisplayName(domainUrl);
   const [message, setMessage] = useState("");
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingPeers, setIsGeneratingPeers] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -59,6 +66,10 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
   const { profile: currentProfile } = useCurrentUserProfile();
   useErrorSfx(error);
   useErrorSfx(submitError);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   const chatMessages = useMemo(
     () => bundle?.chats ?? [],
@@ -143,6 +154,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     () => (bundle?.comments ?? []).slice(-4).reverse(),
     [bundle?.comments],
   );
+  const aiControlsDisabled = hasHydrated && (!bundle || isGeneratingPeers);
 
   useEffect(() => {
     const transcript = transcriptRef.current;
@@ -275,7 +287,8 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!bundle || !message.trim()) {
+    const submittedMessage = message.trim();
+    if (!bundle || !submittedMessage) {
       return;
     }
 
@@ -286,13 +299,24 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
       const createdChat = await postJson("/api/chat", {
         roomId: bundle.room.id,
         pageId: bundle.page.id,
-        message: message.trim(),
+        message: submittedMessage,
       });
       if (isChatRecordWithId(createdChat)) {
         sentChatPostIdsRef.current.add(createdChat.chat_id);
       }
       setMessage("");
       await refresh({ silent: true });
+      void handleGeneratePeers({
+        latestMessage: submittedMessage,
+        messageCount: 1,
+        recentMessages: buildAiChatContext(chatMessages, usersById, {
+          author: "You",
+          body: submittedMessage,
+          isAi: false,
+        }),
+        silent: true,
+        userCount: 1,
+      });
     } catch (sendError) {
       setSubmitError(
         sendError instanceof Error
@@ -305,7 +329,9 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
   };
 
   const handleGeneratePeers = async (options?: {
+    latestMessage?: string;
     messageCount?: number;
+    recentMessages?: AiChatContextMessage[];
     seedKey?: string;
     silent?: boolean;
     userCount?: number;
@@ -320,22 +346,33 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     }
 
     try {
+      const payload = {
+        scope: roomScope,
+        domainUrl,
+        latestMessage: options?.latestMessage,
+        recentMessages: options?.recentMessages ?? buildAiChatContext(chatMessages, usersById),
+        reservedNames: buildReservedAiNames(usersById),
+        topic: getChatTitle(bundle),
+        userCount: options?.userCount ?? 3,
+        messageCount: options?.messageCount ?? 5,
+      };
+
       if (isExtensionRuntime()) {
-        await createHumanFakeChatDirect({
-          pageId: bundle.page.id,
-          scope: roomScope,
-          title: getChatTitle(bundle),
-          userCount: options?.userCount ?? 3,
-          messageCount: options?.messageCount ?? 5,
-        });
+        const didUseServer = await tryCreateServerBackedFakeChat(payload);
+        if (!didUseServer) {
+          await createHumanFakeChatDirect({
+            pageId: bundle.page.id,
+            scope: roomScope,
+            title: getChatTitle(bundle),
+            latestMessage: payload.latestMessage,
+            recentMessages: payload.recentMessages,
+            reservedNames: payload.reservedNames,
+            userCount: payload.userCount,
+            messageCount: payload.messageCount,
+          });
+        }
       } else {
-        await postJson("/api/ai/fake-chat", {
-          scope: roomScope,
-          domainUrl,
-          topic: getChatTitle(bundle),
-          userCount: options?.userCount ?? 3,
-          messageCount: options?.messageCount ?? 5,
-        });
+        await postJson("/api/ai/fake-chat", payload);
       }
 
       await refresh({ silent: true });
@@ -467,7 +504,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                 <button
                   type="button"
                   className="chat-side-button"
-                  disabled={!bundle || isGeneratingPeers}
+                  disabled={aiControlsDisabled}
                   onClick={() => void handleGeneratePeers()}
                 >
                   <span className="chat-side-icon" aria-hidden="true">
@@ -521,7 +558,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                         <div className="chat-message__body">
                           <p>
                             <strong
-                              className={`chat-name chat-name--${pickTone(index)}`}
+                              className={`chat-name chat-name--${pickChatTone(chat.user_id, usersById, index)}`}
                             >
                               <DmInlineUser
                                 userId={chat.user_id}
@@ -664,7 +701,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   <button
                     type="button"
                     className="chat-tool-button"
-                    disabled={!bundle || isGeneratingPeers}
+                    disabled={aiControlsDisabled}
                     onClick={() => void handleGeneratePeers()}
                   >
                     {isGeneratingPeers ? "Creating AI peers..." : "Create AI peer chat"}
@@ -689,6 +726,48 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
       </div>
     </main>
   );
+}
+
+async function tryCreateServerBackedFakeChat(payload: Record<string, unknown>) {
+  const endpoint = getConfiguredSiteEndpoint("/api/ai/fake-chat");
+  if (!endpoint) {
+    return false;
+  }
+
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    return false;
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    console.warn("Server-backed extension AI chat failed.", await response.text());
+    return false;
+  }
+
+  const result = (await response.json()) as { ok?: boolean };
+  return result.ok === true;
+}
+
+function getConfiguredSiteEndpoint(pathname: string) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (!siteUrl) {
+    return null;
+  }
+
+  return new URL(pathname, siteUrl.endsWith("/") ? siteUrl : `${siteUrl}/`).toString();
 }
 
 function isExtensionRuntime() {
@@ -753,6 +832,59 @@ function isAiFakeUser(user: UserProfileRecord | null | undefined) {
     !Array.isArray(configurations) &&
     configurations.kind === "ai_fake_user"
   );
+}
+
+function buildAiChatContext(
+  chats: ChatRecord[],
+  usersById: Record<string, UserProfileRecord>,
+  extra?: AiChatContextMessage,
+) {
+  const recent = chats.slice(-8).map((chat) => {
+    const user = chat.user_id ? usersById[chat.user_id] : null;
+    const body = chat.body?.trim() ?? "";
+
+    return {
+      author: getDisplayName(chat.user_id, usersById),
+      body,
+      isAi: isAiFakeUser(user) || looksLikePrefixedAiFallback(body),
+    };
+  }).filter((message) => message.body);
+
+  if (extra?.body.trim()) {
+    recent.push({
+      ...extra,
+      body: extra.body.trim(),
+    });
+  }
+
+  return recent.slice(-9);
+}
+
+function buildReservedAiNames(usersById: Record<string, UserProfileRecord>) {
+  const reserved = new Set<string>();
+
+  for (const user of Object.values(usersById)) {
+    addReservedName(reserved, user.display_name);
+    addReservedName(reserved, user.username);
+    addReservedName(reserved, getDisplayName(user.id, { [user.id]: user }));
+  }
+
+  return [...reserved].slice(0, 80);
+}
+
+function addReservedName(reserved: Set<string>, value: string | null | undefined) {
+  const normalized = normalizeReservedName(value);
+  if (normalized) {
+    reserved.add(normalized);
+  }
+}
+
+function normalizeReservedName(value: string | null | undefined) {
+  return value?.trim().toLowerCase().replace(/[^a-z0-9]+/g, "") ?? "";
+}
+
+function looksLikePrefixedAiFallback(body: string) {
+  return /^[A-Za-z0-9_.-]{3,28}:\s+/.test(body);
 }
 
 function getKeyboardFormat(event: KeyboardEvent<HTMLTextAreaElement>): TextFormat | null {
@@ -874,6 +1006,18 @@ function getChatTitle(bundle: ReturnType<typeof usePageBundle>["bundle"]) {
 
 function pickTone(index: number) {
   return ["purple", "pink", "green", "blue", "brown"][index % 5];
+}
+
+function pickChatTone(
+  userId: string | null,
+  usersById: Record<string, UserProfileRecord>,
+  index: number,
+) {
+  if (userId && isAiFakeUser(usersById[userId])) {
+    return pickTone(index + 2);
+  }
+
+  return pickTone(index);
 }
 
 function PanelHeader({ title }: { title: string }) {

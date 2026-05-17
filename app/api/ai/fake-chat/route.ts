@@ -10,6 +10,9 @@ export const runtime = "nodejs";
 type FakeChatRequestBody = {
   scope?: unknown;
   domainUrl?: unknown;
+  latestMessage?: unknown;
+  recentMessages?: unknown;
+  reservedNames?: unknown;
   topic?: unknown;
   userCount?: unknown;
   messageCount?: unknown;
@@ -28,6 +31,10 @@ export async function POST(request: Request): Promise<Response> {
   const scope = readScope(body.scope);
   const domainUrl =
     typeof body.domainUrl === "string" ? body.domainUrl.trim() : null;
+  const latestMessage =
+    typeof body.latestMessage === "string" ? body.latestMessage.trim() : null;
+  const recentMessages = readRecentMessages(body.recentMessages);
+  const reservedNames = readReservedNames(body.reservedNames);
   const topic = typeof body.topic === "string" ? body.topic.trim() : null;
   const userCount = readOptionalInteger(body.userCount);
   const messageCount = readOptionalInteger(body.messageCount);
@@ -54,6 +61,9 @@ export async function POST(request: Request): Promise<Response> {
     const data = await createFakeChatFromMistral({
       scope,
       domainUrl,
+      latestMessage,
+      recentMessages,
+      reservedNames,
       topic,
       userCount,
       messageCount,
@@ -89,4 +99,45 @@ function readScope(value: unknown): FakeChatScope | null {
 
 function readOptionalInteger(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) ? value : undefined;
+}
+
+function readRecentMessages(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const record = entry as Record<string, unknown>;
+      const body = typeof record.body === "string" ? record.body.trim() : "";
+      if (!body) {
+        return null;
+      }
+
+      return {
+        author: typeof record.author === "string" && record.author.trim()
+          ? record.author.trim().slice(0, 48)
+          : "Someone",
+        body: body.slice(0, 280),
+        isAi: record.isAi === true,
+      };
+    })
+    .filter((entry): entry is { author: string; body: string; isAi: boolean } => Boolean(entry))
+    .slice(-10);
+}
+
+function readReservedNames(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .slice(0, 100);
 }

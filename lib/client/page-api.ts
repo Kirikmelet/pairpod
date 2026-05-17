@@ -11,6 +11,20 @@ const LOCAL_POST_VOTES_KEY = "pairpod.postVotes";
 const LOCAL_COMMENT_VOTES_KEY = "pairpod.commentVotes";
 const REALTIME_REFRESH_DEBOUNCE_MS = 150;
 const ACTIVE_POLL_INTERVAL_MS = 2500;
+const SHORT_MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 const DEFAULT_PORTS = new Map([
   ["http:", "80"],
   ["https:", "443"],
@@ -94,6 +108,8 @@ export type CommentVoteRecord = {
   user_id: string;
   value: 1 | -1;
 };
+
+type VoteDelta = 1 | -1 | 0;
 
 export type PageBundle = {
   page: PageRecord;
@@ -244,12 +260,12 @@ export function formatTimestamp(timestamp: string) {
     return timestamp;
   }
 
-  return date.toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const hour24 = date.getUTCHours();
+  const hour12 = hour24 % 12 || 12;
+  const minute = String(date.getUTCMinutes()).padStart(2, "0");
+  const period = hour24 >= 12 ? "PM" : "AM";
+
+  return `${SHORT_MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}, ${hour12}:${minute} ${period}`;
 }
 
 export function splitContentLines(content: string) {
@@ -288,30 +304,23 @@ export async function postJson<TResponse>(
   return payload.data;
 }
 
-export async function updatePostLikes(post: PostRecord, delta: 1 | -1) {
-  const userId = await getCurrentAuthUserId();
-  if (userId && getLocalVote(LOCAL_POST_VOTES_KEY, userId, post.id) === delta) {
-    throw new Error(
-      delta === 1
-        ? "You already upvoted this post."
-        : "You already downvoted this post.",
-    );
-  }
+export async function updatePostLikes(post: PostRecord, delta: VoteDelta) {
+  const userId = await getCurrentAppUserId();
 
   try {
     await updatePostLikesDirect(post, delta);
     if (userId) {
-      setLocalVote(LOCAL_POST_VOTES_KEY, userId, post.id, delta);
+      writeLocalVote(LOCAL_POST_VOTES_KEY, userId, post.id, delta);
     }
   } catch (error) {
     await updateVoteThroughApi("post", post.id, delta, error);
     if (userId) {
-      setLocalVote(LOCAL_POST_VOTES_KEY, userId, post.id, delta);
+      writeLocalVote(LOCAL_POST_VOTES_KEY, userId, post.id, delta);
     }
   }
 }
 
-async function updatePostLikesDirect(post: PostRecord, delta: 1 | -1) {
+async function updatePostLikesDirect(post: PostRecord, delta: VoteDelta) {
   const supabase = createClient();
   try {
     await updatePostLikesViaRpc(
@@ -331,7 +340,7 @@ async function updatePostLikesDirect(post: PostRecord, delta: 1 | -1) {
 async function updatePostLikesViaRpc(
   supabase: VoteRpcClient,
   postId: string,
-  delta: 1 | -1,
+  delta: VoteDelta,
 ) {
   const { data, error } = await supabase.rpc("increment_post_likes", {
     p_post_id: postId,
@@ -347,33 +356,23 @@ async function updatePostLikesViaRpc(
   }
 }
 
-export async function updateCommentLikes(comment: CommentRecord, delta: 1 | -1) {
-  const userId = await getCurrentAuthUserId();
-  if (
-    userId &&
-    getLocalVote(LOCAL_COMMENT_VOTES_KEY, userId, comment.id) === delta
-  ) {
-    throw new Error(
-      delta === 1
-        ? "You already liked this reply."
-        : "You already disliked this reply.",
-    );
-  }
+export async function updateCommentLikes(comment: CommentRecord, delta: VoteDelta) {
+  const userId = await getCurrentAppUserId();
 
   try {
     await updateCommentLikesDirect(comment, delta);
     if (userId) {
-      setLocalVote(LOCAL_COMMENT_VOTES_KEY, userId, comment.id, delta);
+      writeLocalVote(LOCAL_COMMENT_VOTES_KEY, userId, comment.id, delta);
     }
   } catch (error) {
     await updateVoteThroughApi("comment", comment.id, delta, error);
     if (userId) {
-      setLocalVote(LOCAL_COMMENT_VOTES_KEY, userId, comment.id, delta);
+      writeLocalVote(LOCAL_COMMENT_VOTES_KEY, userId, comment.id, delta);
     }
   }
 }
 
-async function updateCommentLikesDirect(comment: CommentRecord, delta: 1 | -1) {
+async function updateCommentLikesDirect(comment: CommentRecord, delta: VoteDelta) {
   const supabase = createClient();
   try {
     await updateCommentLikesViaRpc(
@@ -393,7 +392,7 @@ async function updateCommentLikesDirect(comment: CommentRecord, delta: 1 | -1) {
 async function updateCommentLikesViaRpc(
   supabase: VoteRpcClient,
   commentId: string,
-  delta: 1 | -1,
+  delta: VoteDelta,
 ) {
   const { data, error } = await supabase.rpc("increment_comment_likes", {
     p_comment_id: commentId,
@@ -412,7 +411,7 @@ async function updateCommentLikesViaRpc(
 async function updateVoteThroughApi(
   target: "post" | "comment",
   id: string,
-  delta: 1 | -1,
+  delta: VoteDelta,
   directError?: unknown,
 ) {
   const votesUrl = isExtensionRuntime() ? getRemoteApiUrl("/api/votes") : "/api/votes";
@@ -460,11 +459,11 @@ async function updateVoteThroughApi(
 
 async function updatePostLikesViaTables(
   post: PostRecord,
-  delta: 1 | -1,
+  delta: VoteDelta,
   rpcError?: unknown,
 ) {
-  const authUserId = await getCurrentAuthUserId();
-  if (!authUserId) {
+  const appUserId = await getCurrentAppUserId();
+  if (!appUserId) {
     throw new Error("You must be signed in to vote.");
   }
 
@@ -474,28 +473,29 @@ async function updatePostLikesViaTables(
     "post_votes",
     "post_id",
     post.id,
-    authUserId,
+    appUserId,
   );
-  if (previousValue === delta) {
-    throw new Error(
-      delta === 1
-        ? "You already upvoted this post."
-        : "You already downvoted this post.",
-    );
-  }
 
-  const scoreDelta = previousValue === null ? delta : delta - previousValue;
-  const voteError = await upsertVoteValue(
-    supabase,
-    "post_votes",
-    { post_id: post.id, user_id: authUserId, value: delta },
-    "post_id,user_id",
-  );
+  const scoreDelta =
+    delta === 0
+      ? -(previousValue ?? 0)
+      : previousValue === null
+        ? delta
+        : delta - previousValue;
+  const voteError =
+    delta === 0
+      ? await deleteVoteValue(supabase, "post_votes", "post_id", post.id, appUserId)
+      : await upsertVoteValue(
+          supabase,
+          "post_votes",
+          { post_id: post.id, user_id: appUserId, value: delta },
+          "post_id,user_id",
+        );
   if (voteError) {
     console.warn("Could not persist post vote row from extension.", voteError);
   }
 
-  const nextLikes = Math.max(0, post.likes + scoreDelta);
+  const nextLikes = post.likes + scoreDelta;
   const { error: updateError } = await supabase
     .from("posts")
     .update({ likes: nextLikes })
@@ -510,11 +510,11 @@ async function updatePostLikesViaTables(
 
 async function updateCommentLikesViaTables(
   comment: CommentRecord,
-  delta: 1 | -1,
+  delta: VoteDelta,
   rpcError?: unknown,
 ) {
-  const authUserId = await getCurrentAuthUserId();
-  if (!authUserId) {
+  const appUserId = await getCurrentAppUserId();
+  if (!appUserId) {
     throw new Error("You must be signed in to vote.");
   }
 
@@ -524,28 +524,35 @@ async function updateCommentLikesViaTables(
     "comment_votes",
     "comment_id",
     comment.id,
-    authUserId,
+    appUserId,
   );
-  if (previousValue === delta) {
-    throw new Error(
-      delta === 1
-        ? "You already liked this reply."
-        : "You already disliked this reply.",
-    );
-  }
 
-  const scoreDelta = previousValue === null ? delta : delta - previousValue;
-  const voteError = await upsertVoteValue(
-    supabase,
-    "comment_votes",
-    { comment_id: comment.id, user_id: authUserId, value: delta },
-    "comment_id,user_id",
-  );
+  const scoreDelta =
+    delta === 0
+      ? -(previousValue ?? 0)
+      : previousValue === null
+        ? delta
+        : delta - previousValue;
+  const voteError =
+    delta === 0
+      ? await deleteVoteValue(
+          supabase,
+          "comment_votes",
+          "comment_id",
+          comment.id,
+          appUserId,
+        )
+      : await upsertVoteValue(
+          supabase,
+          "comment_votes",
+          { comment_id: comment.id, user_id: appUserId, value: delta },
+          "comment_id,user_id",
+        );
   if (voteError) {
     console.warn("Could not persist comment vote row from extension.", voteError);
   }
 
-  const nextLikes = Math.max(0, comment.likes + scoreDelta);
+  const nextLikes = comment.likes + scoreDelta;
   const { error: updateError } = await supabase
     .from("comments")
     .update({ likes: nextLikes })
@@ -578,6 +585,22 @@ async function loadExistingVoteValue(
   }
 
   return data?.value === 1 || data?.value === -1 ? data.value : null;
+}
+
+async function deleteVoteValue(
+  supabase: any,
+  table: "post_votes" | "comment_votes",
+  targetColumn: "post_id" | "comment_id",
+  targetId: string,
+  userId: string,
+) {
+  const { error } = await supabase
+    .from(table)
+    .delete()
+    .eq(targetColumn, targetId)
+    .eq("user_id", userId);
+
+  return error;
 }
 
 async function upsertVoteValue(
@@ -617,6 +640,8 @@ function hasConfiguredRemoteApiUrl() {
 export function usePageBundle(): UsePageBundleResult {
   const searchParams = useSearchParams();
   const searchString = searchParams.toString();
+  const [hasHydrated, setHasHydrated] = useState(false);
+  const [documentTitle, setDocumentTitle] = useState("PairPod");
   const roomScope = useMemo(
     () => (searchParams.get("room") === "domain" ? "domain" : "global"),
     [searchParams, searchString],
@@ -630,15 +655,25 @@ export function usePageBundle(): UsePageBundleResult {
     () => (roomScope === "domain" ? domainUrl : GLOBAL_ROOM_URL),
     [domainUrl, roomScope],
   );
-  const currentTitle = useMemo(
-    () => searchParams.get("title")?.trim() || getDocumentTitle(),
+  const requestedTitle = useMemo(
+    () => searchParams.get("title")?.trim() || "",
     [searchParams, searchString],
+  );
+  const currentTitle = useMemo(
+    () => requestedTitle || documentTitle,
+    [documentTitle, requestedTitle],
   );
 
   const [bundle, setBundle] = useState<PageBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const bundleRef = useRef<PageBundle | null>(null);
+  const shouldUseExtensionLinks = hasHydrated && isExtensionRuntime();
+
+  useEffect(() => {
+    setHasHydrated(true);
+    setDocumentTitle(getDocumentTitle());
+  }, []);
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     if (!options?.silent) {
@@ -851,13 +886,13 @@ export function usePageBundle(): UsePageBundleResult {
         params.set("title", currentTitle);
       }
 
-      if (isExtensionRuntime()) {
+      if (shouldUseExtensionLinks) {
         return `#${pathname}?${params.toString()}`;
       }
 
       return `${pathname}?${params.toString()}`;
     },
-    [currentTitle, domainUrl, roomScope],
+    [currentTitle, domainUrl, roomScope, shouldUseExtensionLinks],
   );
 
   const buildRoomHref = useCallback(
@@ -870,13 +905,13 @@ export function usePageBundle(): UsePageBundleResult {
         params.set("title", currentTitle);
       }
 
-      if (isExtensionRuntime()) {
+      if (shouldUseExtensionLinks) {
         return `#${pathname}?${params.toString()}`;
       }
 
       return `${pathname}?${params.toString()}`;
     },
-    [currentTitle, domainUrl],
+    [currentTitle, domainUrl, shouldUseExtensionLinks],
   );
 
   const buildDomainHref = useCallback(
@@ -890,13 +925,13 @@ export function usePageBundle(): UsePageBundleResult {
         params.set("title", currentTitle);
       }
 
-      if (isExtensionRuntime()) {
+      if (shouldUseExtensionLinks) {
         return `#${pathname}?${params.toString()}`;
       }
 
       return `${pathname}?${params.toString()}`;
     },
-    [currentTitle],
+    [currentTitle, shouldUseExtensionLinks],
   );
 
   return {
@@ -1118,6 +1153,16 @@ async function withCurrentUserVotes(bundle: PageBundle): Promise<PageBundle> {
     };
   }
 
+  const profile = await ensureCurrentUserProfile();
+  if (!profile) {
+    return {
+      ...bundle,
+      postVotes: [],
+      commentVotes: [],
+    };
+  }
+
+  const appUserId = profile.id;
   const postIds = bundle.posts.map((post) => post.id);
   const commentIds = bundle.comments.map((comment) => comment.id);
   let postVotes: PostVoteRecord[] = [];
@@ -1125,15 +1170,15 @@ async function withCurrentUserVotes(bundle: PageBundle): Promise<PageBundle> {
 
   try {
     [postVotes, commentVotes] = await Promise.all([
-      loadPostVotesForUser(user.id, postIds),
-      loadCommentVotesForUser(user.id, commentIds),
+      loadPostVotesForUser(appUserId, postIds),
+      loadCommentVotesForUser(appUserId, commentIds),
     ]);
   } catch (voteLoadError) {
     console.warn("Could not load current user votes.", voteLoadError);
   }
 
-  postVotes = mergeLocalPostVotes(user.id, postIds, postVotes);
-  commentVotes = mergeLocalCommentVotes(user.id, commentIds, commentVotes);
+  postVotes = mergeLocalPostVotes(appUserId, postIds, postVotes);
+  commentVotes = mergeLocalCommentVotes(appUserId, commentIds, commentVotes);
 
   return {
     ...bundle,
@@ -1142,13 +1187,17 @@ async function withCurrentUserVotes(bundle: PageBundle): Promise<PageBundle> {
   };
 }
 
-async function getCurrentAuthUserId() {
+async function getCurrentAppUserId() {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  return user?.id ?? null;
+  if (!user) {
+    return null;
+  }
+
+  return (await ensureCurrentUserProfile())?.id ?? null;
 }
 
 function mergeLocalPostVotes(
@@ -1205,11 +1254,11 @@ function getLocalVote(
   }
 }
 
-function setLocalVote(
+function writeLocalVote(
   storageKey: string,
   userId: string,
   targetId: string,
-  value: 1 | -1,
+  value: VoteDelta,
 ) {
   if (typeof window === "undefined") {
     return;
@@ -1219,10 +1268,12 @@ function setLocalVote(
     const stored = JSON.parse(
       window.localStorage.getItem(storageKey) ?? "{}",
     ) as Record<string, Record<string, number>>;
-    stored[userId] = {
-      ...(stored[userId] ?? {}),
-      [targetId]: value,
-    };
+    stored[userId] = { ...(stored[userId] ?? {}) };
+    if (value === 0) {
+      delete stored[userId][targetId];
+    } else {
+      stored[userId][targetId] = value;
+    }
     window.localStorage.setItem(storageKey, JSON.stringify(stored));
   } catch {
     // Local vote memory is a UI guard only; the database remains authoritative.

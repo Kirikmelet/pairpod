@@ -195,12 +195,11 @@ function useExtensionHashRoute():
   | { kind: "user-profile"; userId: string }
   | { kind: "dms"; threadId?: string }
   | { kind: "post-detail"; postId: string } {
-  const [hash, setHash] = useState(() =>
-    typeof window === "undefined" ? "" : window.location.hash,
-  );
+  const [hash, setHash] = useState("");
 
   useEffect(() => {
     const handleHashChange = () => setHash(window.location.hash);
+    handleHashChange();
     window.addEventListener("hashchange", handleHashChange);
     window.addEventListener("popstate", handleHashChange);
     return () => {

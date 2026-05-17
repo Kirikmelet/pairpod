@@ -197,10 +197,7 @@ function ChatMessage({
   const createdAt = new Date(post.created_at);
   const timestamp = Number.isNaN(createdAt.getTime())
     ? "--:--"
-    : createdAt.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+    : formatChatTime(createdAt);
 
   return (
     <article className="chat-message">
@@ -215,6 +212,12 @@ function ChatMessage({
       </div>
     </article>
   );
+}
+
+function formatChatTime(date: Date) {
+  const hour = String(date.getUTCHours()).padStart(2, "0");
+  const minute = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${hour}:${minute}`;
 }
 
 const homeChatAdapter = {

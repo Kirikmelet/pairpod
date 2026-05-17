@@ -12,6 +12,7 @@ type VoteRequestBody = {
 };
 
 type VoteTarget = "post" | "comment";
+type VoteDelta = 1 | -1 | 0;
 
 type VoteRow = {
   id: string;
@@ -40,7 +41,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const target = readTarget(body.target);
   const id = typeof body.id === "string" ? body.id.trim() : "";
-  const delta = body.delta === 1 || body.delta === -1 ? body.delta : null;
+  const delta = readDelta(body.delta);
 
   if (!target || !id || delta === null) {
     return jsonError("target, id, and delta are required", 400);
@@ -111,7 +112,7 @@ async function createAuthenticatedRouteClient(request: Request) {
 async function updatePostVote(
   supabase: SupabaseClient<Database>,
   id: string,
-  delta: 1 | -1,
+  delta: VoteDelta,
 ) {
   const { data, error } = await (
     supabase as unknown as VoteRpcClient
@@ -135,7 +136,7 @@ async function updatePostVote(
 async function updateCommentVote(
   supabase: SupabaseClient<Database>,
   id: string,
-  delta: 1 | -1,
+  delta: VoteDelta,
 ) {
   const { data, error } = await (
     supabase as unknown as VoteRpcClient
@@ -158,6 +159,10 @@ async function updateCommentVote(
 
 function readTarget(value: unknown): VoteTarget | null {
   return value === "post" || value === "comment" ? value : null;
+}
+
+function readDelta(value: unknown): VoteDelta | null {
+  return value === 1 || value === -1 || value === 0 ? value : null;
 }
 
 function readBearerToken(authorization: string | null) {
