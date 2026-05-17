@@ -4,7 +4,9 @@ import { toProfileResponse, updateUserProfile } from "@/lib/server/profile";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 const AVATAR_BUCKET = "avatars";
+const AVATAR_SIZE_PX = 128;
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+const PNG_SIGNATURE = "89504e470d0a1a0a";
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -35,6 +37,19 @@ export async function POST(request: Request): Promise<Response> {
     const storagePath = `${user.id}/avatar.png`;
     const admin = createAdminClient();
     const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const imageSize = readPngSize(fileBuffer);
+
+    if (!imageSize) {
+      return jsonError("Avatar must be a valid PNG image.", 400);
+    }
+
+    if (
+      imageSize.width !== AVATAR_SIZE_PX ||
+      imageSize.height !== AVATAR_SIZE_PX
+    ) {
+      return jsonError("Avatar PNG must be exactly 128x128 pixels.", 400);
+    }
+
     const { error: uploadError } = await admin.storage
       .from(AVATAR_BUCKET)
       .upload(storagePath, fileBuffer, {
@@ -57,4 +72,24 @@ export async function POST(request: Request): Promise<Response> {
       error instanceof Error ? error.message : "Failed to upload avatar.";
     return jsonError(message, 500);
   }
+}
+
+function readPngSize(buffer: Buffer) {
+  if (buffer.length < 24) {
+    return null;
+  }
+
+  if (buffer.subarray(0, 8).toString("hex") !== PNG_SIGNATURE) {
+    return null;
+  }
+
+  const chunkType = buffer.subarray(12, 16).toString("ascii");
+  if (chunkType !== "IHDR") {
+    return null;
+  }
+
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  };
 }
