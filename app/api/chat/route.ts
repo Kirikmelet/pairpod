@@ -1,8 +1,8 @@
 import { logEvent } from '@/lib/server/helpers/logEvent'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
+import { resolveAuthenticatedProfileIdOrFallback } from '@/lib/server/profile'
 import { createPost } from '@/lib/server/discussions'
 import { findOrCreateDefaultRoom } from '@/lib/server/pages'
-import { getCurrentUserProfile } from '@/lib/server/profile'
 
 type ChatRequestBody = {
   roomId?: unknown
@@ -33,12 +33,11 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const resolvedRoomId = roomId || (await findOrCreateDefaultRoom(pageId)).id
-    const profile = await getCurrentUserProfile()
-    const userId = profile?.id ?? requestUserId
+    const resolvedUserId = await resolveAuthenticatedProfileIdOrFallback(requestUserId)
 
     const data = await createPost({
       roomId: resolvedRoomId,
-      userId,
+      userId: resolvedUserId,
       type: 'chat',
       content: message,
       sectionId,
@@ -49,7 +48,7 @@ export async function POST(request: Request): Promise<Response> {
       pageId: pageId || null,
       roomId: resolvedRoomId,
       postId: data.id,
-      userId,
+      userId: resolvedUserId,
       payload: {
         type: data.type,
         sectionId: data.section_id,
