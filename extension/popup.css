@@ -5910,6 +5910,549 @@ body {
     transition: none !important;
   }
 }
+@keyframes ext-slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes ext-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ext-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes ext-skeleton-shimmer {
+  0% {
+    background-position: -300px 0;
+  }
+  100% {
+    background-position: 300px 0;
+  }
+}
+@keyframes ext-char-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(-8px);
+  }
+}
+@keyframes ext-char-antenna-sway {
+  0%, 100% {
+    transform: rotate(24deg);
+  }
+  50% {
+    transform: rotate(14deg);
+  }
+}
+@keyframes ext-char-ring-breathe {
+  0%, 100% {
+    transform: scaleX(1);
+    opacity: 0.82;
+  }
+  50% {
+    transform: scaleX(1.08);
+    opacity: 1;
+  }
+}
+@keyframes ext-char-eye-blink {
+  0%, 90%, 100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes ext-traffic-hover-close {
+  0%,100% {
+    box-shadow: 0 0 0  2px rgba(255,95,87,0.3);
+  }
+  50% {
+    box-shadow: 0 0 0  6px rgba(255,95,87,0.6);
+  }
+}
+@keyframes ext-traffic-hover-min {
+  0%,100% {
+    box-shadow: 0 0 0  2px rgba(254,188,46,0.3);
+  }
+  50% {
+    box-shadow: 0 0 0  6px rgba(254,188,46,0.7);
+  }
+}
+@keyframes ext-traffic-hover-max {
+  0%,100% {
+    box-shadow: 0 0 0  2px rgba(40,200,64,0.3);
+  }
+  50% {
+    box-shadow: 0 0 0  6px rgba(40,200,64,0.6);
+  }
+}
+@keyframes ext-pod-avatar-ring {
+  0% {
+    box-shadow: 0 0 0 0   rgba(255,255,255,0.9);
+  }
+  60% {
+    box-shadow: 0 0 0 4px rgba(255,255,255,0);
+  }
+  100% {
+    box-shadow: 0 0 0 0   rgba(255,255,255,0);
+  }
+}
+@keyframes ext-thread-link-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes ext-chat-msg-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ext-arrow-nudge {
+  0%,100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+}
+@keyframes ext-status-slide {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 80px;
+  }
+}
+.extension-app .xp-title-btn,
+.app-window--popup .xp-title-btn {
+  border-radius: 50% !important;
+  width: 14px !important;
+  height: 14px !important;
+  font-size: 0 !important;
+  border: 1px solid rgba(0,0,0,0.20) !important;
+  position: relative;
+  transition: box-shadow 0.18s, filter 0.18s;
+}
+.extension-app .xp-title-btn--close,
+.app-window--popup .xp-title-btn--close {
+  background: #ff5f57 !important;
+  cursor: pointer;
+}
+.extension-app .xp-title-btn--close:hover {
+  animation: ext-traffic-hover-close 0.8s ease-in-out infinite !important;
+  filter: brightness(1.08) !important;
+}
+.extension-app .xp-title-btn--close::before {
+  content: '×';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px !important;
+  font-weight: 900;
+  color: rgba(100,0,0,0.55);
+  opacity: 0;
+  transition: opacity 0.14s;
+  line-height: 1;
+}
+.extension-app .xp-title-btn--close:hover::before {
+  opacity: 1;
+}
+.extension-app .xp-title-btn--min,
+.app-window--popup .xp-title-btn--min {
+  background: #febc2e !important;
+  cursor: not-allowed;
+  pointer-events: none;
+  opacity: 1 !important;
+  filter: none !important;
+}
+.extension-app .xp-title-btn--min::before {
+  content: '–';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px !important;
+  font-weight: 900;
+  color: rgba(100,60,0,0.55);
+  opacity: 0;
+  line-height: 1;
+}
+.extension-app .xp-title-btn--max,
+.app-window--popup .xp-title-btn--max {
+  background: #28c840 !important;
+  cursor: not-allowed;
+  pointer-events: none;
+  opacity: 1 !important;
+  filter: none !important;
+}
+.extension-app .xp-title-btn--max::before {
+  content: '+';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px !important;
+  font-weight: 900;
+  color: rgba(0,60,0,0.55);
+  opacity: 0;
+  line-height: 1;
+}
+.extension-app .xp-title-bar:hover .xp-title-btn--min::before,
+.extension-app .xp-title-bar:hover .xp-title-btn--max::before,
+.extension-app .xp-title-bar:hover .xp-title-btn--close::before {
+  opacity: 1;
+}
+.extension-user-bar {
+  backdrop-filter: blur(8px) saturate(1.4);
+  background: rgba(255,255,255,0.68) !important;
+  border-bottom: 1px solid rgba(180,210,255,0.55) !important;
+  box-shadow: 0 1px 8px rgba(0,60,180,0.08);
+  padding: 5px 10px !important;
+}
+.extension-user-bar__identity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700 !important;
+  color: #1a2a6c !important;
+  font-size: 10px !important;
+}
+.extension-user-bar__identity::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #28c840;
+  box-shadow: 0 0 0 0 rgba(40,200,64,0.7);
+  animation: ext-live-dot-glow 1.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.extension-app .status-note,
+.app-window--popup .status-note {
+  animation: ext-status-slide 0.28s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) both;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  border-left: 3px solid currentColor;
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(4px);
+}
+.extension-app .status-note--error,
+.app-window--popup .status-note--error {
+  background: rgba(255,234,234,0.82);
+}
+.extension-app .status-note--success,
+.app-window--popup .status-note--success {
+  background: rgba(234,255,238,0.82);
+}
+.extension-app .activity-item,
+.pod-window .activity-item {
+  animation: ext-slide-up 0.28s both;
+  border-radius: var(--radius-sm);
+  transition: background 0.16s, padding-left 0.16s, border-left-color 0.16s;
+  border-left: 2px solid transparent;
+  padding-left: 6px;
+}
+.extension-app .activity-item:nth-child(1) {
+  animation-delay: 0.04s;
+}
+.extension-app .activity-item:nth-child(2) {
+  animation-delay: 0.09s;
+}
+.extension-app .activity-item:nth-child(3) {
+  animation-delay: 0.14s;
+}
+.extension-app .activity-item:hover,
+.pod-window .activity-item:hover {
+  background: rgba(56,152,255,0.07);
+  border-left-color: var(--accent-blue);
+  padding-left: 10px;
+}
+.extension-app .activity-panel__action,
+.pod-window .activity-panel__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  transition: color 0.16s, gap 0.18s;
+}
+.extension-app .activity-panel__action:hover,
+.pod-window .activity-panel__action:hover {
+  gap: 10px;
+  color: var(--accent-blue);
+}
+.extension-app .activity-panel__action span,
+.pod-window .activity-panel__action span {
+  display: inline-block;
+  transition: transform 0.22s var(--ease-bounce, cubic-bezier(.34,1.56,.64,1));
+}
+.extension-app .activity-panel__action:hover span,
+.pod-window .activity-panel__action:hover span {
+  transform: translateX(4px);
+}
+.character-preview {
+  animation: ext-char-float 3.2s ease-in-out infinite;
+}
+.character-preview__antenna {
+  animation: ext-char-antenna-sway 2.8s ease-in-out infinite;
+}
+.character-preview__ring {
+  animation: ext-char-ring-breathe 2.4s ease-in-out infinite;
+}
+.character-preview__head i {
+  animation: ext-char-eye-blink 4s ease-in-out infinite;
+}
+.character-preview__head i:nth-child(2) {
+  animation-delay: 0.08s;
+}
+@keyframes ext-skeleton-shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.extension-app .status-note:not(.status-note--error):not(.status-note--success) {
+  background: linear-gradient(
+    90deg,
+    rgba(220,232,255,0.72) 25%,
+    rgba(240,248,255,0.95) 50%,
+    rgba(220,232,255,0.72) 75%
+  );
+  background-size: 400px 100%;
+  animation: ext-skeleton-shimmer 1.4s ease-in-out infinite, ext-status-slide 0.28s both;
+  border-left-color: rgba(100,150,255,0.4);
+  color: #5566aa;
+}
+.extension-app .pod-card__copy:empty,
+.extension-app .pod-card__meta:empty {
+  min-height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(200,220,255,0.55) 25%,
+    rgba(230,242,255,0.88) 50%,
+    rgba(200,220,255,0.55) 75%
+  );
+  background-size: 400px 100%;
+  animation: ext-skeleton-shimmer 1.4s ease-in-out infinite;
+  color: transparent !important;
+}
+.extension-app .dm-thread-link {
+  animation: ext-thread-link-in 0.24s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) both;
+  position: relative;
+  overflow: hidden;
+  transition: background 0.18s, border-color 0.18s, transform 0.16s, box-shadow 0.16s;
+}
+.extension-app .dm-thread-link:nth-child(1) {
+  animation-delay: 0.04s;
+}
+.extension-app .dm-thread-link:nth-child(2) {
+  animation-delay: 0.09s;
+}
+.extension-app .dm-thread-link:nth-child(3) {
+  animation-delay: 0.13s;
+}
+.extension-app .dm-thread-link:nth-child(4) {
+  animation-delay: 0.17s;
+}
+.extension-app .dm-thread-link:hover {
+  transform: translateX(3px);
+  box-shadow: 0 2px 10px rgba(0,80,200,0.12);
+}
+.extension-app .dm-thread-link--active {
+  border-left: 3px solid var(--accent-blue) !important;
+  background: rgba(220,238,255,0.92) !important;
+  box-shadow: 0 2px 10px rgba(0,80,200,0.14);
+}
+.extension-app .dm-thread-link--unread strong::after {
+  content: ' •';
+  color: #c91224;
+  font-size: 1.3em;
+}
+.extension-app .chat-message:last-child,
+.extension-app .chat-message:nth-last-child(-n+2) {
+  animation: ext-chat-msg-up 0.22s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) both;
+}
+.extension-app .dm-message:last-child {
+  animation: ext-message-in-right 0.24s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) both;
+}
+.extension-app .dm-message--own:last-child {
+  animation-name: ext-message-in-left;
+}
+.extension-app .pod-avatar,
+.pod-window .pod-avatar {
+  animation: ext-pod-avatar-ring 2s ease-in-out infinite;
+  transition: transform 0.18s var(--ease-spring, cubic-bezier(.34,1.56,.64,1));
+}
+.extension-app .pod-avatar:hover,
+.pod-window .pod-avatar:hover {
+  transform: scale(1.22) translateY(-2px);
+  z-index: 5;
+}
+.extension-app .pod-avatar:nth-child(2) {
+  animation-delay: 0.4s;
+}
+.extension-app .pod-avatar:nth-child(3) {
+  animation-delay: 0.8s;
+}
+.extension-app .pod-avatar:nth-child(4) {
+  animation-delay: 1.2s;
+}
+.extension-app .pod-avatar:nth-child(5) {
+  animation-delay: 1.6s;
+}
+.extension-app .domain-picker {
+  border: 1.5px solid rgba(120,160,220,0.45);
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.82);
+  overflow: hidden;
+  padding: 0;
+  box-shadow: inset 0 1px 3px rgba(0,40,120,0.08);
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.extension-app .domain-picker:focus-within {
+  border-color: rgba(56,152,255,0.70);
+  box-shadow: inset 0 1px 3px rgba(0,40,120,0.08), 0 0 0 3px rgba(56,152,255,0.14);
+}
+.extension-app .domain-picker input {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding-left: 12px !important;
+  border-radius: 0 !important;
+  outline: none !important;
+}
+.extension-app .domain-picker input:focus {
+  animation: none !important;
+}
+.extension-app .domain-picker button {
+  border-radius: 0 !important;
+  border: none !important;
+  border-left: 1px solid rgba(56,152,255,0.24) !important;
+}
+.extension-app .profile-avatar {
+  animation: ext-pop-in 0.36s 0.08s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) both,
+             ext-aqua-pulse 2.8s 0.5s ease-in-out infinite;
+}
+.extension-app .profile-save-button[disabled] {
+  position: relative;
+  color: transparent !important;
+}
+.extension-app .profile-save-button[disabled]::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: ext-arrow-spin 0.7s linear infinite;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.extension-app .pod-user-tile,
+.pod-window .pod-user-tile {
+  animation: ext-slide-up 0.28s 0.06s both;
+  transition: box-shadow 0.20s, transform 0.20s;
+}
+.extension-app .activity-panel,
+.pod-window .activity-panel {
+  animation: ext-slide-up 0.28s both;
+}
+.extension-app .activity-panel:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.extension-app .activity-panel:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.extension-app .activity-panel:nth-child(4) {
+  animation-delay: 0.18s;
+}
+.extension-app .chat-topic,
+.extension-app .chat-info-card {
+  animation: ext-fade-in 0.30s 0.1s both;
+}
+.extension-app .post-card footer a,
+.extension-app .post-card footer button {
+  transition: color 0.15s, filter 0.15s, transform 0.12s;
+}
+.extension-app .post-card footer a:hover,
+.extension-app .post-card footer button:hover {
+  color: var(--accent-blue);
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+.extension-app .pod-window {
+  animation-delay: 0s;
+}
+.extension-app .chat-window {
+  animation-delay: 0.04s;
+}
+.extension-app .post-window {
+  animation-delay: 0.04s;
+}
+.extension-app .profile-window {
+  animation-delay: 0.04s;
+}
+.extension-app .post-compose-strip:focus-within,
+.extension-app .post-mobile-composer:focus-within {
+  background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(226,238,255,0.96)) !important;
+  box-shadow: 0 0 0 2px rgba(56,152,255,0.18) inset;
+}
+.extension-app .pod-card__meta .live-dot {
+  animation: ext-live-dot-glow 1.2s ease-in-out infinite;
+}
+.extension-app .brand,
+.app-window--popup .brand {
+  animation: ext-slide-up 0.32s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .character-preview,
+  .character-preview__antenna,
+  .character-preview__ring,
+  .character-preview__head i {
+    animation: none !important;
+  }
+}
 @property --tw-rotate-x {
   syntax: "*";
   inherits: false;
