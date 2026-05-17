@@ -277,29 +277,38 @@ export type Database = {
       }
       users: {
         Row: {
+          avatar_url: string | null
           auth_user_id: string | null
           configurations: Json
           created_at: string
+          display_name: string | null
           email: string | null
           id: string
+          updated_at: string
           url: string | null
           username: string | null
         }
         Insert: {
+          avatar_url?: string | null
           auth_user_id?: string | null
           configurations?: Json
           created_at?: string
+          display_name?: string | null
           email?: string | null
           id?: string
+          updated_at?: string
           url?: string | null
           username?: string | null
         }
         Update: {
+          avatar_url?: string | null
           auth_user_id?: string | null
           configurations?: Json
           created_at?: string
+          display_name?: string | null
           email?: string | null
           id?: string
+          updated_at?: string
           url?: string | null
           username?: string | null
         }
