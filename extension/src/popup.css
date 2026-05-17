@@ -154,6 +154,21 @@ body {
   font-size: var(--fs-xs);
 }
 
+.extension-app .domain-picker {
+  grid-template-columns: minmax(0, 1fr) 58px;
+  max-width: none;
+}
+
+.extension-app .domain-picker input,
+.extension-app .domain-picker button {
+  min-height: 26px;
+  font-size: var(--fs-xs);
+}
+
+.extension-app .domain-picker button {
+  padding: 0 var(--space-sm);
+}
+
 .extension-app .pod-list {
   gap: var(--space-sm);
 }
@@ -402,6 +417,7 @@ body {
 .extension-app .post-card footer {
   justify-content: center;
   gap: var(--space-sm);
+  flex-wrap: wrap;
 }
 
 .extension-app .post-detail-main,
@@ -480,6 +496,18 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 28px;
+  padding: 0 var(--space-sm);
+  white-space: nowrap;
+}
+
+.extension-app .post-card footer .post-reply-btn {
+  border: 1.5px solid rgba(24,104,208,0.48);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(206,226,255,0.92));
+  color: var(--accent-blue);
+  font-weight: var(--fw-extrabold);
+  text-decoration: none;
 }
 
 .extension-app .post-reply-form,

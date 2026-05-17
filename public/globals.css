@@ -1375,6 +1375,53 @@ body {
   text-shadow: 0 1px 1px rgba(0,0,80,0.20);
 }
 
+.domain-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-xs);
+  max-width: 360px;
+  padding-top: var(--space-xs);
+}
+
+.domain-picker input {
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 var(--space-sm);
+  border: 1.5px solid var(--cube-border);
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.74);
+  box-shadow: var(--shadow-inset);
+  color: var(--text-dark);
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  outline: none;
+}
+
+.domain-picker input:focus {
+  border-color: var(--accent-blue-light);
+  box-shadow: var(--shadow-input-focus);
+}
+
+.domain-picker button {
+  min-height: 30px;
+  padding: 0 var(--space-md);
+  border: 1.5px solid #0042c8;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, var(--accent-blue-light), var(--accent-blue));
+  color: white;
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-extrabold);
+  cursor: pointer;
+  box-shadow: var(--shadow-cube);
+}
+
+.domain-picker button:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+
 .pod-list {
   display: grid;
   gap: var(--space-lg);

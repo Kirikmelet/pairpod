@@ -28,6 +28,7 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
   const {
     bundle,
     commentsByPost,
+    currentPostVotesById,
     usersById,
     loading,
     error,
@@ -79,30 +80,6 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
       return;
     }
 
-  const formData = new FormData(event.target);
-  const postType = event.target.querySelector('select').value;
-  const title = event.target.querySelector('input[type="text"]').value;
-  const content = event.target.querySelector('textarea').value;
-
-  const { data, error } = await supabase
-    .from('posts')
-    .insert([
-      { 
-        type: postType, 
-        header: title, 
-        content: content,
-        // user_id: currentUserId // Usually required for RLS
-      }
-    ])
-    .select();
-
-  if (error) {
-    console.error('Error posting:', error.message);
-  } else {
-    console.log('Post created successfully:', data);
-    // Optional: Reset form or refresh list
-  }
-
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -117,7 +94,7 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
 
       setHeader("");
       setContent("");
-      await refresh();
+      await refresh({ silent: true });
     } catch (createError) {
       setSubmitError(
         createError instanceof Error
@@ -131,9 +108,18 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
 
   const handlePostVote = async (post: PostRecord, delta: 1 | -1) => {
     setVoteError(null);
+    if (currentPostVotesById[post.id] === delta) {
+      setVoteError(
+        delta === 1
+          ? "You already upvoted this post."
+          : "You already downvoted this post.",
+      );
+      return;
+    }
+
     try {
       await updatePostLikes(post, delta);
-      await refresh();
+      await refresh({ silent: true });
     } catch (voteFailure) {
       setVoteError(
         voteFailure instanceof Error ? voteFailure.message : "Failed to update vote",
@@ -231,52 +217,17 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
           <div className="post-list">
             {posts.length > 0 ? (
               posts.map((post, index) => (
-                <article
-                  className={`post-card post-card--${pickTone(index)}`}
+                <PostCard
                   key={post.id}
-                >
-                  <div className="post-votes">
-                    <button
-                      type="button"
-                      onClick={() => void handlePostVote(post, 1)}
-                    >
-                      +
-                    </button>
-                    <strong>{post.likes}</strong>
-                    <button
-                      type="button"
-                      onClick={() => void handlePostVote(post, -1)}
-                    >
-                      -
-                    </button>
-                  </div>
-                  <div className="post-card__body">
-                    <header>
-                      <span className="post-tag">{post.type}</span>
-                      <h2>
-                        <a href={buildScopedHref(`/posts/${post.id}`)}>
-                          {post.header || truncate(post.content)}
-                        </a>
-                      </h2>
-                      <p>
-                        posted by{" "}
-                        <strong>
-                          {getDisplayName(post.user_id, usersById)}
-                        </strong>{" "}
-                        -{" "}
-                        {formatTimestamp(post.created_at)}
-                      </p>
-                    </header>
-                    <p>{post.content}</p>
-                    <footer>
-                      <a href={buildScopedHref("/chat")}>Continue in #chat</a>
-                      <a href={buildScopedHref(`/posts/${post.id}`)}>
-                        {getCommentCount(commentsByPost, post.id)} replies
-                      </a>
-                      <button type="button">Save</button>
-                    </footer>
-                  </div>
-                </article>
+                  post={post}
+                  tone={pickTone(index)}
+                  voteValue={currentPostVotesById[post.id] ?? null}
+                  commentCount={getCommentCount(commentsByPost, post.id)}
+                  usersById={usersById}
+                  chatHref={buildScopedHref("/chat")}
+                  postHref={buildScopedHref(`/posts/${post.id}`)}
+                  onVote={handlePostVote}
+                />
               ))
             ) : !loading ? (
               <article className="post-card post-card--blue">
@@ -305,10 +256,75 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
   );
 }
 
+function PostCard({
+  post,
+  tone,
+  voteValue,
+  commentCount,
+  usersById,
+  chatHref,
+  postHref,
+  onVote,
+}: {
+  post: PostRecord;
+  tone: string;
+  voteValue: 1 | -1 | null;
+  commentCount: number;
+  usersById: Record<string, UserProfileRecord>;
+  chatHref: string;
+  postHref: string;
+  onVote: (post: PostRecord, delta: 1 | -1) => void;
+}) {
+  return (
+    <article className={`post-card post-card--${tone}`}>
+      <div className="post-votes">
+        <button
+          type="button"
+          aria-pressed={voteValue === 1}
+          disabled={voteValue === 1}
+          onClick={() => onVote(post, 1)}
+        >
+          +
+        </button>
+        <strong>{post.likes}</strong>
+        <button
+          type="button"
+          aria-pressed={voteValue === -1}
+          disabled={voteValue === -1}
+          onClick={() => onVote(post, -1)}
+        >
+          -
+        </button>
+      </div>
+      <div className="post-card__body">
+        <header>
+          <span className="post-tag">{post.type}</span>
+          <h2>
+            <a href={postHref}>{post.header || truncate(post.content)}</a>
+          </h2>
+          <p>
+            posted by <strong>{getDisplayName(post.user_id, usersById)}</strong>{" "}
+            - {formatTimestamp(post.created_at)}
+          </p>
+        </header>
+        <p>{post.content}</p>
+        <footer>
+          <a href={chatHref}>Continue in #chat</a>
+          <a href={postHref}>{commentCount} replies</a>
+          <a className="post-reply-btn" href={postHref}>Reply</a>
+          <button type="button">Save</button>
+        </footer>
+      </div>
+    </article>
+  );
+}
+
 export function PostDetailPage({ postId }: { postId: string }) {
   const {
     bundle,
     commentsByPost,
+    currentPostVotesById,
+    currentCommentVotesById,
     usersById,
     loading,
     error,
@@ -362,7 +378,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
         content: content.trim(),
       });
       setContent("");
-      await refresh();
+      await refresh({ silent: true });
     } catch (createError) {
       setSubmitError(
         createError instanceof Error
@@ -376,9 +392,18 @@ export function PostDetailPage({ postId }: { postId: string }) {
 
   const handlePostVote = async (postToUpdate: PostRecord, delta: 1 | -1) => {
     setVoteError(null);
+    if (currentPostVotesById[postToUpdate.id] === delta) {
+      setVoteError(
+        delta === 1
+          ? "You already upvoted this post."
+          : "You already downvoted this post.",
+      );
+      return;
+    }
+
     try {
       await updatePostLikes(postToUpdate, delta);
-      await refresh();
+      await refresh({ silent: true });
     } catch (voteFailure) {
       setVoteError(
         voteFailure instanceof Error ? voteFailure.message : "Failed to update vote",
@@ -442,6 +467,17 @@ export function PostDetailPage({ postId }: { postId: string }) {
     );
   }
 
+  const scrollToReplyForm = () => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    document.getElementById("post-reply-form")?.scrollIntoView({
+      block: "start",
+      behavior: "smooth",
+    });
+  };
+
   return (
     <PostShell
       title={`PairPod - ${post.header || "Thread"}`}
@@ -461,11 +497,21 @@ export function PostDetailPage({ postId }: { postId: string }) {
             className={`post-card post-card--full post-card--${pickTone(0)}`}
           >
             <div className="post-votes">
-              <button type="button" onClick={() => void handlePostVote(post, 1)}>
+              <button
+                type="button"
+                aria-pressed={currentPostVotesById[post.id] === 1}
+                disabled={currentPostVotesById[post.id] === 1}
+                onClick={() => void handlePostVote(post, 1)}
+              >
                 +
               </button>
               <strong>{post.likes}</strong>
-              <button type="button" onClick={() => void handlePostVote(post, -1)}>
+              <button
+                type="button"
+                aria-pressed={currentPostVotesById[post.id] === -1}
+                disabled={currentPostVotesById[post.id] === -1}
+                onClick={() => void handlePostVote(post, -1)}
+              >
                 -
               </button>
             </div>
@@ -488,6 +534,13 @@ export function PostDetailPage({ postId }: { postId: string }) {
               <footer>
                 <a href={buildScopedHref("/posts")}>Back to post list</a>
                 <a href={buildScopedHref("/chat")}>Continue in #chat</a>
+                <button
+                  className="post-reply-btn"
+                  type="button"
+                  onClick={scrollToReplyForm}
+                >
+                  Reply
+                </button>
               </footer>
             </div>
           </article>
@@ -503,10 +556,11 @@ export function PostDetailPage({ postId }: { postId: string }) {
                     tone={pickTone(index)}
                     postId={postId}
                     replies={repliesByParent[comment.id] ?? []}
-                    refresh={refresh}
-                    parentUser={null}
-                    usersById={usersById}
-                  />
+	                    refresh={refresh}
+	                    parentUser={null}
+	                    usersById={usersById}
+	                    currentCommentVotesById={currentCommentVotesById}
+	                  />
                 ))
               ) : (
                 <article className="post-comment post-comment--blue">
@@ -522,6 +576,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
             </div>
 
             <form
+              id="post-reply-form"
               className="post-compose"
               onSubmit={(event) => void handleSubmit(event)}
             >
@@ -543,7 +598,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
               <button
                 type="submit"
                 className="post-compose-submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !content.trim()}
               >
                 {isSubmitting ? "Posting..." : "Post Reply"}
               </button>
@@ -835,14 +890,16 @@ function CommentCard({
   refresh,
   parentUser,
   usersById,
+  currentCommentVotesById,
 }: {
   comment: CommentRecord;
   tone: string;
   postId: string;
   replies: CommentRecord[];
-  refresh: () => Promise<unknown>;
+  refresh: (options?: { silent?: boolean }) => Promise<unknown>;
   parentUser: string | null;
   usersById: Record<string, UserProfileRecord>;
+  currentCommentVotesById: Record<string, 1 | -1>;
 }) {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyContent, setReplyContent] = useState("");
@@ -864,7 +921,7 @@ function CommentCard({
       });
       setReplyContent("");
       setShowReplyForm(false);
-      await refresh();
+      await refresh({ silent: true });
     } catch (err) {
       setReplyError(err instanceof Error ? err.message : "Failed to post reply");
     } finally {
@@ -874,9 +931,18 @@ function CommentCard({
 
   const handleCommentVote = async (commentToUpdate: CommentRecord, delta: 1 | -1) => {
     setVoteError(null);
+    if (currentCommentVotesById[commentToUpdate.id] === delta) {
+      setVoteError(
+        delta === 1
+          ? "You already liked this reply."
+          : "You already disliked this reply.",
+      );
+      return;
+    }
+
     try {
       await updateCommentLikes(commentToUpdate, delta);
-      await refresh();
+      await refresh({ silent: true });
     } catch (voteFailure) {
       setVoteError(
         voteFailure instanceof Error ? voteFailure.message : "Failed to update vote",
@@ -902,11 +968,21 @@ function CommentCard({
           </header>
           <p>{comment.content}</p>
           <div className="post-comment__votes" aria-label="Comment votes">
-            <button type="button" onClick={() => void handleCommentVote(comment, 1)}>
+            <button
+              type="button"
+              aria-pressed={currentCommentVotesById[comment.id] === 1}
+              disabled={currentCommentVotesById[comment.id] === 1}
+              onClick={() => void handleCommentVote(comment, 1)}
+            >
               Like
             </button>
             <strong>{comment.likes}</strong>
-            <button type="button" onClick={() => void handleCommentVote(comment, -1)}>
+            <button
+              type="button"
+              aria-pressed={currentCommentVotesById[comment.id] === -1}
+              disabled={currentCommentVotesById[comment.id] === -1}
+              onClick={() => void handleCommentVote(comment, -1)}
+            >
               Dislike
             </button>
             <button
@@ -979,6 +1055,8 @@ function CommentCard({
                 <div className="post-comment__votes" aria-label="Reply votes">
                   <button
                     type="button"
+                    aria-pressed={currentCommentVotesById[reply.id] === 1}
+                    disabled={currentCommentVotesById[reply.id] === 1}
                     onClick={() => void handleCommentVote(reply, 1)}
                   >
                     Like
@@ -986,6 +1064,8 @@ function CommentCard({
                   <strong>{reply.likes}</strong>
                   <button
                     type="button"
+                    aria-pressed={currentCommentVotesById[reply.id] === -1}
+                    disabled={currentCommentVotesById[reply.id] === -1}
                     onClick={() => void handleCommentVote(reply, -1)}
                   >
                     Dislike

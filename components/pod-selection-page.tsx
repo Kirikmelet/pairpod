@@ -1,5 +1,6 @@
 "use client";
 
+import { FormEvent, useState } from "react";
 import {
   DEFAULT_AVATAR_URL,
   formatTimestamp,
@@ -31,6 +32,7 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
     loading,
     error,
     buildRoomHref,
+    buildDomainHref,
     buildScopedHref,
     currentUrl,
     domainUrl,
@@ -38,6 +40,7 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
   } =
     usePageBundle();
   const { profile } = useCurrentUserProfile();
+  const [customDomain, setCustomDomain] = useState("");
 
   const posts = bundle?.posts ?? [];
   const comments = bundle?.comments ?? [];
@@ -46,6 +49,16 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
   const currentUserName = profile
     ? getDisplayName(profile.id, { [profile.id]: profile })
     : (userEmail ?? "Signed in user");
+
+  const handleCustomDomainSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextDomain = customDomain.trim();
+    if (!nextDomain || typeof window === "undefined") {
+      return;
+    }
+
+    window.location.href = buildDomainHref("/", nextDomain);
+  };
 
   const recentPosts: Activity[] = posts.slice(-3).reverse().map((post) => ({
     domain: pageDomain,
@@ -119,6 +132,23 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
                     {domainName}
                   </a>
                 </div>
+                <form
+                  className="domain-picker"
+                  onSubmit={(event) => handleCustomDomainSubmit(event)}
+                >
+                  <label className="sr-only" htmlFor="domain-picker-input">
+                    Set domain
+                  </label>
+                  <input
+                    id="domain-picker-input"
+                    value={customDomain}
+                    onChange={(event) => setCustomDomain(event.target.value)}
+                    placeholder="example.com"
+                  />
+                  <button type="submit" disabled={!customDomain.trim()}>
+                    Open
+                  </button>
+                </form>
               </header>
 
               {error ? (
