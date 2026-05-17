@@ -42,6 +42,8 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
     usePageBundle();
   const { profile } = useCurrentUserProfile();
   const [customDomain, setCustomDomain] = useState("");
+  const [podName, setPodName] = useState("");
+  const [podSlug, setPodSlug] = useState("");
   useErrorSfx(error);
 
   const posts = bundle?.posts ?? [];
@@ -60,6 +62,18 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
     }
 
     window.location.href = buildDomainHref("/", nextDomain);
+  };
+
+  const handleCreatePodSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const name = podName.trim();
+    const slug = normalizePodSlug(podSlug || name);
+    if (!slug || typeof window === "undefined") {
+      return;
+    }
+
+    const podUrl = `https://${slug}.pairpod.local/`;
+    window.location.href = buildDomainHref("/", podUrl);
   };
 
   const recentPosts: Activity[] = posts.slice(-3).reverse().map((post) => ({
@@ -155,6 +169,39 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
                     Open
                   </button>
                 </form>
+                <form
+                  className="pod-create-form"
+                  onSubmit={(event) => handleCreatePodSubmit(event)}
+                >
+                  <div>
+                    <label htmlFor="pod-name-input">Create pod or map</label>
+                    <input
+                      id="pod-name-input"
+                      value={podName}
+                      onChange={(event) => {
+                        setPodName(event.target.value);
+                        if (!podSlug.trim()) {
+                          setPodSlug(normalizePodSlug(event.target.value));
+                        }
+                      }}
+                      placeholder="Late night build room"
+                      maxLength={48}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="pod-slug-input">Pod slug</label>
+                    <input
+                      id="pod-slug-input"
+                      value={podSlug}
+                      onChange={(event) => setPodSlug(normalizePodSlug(event.target.value))}
+                      placeholder="late-night-build"
+                      maxLength={36}
+                    />
+                  </div>
+                  <button type="submit" disabled={!normalizePodSlug(podSlug || podName)}>
+                    Create
+                  </button>
+                </form>
               </header>
 
               {error ? (
@@ -212,6 +259,33 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
                     <span aria-hidden="true">&gt;</span>
                   </a>
                 </article>
+                <article className="pod-card pod-card--green">
+                  <PodIcon icon="plus" />
+                  <div className="pod-card__content">
+                    <h2 className="pod-card__title">Your Own Map</h2>
+                    <p className="pod-card__copy">
+                      Make a named room that behaves like its own tiny world for chat, posts, and peers.
+                    </p>
+                    <p className="pod-card__meta">
+                      {normalizePodSlug(podSlug || podName) || "custom"} · pairpod.local
+                    </p>
+                  </div>
+                  <div className="pod-avatars" aria-hidden="true" />
+                  <button
+                    className="pod-card__button"
+                    type="button"
+                    aria-label="Create pod"
+                    onClick={() => {
+                      const slug = normalizePodSlug(podSlug || podName);
+                      if (slug && typeof window !== "undefined") {
+                        window.location.href = buildDomainHref("/", `https://${slug}.pairpod.local/`);
+                      }
+                    }}
+                    disabled={!normalizePodSlug(podSlug || podName)}
+                  >
+                    <span aria-hidden="true">+</span>
+                  </button>
+                </article>
               </div>
             </section>
 
@@ -231,6 +305,15 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
       </section>
     </main>
   );
+}
+
+function normalizePodSlug(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 36);
 }
 
 function getPageDomain(bundle: PageBundle | null) {

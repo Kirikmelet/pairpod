@@ -136,14 +136,14 @@ async function startDirectMessageDirect(recipientUserId: string) {
   }
 
   const now = new Date().toISOString();
-  const { data: thread, error: threadError } = await supabase
+  const threadId = crypto.randomUUID();
+  const { error: threadError } = await supabase
     .from("dm_threads")
     .insert({
+      id: threadId,
       created_by: profile.id,
       updated_at: now,
-    } satisfies TablesInsert<"dm_threads">)
-    .select("*")
-    .single<DmThreadRow>();
+    } satisfies TablesInsert<"dm_threads">);
 
   if (threadError) {
     throw new Error(`Could not create DM thread: ${threadError.message}`);
@@ -152,15 +152,15 @@ async function startDirectMessageDirect(recipientUserId: string) {
   const { error: membersError } = await supabase
     .from("dm_thread_members")
     .insert([
-      { thread_id: thread.id, user_id: profile.id },
-      { thread_id: thread.id, user_id: normalizedRecipientUserId },
+      { thread_id: threadId, user_id: profile.id },
+      { thread_id: threadId, user_id: normalizedRecipientUserId },
     ] satisfies TablesInsert<"dm_thread_members">[]);
 
   if (membersError) {
     throw new Error(`Could not create DM members: ${membersError.message}`);
   }
 
-  return await loadThreadSummaryDirect(thread.id);
+  return await loadThreadSummaryDirect(threadId);
 }
 
 async function listDmMessagesDirect(threadId: string) {

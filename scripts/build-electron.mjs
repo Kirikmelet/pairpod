@@ -15,7 +15,10 @@ const staticExportExcludedRoutes = [
 
 function run(command, args, env) {
   return new Promise((resolve, reject) => {
-    const executable = process.platform === "win32" && command === "npm" ? "npm.cmd" : command;
+    const executable =
+      process.platform === "win32" && (command === "npm" || command === "npx")
+        ? `${command}.cmd`
+        : command;
     const child = spawn(executable, args, {
       cwd: root,
       env: { ...process.env, ...env },
@@ -47,7 +50,7 @@ try {
 
   await rm(path.join(root, ".next", "dev", "types"), { recursive: true, force: true });
   await rm(path.join(root, ".next", "types"), { recursive: true, force: true });
-  await run("npm", ["run", "build"], { BUILD_ELECTRON: "1" });
+  await run("npx", ["next", "build", "--webpack"], { BUILD_ELECTRON: "1" });
 } finally {
   while (stashedRoutes.length > 0) {
     await restoreRoute(stashedRoutes.pop());

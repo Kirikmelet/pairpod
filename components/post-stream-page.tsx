@@ -18,108 +18,6 @@ import { useErrorSfx } from "@/lib/client/sfx";
 import { getUserProfilePath } from "@/lib/client/users";
 
 /* ------------------------------------------------------------------ */
-/*  Supabase config (matches login page)                               */
-/* ------------------------------------------------------------------ */
-
-const SUPABASE_URL = "https://xgfgqzveuyeceupfaebh.supabase.co";
-const SUPABASE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnZmdxenZldXllY2V1cGZhZWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NDQ1OTAsImV4cCI6MjA5NDUyMDU5MH0.FLAZt7GXlRorlOBt-n0uYVAP4Ls_bTWQ8aD4w_hDzYE";
-
-function supabaseHeaders(accessToken?: string) {
-  const h: Record<string, string> = {
-    "Content-Type": "application/json",
-    apikey: SUPABASE_KEY,
-  };
-  if (accessToken) h["Authorization"] = `Bearer ${accessToken}`;
-  return h;
-}
-
-function getSessionToken(): string | null {
-  try {
-    const session = JSON.parse(localStorage.getItem("uh_session") ?? "null");
-    return session?.access_token ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function getSessionUserId(): string | null {
-  try {
-    const session = JSON.parse(localStorage.getItem("uh_session") ?? "null");
-    return session?.user?.id ?? session?.id ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function generateUUID(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-  });
-}
-
-/* ------------------------------------------------------------------ */
-/*  Direct Supabase insert helpers                                     */
-/* ------------------------------------------------------------------ */
-
-async function insertPost(payload: {
-  id: string;
-  room_id: string;
-  type: string;
-  section_id: string;
-  header: string | null;
-  content: string;
-  likes: number;
-  user_id: string;
-  created_at: string;
-}) {
-  const token = getSessionToken();
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/posts`, {
-    method: "POST",
-    headers: {
-      ...supabaseHeaders(token ?? undefined),
-      Prefer: "return=representation",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.message || "Failed to create post");
-  }
-
-  return res.json();
-}
-
-async function insertComment(payload: {
-  id: string;
-  post_id: string;
-  content: string;
-  likes: number;
-  user_id: string;
-  reply_id: string | null;
-  created_at: string;
-}) {
-  const token = getSessionToken();
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/comments`, {
-    method: "POST",
-    headers: {
-      ...supabaseHeaders(token ?? undefined),
-      Prefer: "return=representation",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.message || "Failed to create comment");
-  }
-
-  return res.json();
-}
-
-/* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -130,6 +28,11 @@ type SidebarItem = {
 
 type PostStreamPageProps = {
   variant?: "page" | "popup";
+};
+
+type ReplyTarget = {
+  commentId: string | null;
+  label: string;
 };
 
 /* ------------------------------------------------------------------ */
@@ -201,28 +104,16 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
       return;
     }
 
-    const userId = getSessionUserId();
-    if (!userId) {
-      setSubmitError("You must be signed in to post.");
-      return;
-    }
-
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
-      const now = new Date().toISOString();
-
-      await insertPost({
-        id: generateUUID(),
-        room_id: bundle.room.id,
-        type: mode,
-        section_id: sectionId,
-        header: header.trim() || null,
-        content: content.trim(),
-        likes: 0,
-        user_id: userId,
-        created_at: now,
+      await postJson<PostRecord>(mode === "question" ? "/api/questions" : "/api/guides", {
+        roomId: bundle.room.id,
+        pageId: bundle.page.id,
+        sectionId,
+        header,
+        content,
       });
 
       setHeader("");
@@ -506,6 +397,10 @@ export function PostDetailPage({ postId }: { postId: string }) {
   const domainName = getRoomDisplayName(domainUrl);
 
   const [content, setContent] = useState("");
+  const [replyTarget, setReplyTarget] = useState<ReplyTarget>({
+    commentId: null,
+    label: "the thread",
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
@@ -544,29 +439,18 @@ export function PostDetailPage({ postId }: { postId: string }) {
       return;
     }
 
-    const userId = getSessionUserId();
-    if (!userId) {
-      setSubmitError("You must be signed in to post.");
-      return;
-    }
-
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
-      const now = new Date().toISOString();
-
-      await insertComment({
-        id: generateUUID(),
-        post_id: post.id,
-        content: content.trim(),
-        likes: 0,
-        user_id: userId,
-        reply_id: null,
-        created_at: now,
+      await postJson<CommentRecord>("/api/answers", {
+        postId: post.id,
+        content,
+        replyId: replyTarget.commentId,
       });
 
       setContent("");
+      setReplyTarget({ commentId: null, label: "the thread" });
       await refresh({ silent: true });
     } catch (createError) {
       setSubmitError(
@@ -640,22 +524,29 @@ export function PostDetailPage({ postId }: { postId: string }) {
     );
   }
 
-  const scrollToReplyForm = () => {
+  const focusReplyComposer = (target?: ReplyTarget) => {
+    if (target) {
+      setReplyTarget(target);
+    }
+
     if (typeof document === "undefined") {
       return;
     }
 
-    document.getElementById("post-reply-form")?.scrollIntoView({
-      block: "start",
+    document.getElementById("post-mobile-composer")?.scrollIntoView({
+      block: "end",
       behavior: "smooth",
     });
+    window.setTimeout(() => {
+      document.getElementById("post-reply-input")?.focus();
+    }, 160);
   };
 
   /* -- success render ---------------------------------------------- */
   return (
     <PostShell title={`PairPod - ${post.header || "Thread"}`} {...shellProps}>
-      <div className="post-layout">
-        <section className="post-stream" aria-label="Thread detail">
+      <div className="post-detail-layout">
+        <section className="post-detail-main" aria-label="Thread detail">
           {/* ---------- main post ---------- */}
           <article
             className={`post-card post-card--full post-card--${pickTone(0)}`}
@@ -700,7 +591,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
                 <button
                   className="post-reply-btn"
                   type="button"
-                  onClick={scrollToReplyForm}
+                  onClick={() => focusReplyComposer({ commentId: null, label: "the thread" })}
                 >
                   Reply
                 </button>
@@ -719,12 +610,12 @@ export function PostDetailPage({ postId }: { postId: string }) {
                     key={comment.id}
                     comment={comment}
                     tone={pickTone(index)}
-                    postId={postId}
                     replies={repliesByParent[comment.id] ?? []}
                     refresh={refresh}
                     parentUser={null}
                     usersById={usersById}
                     currentCommentVotesById={currentCommentVotesById}
+                    onReply={(target) => focusReplyComposer(target)}
                   />
                 ))
               ) : (
@@ -734,26 +625,42 @@ export function PostDetailPage({ postId }: { postId: string }) {
                     <header>
                       <h2>No answers yet</h2>
                     </header>
-                    <p>Reply to this thread using the form below.</p>
+                    <p>Start the conversation from the composer below.</p>
                   </div>
                 </article>
               )}
             </div>
 
-            {/* ---------- reply form ---------- */}
             <form
-              id="post-reply-form"
-              className="post-compose"
+              id="post-mobile-composer"
+              className="post-mobile-composer"
               onSubmit={(event) => void handleSubmit(event)}
             >
-              <div className="post-compose-field">
-                <span className="post-compose-label">Reply</span>
+              <div className="post-mobile-composer__context">
+                <span>Replying to <strong>{replyTarget.label}</strong></span>
+                {replyTarget.commentId ? (
+                  <button
+                    type="button"
+                    onClick={() => setReplyTarget({ commentId: null, label: "the thread" })}
+                  >
+                    Thread
+                  </button>
+                ) : null}
+              </div>
+              <div className="post-mobile-composer__input">
                 <textarea
-                  className="post-compose-input"
+                  id="post-reply-input"
                   value={content}
                   onChange={(event) => setContent(event.target.value)}
-                  placeholder="Write an answer or comment..."
+                  placeholder={`Reply to ${replyTarget.label}...`}
+                  rows={2}
                 />
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !content.trim()}
+                >
+                  {isSubmitting ? "..." : "Send"}
+                </button>
               </div>
 
               {submitError ? (
@@ -762,14 +669,6 @@ export function PostDetailPage({ postId }: { postId: string }) {
               {voteError ? (
                 <p className="status-note status-note--error">{voteError}</p>
               ) : null}
-
-              <button
-                type="submit"
-                className="post-compose-submit"
-                disabled={isSubmitting || !content.trim()}
-              >
-                {isSubmitting ? "Posting..." : "Post Reply"}
-              </button>
             </form>
           </section>
         </section>
@@ -1065,69 +964,26 @@ function PostSidebar({
 function CommentCard({
   comment,
   tone,
-  postId,
   replies,
   refresh,
   parentUser,
   usersById,
   currentCommentVotesById,
+  onReply,
 }: {
   comment: CommentRecord;
   tone: string;
-  postId: string;
   replies: CommentRecord[];
   refresh: (options?: { silent?: boolean }) => Promise<unknown>;
   parentUser: string | null;
   usersById: Record<string, UserProfileRecord>;
   currentCommentVotesById: Record<string, 1 | -1>;
+  onReply: (target: ReplyTarget) => void;
 }) {
-  const [showReplyForm, setShowReplyForm] = useState(false);
-  const [replyContent, setReplyContent] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [replyError, setReplyError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
-  useErrorSfx(replyError);
   useErrorSfx(voteError);
 
   const displayName = getDisplayName(comment.user_id, usersById);
-
-  const handleReply = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!replyContent.trim()) return;
-
-    const userId = getSessionUserId();
-    if (!userId) {
-      setReplyError("You must be signed in to reply.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setReplyError(null);
-
-    try {
-      const now = new Date().toISOString();
-
-      await insertComment({
-        id: generateUUID(),
-        post_id: postId,
-        content: replyContent.trim(),
-        likes: 0,
-        user_id: userId,
-        reply_id: comment.id,
-        created_at: now,
-      });
-
-      setReplyContent("");
-      setShowReplyForm(false);
-      await refresh({ silent: true });
-    } catch (err) {
-      setReplyError(
-        err instanceof Error ? err.message : "Failed to post reply",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleCommentVote = async (
     commentToUpdate: CommentRecord,
@@ -1197,46 +1053,14 @@ function CommentCard({
           <button
             type="button"
             className="post-reply-btn"
-            onClick={() => {
-              setShowReplyForm((prev) => !prev);
-              setReplyError(null);
-            }}
+            onClick={() => onReply({ commentId: comment.id, label: `@${displayName}` })}
           >
-            {showReplyForm ? "Cancel" : "Reply"}
+            Reply
           </button>
         </div>
 
         {voteError ? (
           <p className="status-note status-note--error">{voteError}</p>
-        ) : null}
-
-        {/* ---------- inline reply form ---------- */}
-        {showReplyForm ? (
-          <form
-            className="post-reply-form"
-            onSubmit={(event) => void handleReply(event)}
-          >
-            <div className="post-reply-form__label">
-              Replying to <strong>@{displayName}</strong>
-            </div>
-            <textarea
-              className="post-compose-input"
-              value={replyContent}
-              onChange={(event) => setReplyContent(event.target.value)}
-              placeholder={`Reply to @${displayName}...`}
-              rows={3}
-            />
-            {replyError ? (
-              <p className="status-note status-note--error">{replyError}</p>
-            ) : null}
-            <button
-              type="submit"
-              className="post-compose-submit"
-              disabled={isSubmitting || !replyContent.trim()}
-            >
-              {isSubmitting ? "Posting..." : "Post Reply"}
-            </button>
-          </form>
         ) : null}
 
         {/* ---------- nested replies ---------- */}
@@ -1283,6 +1107,18 @@ function CommentCard({
                       onClick={() => void handleCommentVote(reply, -1)}
                     >
                       Dislike
+                    </button>
+                    <button
+                      type="button"
+                      className="post-reply-btn"
+                      onClick={() =>
+                        onReply({
+                          commentId: comment.id,
+                          label: `@${getDisplayName(reply.user_id, usersById)}`,
+                        })
+                      }
+                    >
+                      Reply
                     </button>
                   </div>
                 </div>

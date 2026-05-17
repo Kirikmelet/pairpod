@@ -44,6 +44,10 @@ export function ProfileSettingsPage({
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState(DEFAULT_AVATAR_URL);
+  const [avatarColor, setAvatarColor] = useState("#6ebe44");
+  const [avatarAccent, setAvatarAccent] = useState("#2d90ff");
+  const [avatarFace, setAvatarFace] = useState<"smile" | "focus" | "star">("smile");
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -160,6 +164,60 @@ export function ProfileSettingsPage({
     }
   };
 
+  useEffect(() => {
+    let active = true;
+
+    createGeneratedAvatarBlob({
+      body: avatarColor,
+      accent: avatarAccent,
+      face: avatarFace,
+    })
+      .then((blob) => blobToDataUrl(blob))
+      .then((dataUrl) => {
+        if (active) {
+          setAvatarPreview(dataUrl);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setAvatarPreview(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [avatarAccent, avatarColor, avatarFace]);
+
+  const handleGeneratedAvatarSave = async () => {
+    if (!profile) {
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
+    setStatus(null);
+
+    try {
+      const blob = await createGeneratedAvatarBlob({
+        body: avatarColor,
+        accent: avatarAccent,
+        face: avatarFace,
+      });
+      const nextProfile = await uploadAvatar(blob);
+      hydrateForm(nextProfile);
+      setStatus("Avatar updated.");
+    } catch (avatarError) {
+      setError(
+        avatarError instanceof Error
+          ? avatarError.message
+          : "Could not save generated avatar.",
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <main className={`app-scene profile-scene ${isPopup ? "profile-scene--popup" : ""}`}>
       <ProfileBackground />
@@ -205,62 +263,113 @@ export function ProfileSettingsPage({
             {error ? <p className="status-note status-note--error">{error}</p> : null}
             {status ? <p className="status-note status-note--success">{status}</p> : null}
 
-            <form className="profile-form" onSubmit={handleSubmit}>
-              <label className="profile-field">
-                <span>Username</span>
-                <input
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                  placeholder="coolbuilder"
-                  maxLength={40}
-                />
-              </label>
-
-              <label className="profile-field">
-                <span>Display name</span>
-                <input
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder="Cool Builder"
-                  maxLength={80}
-                />
-              </label>
-
-              {canUseFilePicker ? (
+            <div className="profile-editor-grid">
+              <form className="profile-form" onSubmit={handleSubmit}>
                 <label className="profile-field">
-                  <span>Avatar PNG</span>
+                  <span>Username</span>
                   <input
-                    type="file"
-                    accept="image/png"
-                    onChange={(event) => void handleAvatarChange(event)}
-                    disabled={!profile || uploading}
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    placeholder="coolbuilder"
+                    maxLength={40}
                   />
                 </label>
-              ) : (
-                <div className="profile-field">
-                  <span>Avatar PNG</span>
-                  <a
-                    className="profile-upload-link"
-                    href={nav.fullProfileHref}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open avatar editor
-                  </a>
-                  <p className="profile-field-note">
-                    Opens in a normal tab so the file picker can stay open.
-                  </p>
-                </div>
-              )}
 
-              <button
-                className="profile-save-button"
-                type="submit"
-                disabled={!profile || saving || uploading}
-              >
-                {saving ? "Saving..." : uploading ? "Uploading..." : "Save profile"}
-              </button>
-            </form>
+                <label className="profile-field">
+                  <span>Display name</span>
+                  <input
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                    placeholder="Cool Builder"
+                    maxLength={80}
+                  />
+                </label>
+
+                {canUseFilePicker ? (
+                  <label className="profile-field">
+                    <span>Avatar PNG</span>
+                    <input
+                      type="file"
+                      accept="image/png"
+                      onChange={(event) => void handleAvatarChange(event)}
+                      disabled={!profile || uploading}
+                    />
+                  </label>
+                ) : (
+                  <div className="profile-field">
+                    <span>Avatar PNG</span>
+                    <a
+                      className="profile-upload-link"
+                      href={nav.fullProfileHref}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open avatar editor
+                    </a>
+                    <p className="profile-field-note">
+                      Opens in a normal tab so the file picker can stay open.
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  className="profile-save-button"
+                  type="submit"
+                  disabled={!profile || saving || uploading}
+                >
+                  {saving ? "Saving..." : uploading ? "Uploading..." : "Save profile"}
+                </button>
+              </form>
+
+              <section className="avatar-creator" aria-label="Avatar creator">
+                <header>
+                  <p className="app-eyebrow">avatar creator</p>
+                  <h2>Build a pod</h2>
+                </header>
+                <div className="avatar-creator__preview">
+                  {avatarPreview ? <img src={avatarPreview} alt="" /> : null}
+                </div>
+                <div className="avatar-creator__controls">
+                  <label>
+                    <span>Body</span>
+                    <input
+                      type="color"
+                      value={avatarColor}
+                      onChange={(event) => setAvatarColor(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Accent</span>
+                    <input
+                      type="color"
+                      value={avatarAccent}
+                      onChange={(event) => setAvatarAccent(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Face</span>
+                    <select
+                      value={avatarFace}
+                      onChange={(event) =>
+                        setAvatarFace(event.target.value as "smile" | "focus" | "star")
+                      }
+                    >
+                      <option value="smile">Smile</option>
+                      <option value="focus">Focus</option>
+                      <option value="star">Star</option>
+                    </select>
+                  </label>
+                </div>
+                <button
+                  className="profile-save-button avatar-creator__save"
+                  type="button"
+                  disabled={!profile || uploading || saving}
+                  onClick={() => void handleGeneratedAvatarSave()}
+                >
+                  {uploading ? "Saving..." : "Use generated avatar"}
+                </button>
+              </section>
+            </div>
           </div>
         </section>
       </div>
@@ -669,6 +778,153 @@ function buildProfileRequestHeaders(
   return nextHeaders;
 }
 
+type GeneratedAvatarOptions = {
+  body: string;
+  accent: string;
+  face: "smile" | "focus" | "star";
+};
+
+async function createGeneratedAvatarBlob(options: GeneratedAvatarOptions) {
+  const canvas = document.createElement("canvas");
+  const size = 128;
+  canvas.width = size;
+  canvas.height = size;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Could not create avatar.");
+  }
+
+  context.clearRect(0, 0, size, size);
+  const background = context.createLinearGradient(0, 0, size, size);
+  background.addColorStop(0, "#eff8ff");
+  background.addColorStop(1, "#b9dcff");
+  context.fillStyle = background;
+  roundedRect(context, 0, 0, size, size, 26);
+  context.fill();
+
+  context.save();
+  context.translate(64, 68);
+  context.fillStyle = options.body;
+  context.shadowColor = "rgba(0, 60, 140, 0.28)";
+  context.shadowBlur = 10;
+  context.beginPath();
+  context.ellipse(0, 8, 39, 43, 0, 0, Math.PI * 2);
+  context.fill();
+  context.shadowBlur = 0;
+
+  context.fillStyle = "rgba(255,255,255,0.48)";
+  context.beginPath();
+  context.ellipse(-15, -9, 12, 17, -0.7, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = options.accent;
+  context.beginPath();
+  context.ellipse(17, -47, 10, 20, 0.65, 0, Math.PI * 2);
+  context.fill();
+  context.strokeStyle = "#2d5018";
+  context.lineWidth = 4;
+  context.beginPath();
+  context.moveTo(0, -36);
+  context.quadraticCurveTo(3, -49, 15, -56);
+  context.stroke();
+
+  drawAvatarFace(context, options.face);
+  context.restore();
+
+  return await canvasToPngBlob(canvas);
+}
+
+function drawAvatarFace(
+  context: CanvasRenderingContext2D,
+  face: GeneratedAvatarOptions["face"],
+) {
+  context.fillStyle = "#ffffff";
+  context.beginPath();
+  context.arc(-14, -2, 9, 0, Math.PI * 2);
+  context.arc(14, -2, 9, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#182746";
+  context.beginPath();
+  if (face === "star") {
+    drawStar(context, -14, -2, 5, 9, 4);
+    drawStar(context, 14, -2, 5, 9, 4);
+  } else {
+    context.arc(-14, face === "focus" ? -1 : -2, 4, 0, Math.PI * 2);
+    context.arc(14, face === "focus" ? -1 : -2, 4, 0, Math.PI * 2);
+  }
+  context.fill();
+
+  context.strokeStyle = "#2d5018";
+  context.lineWidth = 4;
+  context.lineCap = "round";
+  context.beginPath();
+  if (face === "focus") {
+    context.moveTo(-16, 23);
+    context.lineTo(16, 23);
+  } else {
+    context.arc(0, 16, 17, 0.18 * Math.PI, 0.82 * Math.PI);
+  }
+  context.stroke();
+}
+
+function drawStar(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  points: number,
+  outerRadius: number,
+  innerRadius: number,
+) {
+  context.moveTo(x, y - outerRadius);
+  for (let i = 1; i < points * 2; i += 1) {
+    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+    const angle = (i * Math.PI) / points - Math.PI / 2;
+    context.lineTo(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius);
+  }
+  context.closePath();
+}
+
+function roundedRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.arcTo(x + width, y, x + width, y + height, radius);
+  context.arcTo(x + width, y + height, x, y + height, radius);
+  context.arcTo(x, y + height, x, y, radius);
+  context.arcTo(x, y, x + width, y, radius);
+  context.closePath();
+}
+
+async function canvasToPngBlob(canvas: HTMLCanvasElement) {
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Could not export avatar PNG."));
+        return;
+      }
+
+      resolve(blob);
+    }, "image/png");
+  });
+}
+
+async function blobToDataUrl(blob: Blob) {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("Could not preview avatar."));
+    reader.readAsDataURL(blob);
+  });
+}
+
 async function resizePngToAvatar(file: File) {
   const imageUrl = URL.createObjectURL(file);
 
@@ -692,16 +948,7 @@ async function resizePngToAvatar(file: File) {
     const y = Math.round((size - height) / 2);
     context.drawImage(image, x, y, width, height);
 
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          reject(new Error("Could not export resized PNG."));
-          return;
-        }
-
-        resolve(blob);
-      }, "image/png");
-    });
+    return await canvasToPngBlob(canvas);
   } finally {
     URL.revokeObjectURL(imageUrl);
   }
