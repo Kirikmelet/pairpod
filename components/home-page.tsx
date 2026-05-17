@@ -113,7 +113,7 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   }
 
   if (!isPopup) {
-    return <PodSelectionPage userEmail={user.email ?? null} />;
+    return <PodSelectionPage userEmail={user.email ?? null} onSignOut={() => void handleSignOut()} />;
   }
 
   return <ExtensionPopupApp user={user} onSignOut={() => void handleSignOut()} />;
@@ -144,6 +144,17 @@ function ExtensionPopupApp({
         }
       }}
     >
+      <div className="extension-user-bar">
+        <span className="extension-user-bar__identity">
+          {getDisplayIdentity(user)}
+        </span>
+        <div className="extension-user-bar__actions">
+          <a href="#/" className="text-button">Home</a>
+          <button type="button" onClick={onSignOut} className="text-button text-button--danger">
+            Sign out
+          </button>
+        </div>
+      </div>
       {route.kind === "chat" ? (
         <ChatPage />
       ) : route.kind === "posts" ? (
@@ -153,7 +164,7 @@ function ExtensionPopupApp({
       ) : route.kind === "profile" ? (
         <ProfileSettingsPage variant="popup" />
       ) : (
-        <PodSelectionPage userEmail={user.email ?? null} />
+        <PodSelectionPage userEmail={user.email ?? null} onSignOut={onSignOut} />
       )}
     </div>
   );
@@ -195,6 +206,15 @@ function useExtensionHashRoute():
   }
 
   return { kind: "home" };
+}
+
+function getDisplayIdentity(user: User) {
+  const fullName =
+    typeof user.user_metadata?.full_name === "string"
+      ? user.user_metadata.full_name.trim()
+      : "";
+
+  return fullName || user.email || "Authenticated user";
 }
 
 type AppShellProps = {

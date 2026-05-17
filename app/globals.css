@@ -987,6 +987,39 @@ body {
   padding: var(--space-lg);
 }
 
+.extension-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.extension-user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: 6px var(--space-md);
+  background: rgba(255,255,255,0.55);
+  border-bottom: 1px solid rgba(180,210,255,0.45);
+  font-size: var(--fs-xs);
+}
+
+.extension-user-bar__identity {
+  color: var(--text-mid);
+  font-weight: var(--fw-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.extension-user-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-shrink: 0;
+}
+
 .app-stack {
   position: relative;
   display: grid;
@@ -1180,6 +1213,32 @@ body {
 .text-button:hover {
   color: var(--text-link-hover);
   text-decoration: underline;
+}
+
+.text-button--danger {
+  color: #c84030;
+}
+
+.text-button--danger:hover {
+  color: #a83020;
+}
+
+.app-user-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-shrink: 0;
+}
+
+.pod-user-signout {
+  font-size: var(--fs-base);
+  opacity: 0.7;
+  transition: opacity var(--dur-normal), color var(--dur-normal);
+}
+
+.pod-user-signout:hover {
+  opacity: 1;
+  color: #c84030;
 }
 
 .btn-secondary {
