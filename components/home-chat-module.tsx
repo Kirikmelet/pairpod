@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
+import { playSfx, useErrorSfx } from "@/lib/client/sfx";
 import { createClient } from "@/utils/supabase/client";
 import type { Tables, TablesInsert } from "@/utils/database.types";
 
@@ -24,6 +25,8 @@ export function HomeChatModule({ user }: HomeChatModuleProps) {
   const [room, setRoom] = useState<Room | null>(null);
   const [sentPostIds, setSentPostIds] = useState<Set<string>>(() => new Set());
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const seenPostIdsRef = useRef<Set<string> | null>(null);
+  useErrorSfx(error);
 
   useEffect(() => {
     let isActive = true;
@@ -75,6 +78,26 @@ export function HomeChatModule({ user }: HomeChatModuleProps) {
       behavior: "smooth",
     });
   }, [posts.length]);
+
+  useEffect(() => {
+    const knownIds = seenPostIdsRef.current;
+    const nextIds = new Set(posts.map((post) => post.id));
+
+    if (!knownIds) {
+      seenPostIdsRef.current = nextIds;
+      return;
+    }
+
+    const hasRemoteIncomingMessage = posts.some(
+      (post) => !knownIds.has(post.id) && !sentPostIds.has(post.id),
+    );
+
+    seenPostIdsRef.current = nextIds;
+
+    if (hasRemoteIncomingMessage) {
+      playSfx("im");
+    }
+  }, [posts, sentPostIds]);
 
   const handleSend = async () => {
     const content = draft.trim();

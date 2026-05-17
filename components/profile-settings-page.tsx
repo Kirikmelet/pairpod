@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { useErrorSfx } from "@/lib/client/sfx";
 import { createClient } from "@/utils/supabase/client";
 import type { Json } from "@/utils/database.types";
 import type { User } from "@supabase/supabase-js";
@@ -28,7 +29,7 @@ type UserProfileRow = {
 };
 const DEFAULT_AVATAR_URL =
   "https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png";
-const AVATAR_BUCKET = "avatars";
+const AVATAR_BUCKET = "profile_pictures";
 const USER_PROFILE_COLUMNS =
   "id,auth_user_id,email,username,configurations,display_name,avatar_url,updated_at";
 
@@ -48,6 +49,7 @@ export function ProfileSettingsPage({
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useErrorSfx(error);
 
   const title = useMemo(
     () => displayName.trim() || username.trim() || authEmail || "Your profile",
@@ -295,7 +297,10 @@ function useProfileNavLinks() {
     fullParams.set("fullProfile", "1");
     const fullSuffix = `?${fullParams.toString()}`;
     const extensionProfilePath = `popup.html#/profile${fullSuffix}`;
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+    const fullProfileHref = siteUrl
+      ? `${siteUrl.replace(/\/+$/, "")}/profile${fullSuffix}`
+      : `/profile${fullSuffix}`;
 
     setLinks({
       backHref: isExtension ? `#/${suffix}` : `/pods${suffix}`,
@@ -305,7 +310,7 @@ function useProfileNavLinks() {
       roomHref: isExtension ? `#/${suffix}` : `/pods${suffix}`,
       fullProfileHref: isExtension
         ? (runtime?.runtime?.getURL?.(extensionProfilePath) ?? extensionProfilePath)
-        : `${siteUrl.replace(/\/+$/, "")}/profile${fullSuffix}`,
+        : fullProfileHref,
       isFullProfileEditor,
     });
   }, []);
@@ -406,21 +411,30 @@ async function updateProfileDirect(patch: {
   const { supabase, user } = await getAuthenticatedDirectProfileClient();
   const profile = await ensureDirectProfile(supabase, user);
   const nextConfiguration = readConfiguration(profile.configurations);
-  const nextDisplayName = normalizeOptionalText(patch.displayName ?? "");
+  const nextPatch: Partial<UserProfileRow> = {
+    auth_user_id: user.id,
+    email: user.email ?? profile.email,
+    updated_at: new Date().toISOString(),
+  };
 
-  nextConfiguration.displayName = nextDisplayName ?? "";
+  if (Object.prototype.hasOwnProperty.call(patch, "username")) {
+    nextPatch.username = normalizeUsernameForProfile(patch.username);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(patch, "displayName")) {
+    const nextDisplayName = normalizeOptionalText(patch.displayName ?? "");
+    nextConfiguration.displayName = nextDisplayName ?? "";
+    nextPatch.display_name = nextDisplayName;
+    nextPatch.configurations = nextConfiguration;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(patch, "avatarUrl")) {
+    nextPatch.avatar_url = patch.avatarUrl || profile.avatar_url || DEFAULT_AVATAR_URL;
+  }
 
   const { data, error } = await supabase
     .from("users")
-    .update({
-      auth_user_id: user.id,
-      email: user.email ?? profile.email,
-      username: normalizeUsernameForProfile(patch.username),
-      display_name: nextDisplayName,
-      avatar_url: patch.avatarUrl || profile.avatar_url || DEFAULT_AVATAR_URL,
-      configurations: nextConfiguration,
-      updated_at: new Date().toISOString(),
-    })
+    .update(nextPatch)
     .eq("id", profile.id)
     .select(USER_PROFILE_COLUMNS)
     .maybeSingle<UserProfileRow>();
@@ -492,7 +506,7 @@ async function ensureDirectProfile(
   }
 
   if (existingByAuth) {
-    return existingByAuth;
+    return await syncDirectProfileSeed(supabase, existingByAuth, user);
   }
 
   const { data: legacyById, error: legacyByIdError } = await users
@@ -505,37 +519,19 @@ async function ensureDirectProfile(
   }
 
   if (legacyById) {
-    const { data, error } = await users
-      .update({
-        auth_user_id: user.id,
-        email: user.email ?? legacyById.email,
-        avatar_url: legacyById.avatar_url || DEFAULT_AVATAR_URL,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", legacyById.id)
-      .select(USER_PROFILE_COLUMNS)
-      .maybeSingle<UserProfileRow>();
-
-    if (error) {
-      throw error;
-    }
-
-    if (!data) {
-      throw new Error("Could not load your profile.");
-    }
-
-    return data;
+    return await syncDirectProfileSeed(supabase, legacyById, user);
   }
 
+  const displayName = readOAuthDisplayName(user);
   const { data, error } = await users
     .insert({
       auth_user_id: user.id,
       email: user.email ?? null,
       username: normalizeUsernameForProfile(readMetadataString(user.user_metadata?.username)),
-      display_name: null,
+      display_name: displayName,
       avatar_url: DEFAULT_AVATAR_URL,
       configurations: {
-        displayName: "",
+        displayName: displayName ?? "",
       },
       updated_at: new Date().toISOString(),
     })
@@ -548,6 +544,44 @@ async function ensureDirectProfile(
 
   if (!data) {
     throw new Error("Could not create your profile.");
+  }
+
+  return data;
+}
+
+async function syncDirectProfileSeed(
+  supabase: ReturnType<typeof createClient>,
+  profile: UserProfileRow,
+  user: User,
+) {
+  const users = supabase.from("users");
+  const configurations = readConfiguration(profile.configurations);
+  const displayName = readOAuthDisplayName(user);
+  const avatarUrl = getStoredAvatarUrl(profile.avatar_url, user);
+
+  if (!configurations.displayName && displayName) {
+    configurations.displayName = displayName;
+  }
+
+  const { data, error } = await users
+    .update({
+      auth_user_id: user.id,
+      email: user.email ?? profile.email,
+      display_name: profile.display_name || displayName,
+      avatar_url: avatarUrl,
+      configurations,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", profile.id)
+    .select(USER_PROFILE_COLUMNS)
+    .maybeSingle<UserProfileRow>();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Could not load your profile.");
   }
 
   return data;
@@ -719,6 +753,48 @@ function normalizeUsernameForProfile(value: string | null | undefined) {
 
 function readMetadataString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readOAuthDisplayName(user: User) {
+  return (
+    readMetadataString(user.user_metadata?.full_name) ||
+    readMetadataString(user.user_metadata?.display_name) ||
+    readMetadataString(user.user_metadata?.name) ||
+    null
+  );
+}
+
+function readOAuthAvatarUrl(user: User) {
+  return (
+    readMetadataString(user.user_metadata?.avatar_url) ||
+    readMetadataString(user.user_metadata?.picture) ||
+    null
+  );
+}
+
+function hasCustomAvatar(avatarUrl: string | null) {
+  return Boolean(avatarUrl && avatarUrl !== DEFAULT_AVATAR_URL);
+}
+
+function getStoredAvatarUrl(avatarUrl: string | null, user: User) {
+  if (!hasCustomAvatar(avatarUrl)) {
+    return DEFAULT_AVATAR_URL;
+  }
+
+  return isOAuthAvatarUrl(avatarUrl, user) ? DEFAULT_AVATAR_URL : avatarUrl;
+}
+
+function isOAuthAvatarUrl(avatarUrl: string | null, user: User) {
+  const oauthAvatarUrl = readOAuthAvatarUrl(user);
+  return Boolean(
+    avatarUrl &&
+      oauthAvatarUrl &&
+      stripCacheBuster(avatarUrl) === stripCacheBuster(oauthAvatarUrl),
+  );
+}
+
+function stripCacheBuster(value: string) {
+  return value.split("?")[0];
 }
 
 async function assertPngBlobSize(file: Blob, expectedSize: number) {

@@ -181,8 +181,8 @@ create unique index if not exists users_username_lower_unique_idx on users(lower
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
-  'avatars',
-  'avatars',
+  'profile_pictures',
+  'profile_pictures',
   true,
   2097152,
   array['image/png']::text[]
@@ -200,13 +200,13 @@ begin
     from pg_policies
     where schemaname = 'storage'
       and tablename = 'objects'
-      and policyname = 'public can read avatars'
+      and policyname = 'public can read profile pictures'
   ) then
-    create policy "public can read avatars"
+    create policy "public can read profile pictures"
       on storage.objects
       for select
       to public
-      using (bucket_id = 'avatars');
+      using (bucket_id = 'profile_pictures');
   end if;
 end
 $$;
@@ -218,14 +218,14 @@ begin
     from pg_policies
     where schemaname = 'storage'
       and tablename = 'objects'
-      and policyname = 'authenticated users can insert own avatar'
+      and policyname = 'authenticated users can insert own profile picture'
   ) then
-    create policy "authenticated users can insert own avatar"
+    create policy "authenticated users can insert own profile picture"
       on storage.objects
       for insert
       to authenticated
       with check (
-        bucket_id = 'avatars'
+        bucket_id = 'profile_pictures'
         and (storage.foldername(name))[1] = auth.uid()::text
         and name = auth.uid()::text || '/avatar.png'
       );
@@ -240,19 +240,19 @@ begin
     from pg_policies
     where schemaname = 'storage'
       and tablename = 'objects'
-      and policyname = 'authenticated users can update own avatar'
+      and policyname = 'authenticated users can update own profile picture'
   ) then
-    create policy "authenticated users can update own avatar"
+    create policy "authenticated users can update own profile picture"
       on storage.objects
       for update
       to authenticated
       using (
-        bucket_id = 'avatars'
+        bucket_id = 'profile_pictures'
         and (storage.foldername(name))[1] = auth.uid()::text
         and name = auth.uid()::text || '/avatar.png'
       )
       with check (
-        bucket_id = 'avatars'
+        bucket_id = 'profile_pictures'
         and (storage.foldername(name))[1] = auth.uid()::text
         and name = auth.uid()::text || '/avatar.png'
       );

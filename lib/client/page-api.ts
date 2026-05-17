@@ -1251,9 +1251,9 @@ async function ensureCurrentUserProfile() {
 
   const nextDisplayName =
     readMetadataString(user.user_metadata.full_name) ||
+    readMetadataString(user.user_metadata.display_name) ||
     readMetadataString(user.user_metadata.name);
-  const nextAvatarUrl =
-    readMetadataString(user.user_metadata.avatar_url) || DEFAULT_AVATAR_URL;
+  const nextAvatarUrl = DEFAULT_AVATAR_URL;
 
   if (legacyById) {
     const nextConfigurations = readProfileConfiguration(legacyById.configurations);

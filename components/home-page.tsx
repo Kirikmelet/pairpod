@@ -8,6 +8,7 @@ import { ChatPage } from "@/components/chat-page";
 import { PodSelectionPage } from "@/components/pod-selection-page";
 import { PostDetailPage, PostStreamPage } from "@/components/post-stream-page";
 import { ProfileSettingsPage } from "@/components/profile-settings-page";
+import { playSfx, useErrorSfx, useSfxUnlock } from "@/lib/client/sfx";
 import {
   completeClientSideAuthRedirect,
   createClient,
@@ -28,6 +29,8 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  useSfxUnlock();
+  useErrorSfx(authError);
 
   const refreshUser = useCallback(async () => {
     const supabase = createClient();
@@ -64,6 +67,7 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
         }
 
         if (didCompleteRedirect) {
+          playSfx("welcome");
           return refreshUser();
         }
 
@@ -88,6 +92,7 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   }, [refreshUser]);
 
   const handleSignOut = async () => {
+    playSfx("goodbye");
     const supabase = createClient();
     await supabase.auth.signOut();
     setUser(null);

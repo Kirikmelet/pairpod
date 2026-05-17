@@ -7,7 +7,6 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const extensionDir = path.join(root, "extension");
 const env = loadEnvLocal(root);
 const { url: supabaseUrl, key: supabaseKey } = requireSupabaseEnv(env);
-const siteUrl = env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 const stripNextClientDirective: Plugin = {
   name: "strip-next-client-directive",
@@ -42,7 +41,7 @@ export default defineConfig({
       env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
     ),
     "process.env.NEXT_PUBLIC_SITE_URL": JSON.stringify(
-      siteUrl,
+      env.NEXT_PUBLIC_SITE_URL ?? "",
     ),
   },
   build: {

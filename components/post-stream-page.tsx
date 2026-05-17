@@ -14,6 +14,7 @@ import {
   type UserProfileRecord,
   usePageBundle,
 } from "@/lib/client/page-api";
+import { useErrorSfx } from "@/lib/client/sfx";
 
 /* ------------------------------------------------------------------ */
 /*  Supabase config (matches login page)                               */
@@ -160,6 +161,9 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
+  useErrorSfx(error);
+  useErrorSfx(submitError);
+  useErrorSfx(voteError);
 
   /* -- derived data ------------------------------------------------ */
   const posts = useMemo(
@@ -503,6 +507,9 @@ export function PostDetailPage({ postId }: { postId: string }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
+  useErrorSfx(error);
+  useErrorSfx(submitError);
+  useErrorSfx(voteError);
 
   /* -- derived data ------------------------------------------------ */
   const post = useMemo(
@@ -1057,6 +1064,8 @@ function CommentCard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
+  useErrorSfx(replyError);
+  useErrorSfx(voteError);
 
   const displayName = getDisplayName(comment.user_id, usersById);
 

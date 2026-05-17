@@ -3,7 +3,7 @@ import { jsonError, jsonSuccess } from "@/lib/server/http";
 import { toProfileResponse, updateUserProfile } from "@/lib/server/profile";
 import { createAdminClient } from "@/utils/supabase/admin";
 
-const AVATAR_BUCKET = "avatars";
+const AVATAR_BUCKET = "profile_pictures";
 const AVATAR_SIZE_PX = 128;
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 const PNG_SIGNATURE = "89504e470d0a1a0a";

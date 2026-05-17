@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
+import { playSfx, primeSfx, useErrorSfx } from "@/lib/client/sfx";
 import { getStaticEmailAuthRedirectUrl } from "@/utils/auth-redirect";
 import { createClient } from "@/utils/supabase/client";
 
@@ -25,6 +26,7 @@ export function AuthForm({
 
   const handleEmailAuth = async (event: FormEvent) => {
     event.preventDefault();
+    primeSfx();
     setIsLoading(true);
     setStatus(null);
 
@@ -45,6 +47,7 @@ export function AuthForm({
       }
       if (data.session) {
         setIsLoading(false);
+        playSfx("welcome");
         onSuccess?.();
         return;
       }
@@ -62,11 +65,13 @@ export function AuthForm({
     }
 
     setIsLoading(false);
+    playSfx("welcome");
     onSuccess?.();
   };
 
   const statusKind =
     status?.includes("confirm") || status?.includes("created") ? "success" : "error";
+  useErrorSfx(statusKind === "error" ? status : null);
 
   return (
     <div className="app-stack">
@@ -110,6 +115,7 @@ export function AuthForm({
         variant={variant}
         disabled={isLoading}
         onStart={() => {
+          primeSfx();
           setIsLoading(true);
           setStatus(null);
         }}
@@ -120,6 +126,7 @@ export function AuthForm({
         onSuccess={() => {
           setStatus(null);
           setIsLoading(false);
+          playSfx("welcome");
           onSuccess?.();
         }}
       />

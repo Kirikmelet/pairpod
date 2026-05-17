@@ -8,8 +8,10 @@ import {
   postJson,
   splitContentLines,
   type UserProfileRecord,
+  useCurrentUserProfile,
   usePageBundle,
 } from "@/lib/client/page-api";
+import { playSfx, useErrorSfx } from "@/lib/client/sfx";
 
 type ChatPageProps = {
   currentUsername?: string;
@@ -38,6 +40,11 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const seenChatPostIdsRef = useRef<Set<string> | null>(null);
+  const sentChatPostIdsRef = useRef<Set<string>>(new Set());
+  const { profile: currentProfile } = useCurrentUserProfile();
+  useErrorSfx(error);
+  useErrorSfx(submitError);
 
   const chatPosts = useMemo(
     () => (bundle?.posts ?? []).filter((post) => post.type === "chat"),
@@ -113,6 +120,29 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     });
   }, [chatPosts.length]);
 
+  useEffect(() => {
+    const knownIds = seenChatPostIdsRef.current;
+    const nextIds = new Set(chatPosts.map((post) => post.id));
+
+    if (!knownIds) {
+      seenChatPostIdsRef.current = nextIds;
+      return;
+    }
+
+    const hasRemoteIncomingMessage = chatPosts.some(
+      (post) =>
+        !knownIds.has(post.id) &&
+        !sentChatPostIdsRef.current.has(post.id) &&
+        (!currentProfile?.id || post.user_id !== currentProfile.id),
+    );
+
+    seenChatPostIdsRef.current = nextIds;
+
+    if (hasRemoteIncomingMessage) {
+      playSfx("im");
+    }
+  }, [chatPosts, currentProfile?.id]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -124,11 +154,14 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     setSubmitError(null);
 
     try {
-      await postJson("/api/chat", {
+      const createdPost = await postJson("/api/chat", {
         roomId: bundle.room.id,
         pageId: bundle.page.id,
         message: message.trim(),
       });
+      if (isRecordWithId(createdPost)) {
+        sentChatPostIdsRef.current.add(createdPost.id);
+      }
       setMessage("");
       await refresh({ silent: true });
     } catch (sendError) {
@@ -396,6 +429,15 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
         </section>
       </div>
     </main>
+  );
+}
+
+function isRecordWithId(value: unknown): value is { id: string } {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "id" in value &&
+    typeof value.id === "string"
   );
 }
 

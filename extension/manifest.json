@@ -29,7 +29,7 @@
     "tabs"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://xgfgqzveuyeceupfaebh.supabase.co wss://xgfgqzveuyeceupfaebh.supabase.co http://localhost:3000"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://xgfgqzveuyeceupfaebh.supabase.co wss://xgfgqzveuyeceupfaebh.supabase.co; media-src 'self' https://xgfgqzveuyeceupfaebh.supabase.co"
   },
   "browser_specific_settings": {
     "gecko": {
@@ -44,7 +44,6 @@
     }
   },
   "host_permissions": [
-    "https://xgfgqzveuyeceupfaebh.supabase.co/*",
-    "http://localhost:3000/*"
+    "https://xgfgqzveuyeceupfaebh.supabase.co/*"
   ]
 }

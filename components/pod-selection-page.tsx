@@ -11,6 +11,7 @@ import {
   useCurrentUserProfile,
   usePageBundle,
 } from "@/lib/client/page-api";
+import { useErrorSfx } from "@/lib/client/sfx";
 import { createClient } from "@/utils/supabase/client";
 
 type Activity = {
@@ -41,6 +42,7 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
     usePageBundle();
   const { profile } = useCurrentUserProfile();
   const [customDomain, setCustomDomain] = useState("");
+  useErrorSfx(error);
 
   const posts = bundle?.posts ?? [];
   const comments = bundle?.comments ?? [];

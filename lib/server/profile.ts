@@ -168,7 +168,7 @@ export async function ensureUserProfile(
     auth_user_id: authUser.id,
     username: await getAvailableSeedUsernameForSupabase(supabase, authUser),
     display_name: readDisplayNameFromMetadata(authUser),
-    avatar_url: readAvatarUrlFromMetadata(authUser) ?? DEFAULT_AVATAR_URL,
+    avatar_url: DEFAULT_AVATAR_URL,
     email: authUser.email ?? null,
     configurations: {
       displayName: readDisplayNameFromMetadata(authUser),
@@ -369,7 +369,7 @@ async function syncUserProfileDefaults(
   extraPatch: TablesUpdate<'users'> = {},
 ) {
   const seedDisplayName = readDisplayNameFromMetadata(authUser)
-  const seedAvatarUrl = readAvatarUrlFromMetadata(authUser) ?? DEFAULT_AVATAR_URL
+  const seedAvatarUrl = DEFAULT_AVATAR_URL
   const configuration = readConfiguration(profile.configurations)
   let shouldUpdate = false
   const patch: TablesUpdate<'users'> = {
@@ -484,17 +484,6 @@ function readDisplayNameFromMetadata(authUser: User): string | null {
             : null
 
   return normalizeOptionalText(candidate)
-}
-
-function readAvatarUrlFromMetadata(authUser: User): string | null {
-  const candidate =
-    typeof authUser.user_metadata?.avatar_url === 'string'
-      ? authUser.user_metadata.avatar_url
-      : typeof authUser.user_metadata?.picture === 'string'
-        ? authUser.user_metadata.picture
-        : null
-
-  return normalizeAvatarUrl(candidate, false)
 }
 
 function normalizeOptionalText(value: unknown): string | null {
