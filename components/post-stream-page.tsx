@@ -389,7 +389,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
   const {
     bundle,
     commentsByPost,
-    currentPostxVotesById,
+    currentPostVotesById,
     currentCommentVotesById,
     usersById,
     loading,
