@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { AuthForm } from "@/components/auth-form";
 import { ChatPage } from "@/components/chat-page";
+import { DmPage } from "@/components/dm-page";
 import { PodSelectionPage } from "@/components/pod-selection-page";
 import { PostDetailPage, PostStreamPage } from "@/components/post-stream-page";
 import { ProfileSettingsPage } from "@/components/profile-settings-page";
@@ -211,6 +212,8 @@ function ExtensionPopupApp({
         <PostDetailPage postId={route.postId} />
       ) : route.kind === "profile" ? (
         <ProfileSettingsPage variant="popup" />
+      ) : route.kind === "dms" ? (
+        <DmPage threadId={route.threadId} />
       ) : (
         <PodSelectionPage userEmail={user.email ?? null} onSignOut={onSignOut} />
       )}
@@ -223,6 +226,7 @@ function useExtensionHashRoute():
   | { kind: "chat" }
   | { kind: "posts" }
   | { kind: "profile" }
+  | { kind: "dms"; threadId?: string }
   | { kind: "post-detail"; postId: string } {
   const [hash, setHash] = useState(() =>
     typeof window === "undefined" ? "" : window.location.hash,
@@ -251,6 +255,15 @@ function useExtensionHashRoute():
 
   if (path === "/profile") {
     return { kind: "profile" };
+  }
+
+  if (path === "/dms") {
+    return { kind: "dms" };
+  }
+
+  const dmMatch = path.match(/^\/dms\/([^/?#]+)$/);
+  if (dmMatch?.[1]) {
+    return { kind: "dms", threadId: decodeURIComponent(dmMatch[1]) };
   }
 
   return { kind: "home" };

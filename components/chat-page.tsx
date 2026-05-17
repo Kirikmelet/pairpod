@@ -11,6 +11,7 @@ import {
   useCurrentUserProfile,
   usePageBundle,
 } from "@/lib/client/page-api";
+import { getDmPath, startDirectMessage } from "@/lib/client/dms";
 import { playSfx, useErrorSfx } from "@/lib/client/sfx";
 
 type ChatPageProps = {
@@ -18,6 +19,8 @@ type ChatPageProps = {
 };
 
 type Member = {
+  id: string | null;
+  avatarUrl: string | null;
   name: string;
   status: "Online" | "Away";
 };
@@ -35,6 +38,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     domainUrl,
     roomScope,
   } = usePageBundle();
+  const { profile } = useCurrentUserProfile();
   const domainName = getRoomDisplayName(domainUrl);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,12 +69,15 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
 
     if (currentUsername?.trim()) {
       values.set(currentUsername, {
+        id: null,
+        avatarUrl: null,
         name: currentUsername,
         status: "Online",
       });
     }
 
     for (const post of bundle?.posts ?? []) {
+      const authorProfile = post.user_id ? usersById[post.user_id] : null;
       const fallbackName = getDisplayName(post.user_id, usersById);
       const name =
         currentUsername?.trim() && fallbackName === "Anonymous"
@@ -79,6 +86,8 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
 
       if (!values.has(name)) {
         values.set(name, {
+          id: post.user_id,
+          avatarUrl: authorProfile?.avatar_url ?? null,
           name,
           status: post.type === "chat" ? "Online" : "Away",
         });
@@ -86,6 +95,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     }
 
     for (const comment of bundle?.comments ?? []) {
+      const authorProfile = comment.user_id ? usersById[comment.user_id] : null;
       const fallbackName = getDisplayName(comment.user_id, usersById);
       const name =
         currentUsername?.trim() && fallbackName === "Anonymous"
@@ -94,6 +104,8 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
 
       if (!values.has(name)) {
         values.set(name, {
+          id: comment.user_id,
+          avatarUrl: authorProfile?.avatar_url ?? null,
           name,
           status: "Away",
         });
@@ -215,6 +227,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
             >
               {domainName}
             </a>
+            <a href={getDmPath("/dms")}>DMs</a>
           </nav>
 
           <div className="chat-layout">
@@ -223,14 +236,22 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
               <div className="chat-members__list">
                 {authors.length > 0 ? (
                   authors.map((member, index) => (
-                    <article className="chat-member" key={member.name}>
+                    <article className="chat-member" key={`${member.id ?? "anon"}-${member.name}`}>
                       <span
                         className={`chat-avatar chat-avatar--${(index % 8) + 1}`}
                       >
-                        {member.name.charAt(0).toUpperCase()}
+                        {member.avatarUrl ? (
+                          <img src={member.avatarUrl} alt="" />
+                        ) : (
+                          member.name.charAt(0).toUpperCase()
+                        )}
                       </span>
                       <div>
-                        <h2>{member.name}</h2>
+                        <DmUserMenu
+                          currentUserId={profile?.id ?? null}
+                          userId={member.id}
+                          userName={member.name}
+                        />
                         <p>
                           <span
                             className={`chat-status-dot chat-status-dot--${
@@ -314,7 +335,12 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                             <strong
                               className={`chat-name chat-name--${pickTone(index)}`}
                             >
-                              {getDisplayName(post.user_id, usersById)}:
+                              <DmInlineUser
+                                currentUserId={profile?.id ?? null}
+                                userId={post.user_id}
+                                userName={getDisplayName(post.user_id, usersById)}
+                              />
+                              :
                             </strong>{" "}
                             {lines[0] ?? post.content}
                           </p>
@@ -588,6 +614,103 @@ function CommentPanel({
         <a href={action}>View full history</a>
       </div>
     </section>
+  );
+}
+
+function DmUserMenu({
+  currentUserId,
+  userId,
+  userName,
+}: {
+  currentUserId: string | null;
+  userId: string | null;
+  userName: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canStartDm = Boolean(userId && userId !== currentUserId);
+
+  const handleStartDm = async () => {
+    if (!userId || isStarting) {
+      return;
+    }
+
+    setIsStarting(true);
+    setError(null);
+
+    try {
+      const thread = await startDirectMessage(userId);
+      window.location.href = getDmPath(`/dms/${thread.id}`);
+    } catch (startError) {
+      setError(startError instanceof Error ? startError.message : "Could not start DM.");
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  return (
+    <div className="dm-user-menu">
+      <button
+        type="button"
+        className="dm-user-menu__trigger"
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        {userName}
+      </button>
+      {isOpen ? (
+        <div className="dm-user-menu__popup">
+          <strong>{userName}</strong>
+          <button type="button" disabled={!canStartDm || isStarting} onClick={handleStartDm}>
+            {isStarting ? "Opening..." : canStartDm ? "Start DM" : "DM unavailable"}
+          </button>
+          {error ? <p>{error}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DmInlineUser({
+  currentUserId,
+  userId,
+  userName,
+}: {
+  currentUserId: string | null;
+  userId: string | null;
+  userName: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const canStartDm = Boolean(userId && userId !== currentUserId);
+
+  const handleStartDm = async () => {
+    if (!userId || isStarting) {
+      return;
+    }
+
+    setIsStarting(true);
+    try {
+      const thread = await startDirectMessage(userId);
+      window.location.href = getDmPath(`/dms/${thread.id}`);
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  return (
+    <span className="dm-inline-user">
+      <button type="button" onClick={() => setIsOpen((current) => !current)}>
+        {userName}
+      </button>
+      {isOpen ? (
+        <span className="dm-inline-user__popup">
+          <button type="button" disabled={!canStartDm || isStarting} onClick={handleStartDm}>
+            {isStarting ? "Opening..." : canStartDm ? "Start DM" : "DM unavailable"}
+          </button>
+        </span>
+      ) : null}
+    </span>
   );
 }
 
