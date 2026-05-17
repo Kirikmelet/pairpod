@@ -13,7 +13,7 @@ const { url: supabaseUrl, key: supabaseKey } = requireSupabaseEnv(env);
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const supabaseOrigin = new URL(supabaseUrl).origin;
 const supabaseRealtimeOrigin = supabaseOrigin.replace(/^https:/, "wss:");
-const siteUrl = env.NEXT_PUBLIC_SITE_URL?.trim();
+const siteUrl = env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
 const hostPermissions = [`${supabaseOrigin}/*`];
 const connectSrc = ["'self'", supabaseOrigin, supabaseRealtimeOrigin];
 

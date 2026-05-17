@@ -3,6 +3,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import type { Json } from "@/utils/database.types";
+import type { User } from "@supabase/supabase-js";
 
 type ProfileSettingsPageProps = {
   variant?: "page" | "popup";
@@ -17,13 +18,19 @@ type ExtensionRuntime = {
 
 type UserProfileRow = {
   id: string;
+  auth_user_id: string | null;
   email: string | null;
   username: string | null;
   configurations: Json;
+  display_name: string | null;
   avatar_url: string | null;
+  updated_at: string;
 };
 const DEFAULT_AVATAR_URL =
   "https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png";
+const AVATAR_BUCKET = "avatars";
+const USER_PROFILE_COLUMNS =
+  "id,auth_user_id,email,username,configurations,display_name,avatar_url,updated_at";
 
 export function ProfileSettingsPage({
   variant = "page",
@@ -51,7 +58,7 @@ export function ProfileSettingsPage({
     const configuration = readConfiguration(nextProfile.configurations);
     setProfile(nextProfile);
     setUsername(nextProfile.username ?? "");
-    setDisplayName(configuration.displayName ?? "");
+    setDisplayName(nextProfile.display_name ?? configuration.displayName ?? "");
     setAvatarUrl(nextProfile.avatar_url || DEFAULT_AVATAR_URL);
   }
 
@@ -335,6 +342,10 @@ function goBack(fallbackHref: string) {
 }
 
 async function loadProfileRequest() {
+  if (shouldUseDirectProfileAccess()) {
+    return await loadProfileDirect();
+  }
+
   const response = await fetchProfileApi("/api/profile", {
     method: "GET",
   });
@@ -347,6 +358,10 @@ async function updateProfile(patch: {
   displayName?: string | null;
   avatarUrl?: string | null;
 }) {
+  if (shouldUseDirectProfileAccess()) {
+    return await updateProfileDirect(patch);
+  }
+
   const response = await fetchProfileApi("/api/profile", {
     method: "PATCH",
     body: JSON.stringify(patch),
@@ -359,6 +374,10 @@ async function updateProfile(patch: {
 }
 
 async function uploadAvatar(file: Blob) {
+  if (shouldUseDirectProfileAccess()) {
+    return await uploadAvatarDirect(file);
+  }
+
   const formData = new FormData();
   formData.set("file", file, "avatar.png");
 
@@ -368,6 +387,170 @@ async function uploadAvatar(file: Blob) {
   });
 
   return toUserProfileRow(response);
+}
+
+function shouldUseDirectProfileAccess() {
+  return Boolean(getExtensionRuntime()?.runtime?.id) && !getRemoteApiUrl("/api/profile");
+}
+
+async function loadProfileDirect() {
+  const { supabase, user } = await getAuthenticatedDirectProfileClient();
+  return await ensureDirectProfile(supabase, user);
+}
+
+async function updateProfileDirect(patch: {
+  username?: string | null;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+}) {
+  const { supabase, user } = await getAuthenticatedDirectProfileClient();
+  const profile = await ensureDirectProfile(supabase, user);
+  const nextConfiguration = readConfiguration(profile.configurations);
+  const nextDisplayName = normalizeOptionalText(patch.displayName ?? "");
+
+  nextConfiguration.displayName = nextDisplayName ?? "";
+
+  const { data, error } = await supabase
+    .from("users")
+    .update({
+      auth_user_id: user.id,
+      email: user.email ?? profile.email,
+      username: normalizeUsernameForProfile(patch.username),
+      display_name: nextDisplayName,
+      avatar_url: patch.avatarUrl || profile.avatar_url || DEFAULT_AVATAR_URL,
+      configurations: nextConfiguration,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", profile.id)
+    .select(USER_PROFILE_COLUMNS)
+    .maybeSingle<UserProfileRow>();
+
+  if (error) {
+    throw new Error(`Could not save profile: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Could not save profile.");
+  }
+
+  return data;
+}
+
+async function uploadAvatarDirect(file: Blob) {
+  await assertPngBlobSize(file, 128);
+
+  const { supabase, user } = await getAuthenticatedDirectProfileClient();
+  const storagePath = `${user.id}/avatar.png`;
+  const { error: uploadError } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .upload(storagePath, file, {
+      cacheControl: "3600",
+      contentType: "image/png",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw new Error(`Could not upload avatar: ${uploadError.message}`);
+  }
+
+  const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(storagePath);
+  return await updateProfileDirect({
+    avatarUrl: `${data.publicUrl}?v=${Date.now()}`,
+  });
+}
+
+async function getAuthenticatedDirectProfileClient() {
+  const supabase = createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!user) {
+    throw new Error("You must be signed in to edit your profile.");
+  }
+
+  return { supabase, user };
+}
+
+async function ensureDirectProfile(
+  supabase: ReturnType<typeof createClient>,
+  user: User,
+) {
+  const users = supabase.from("users");
+  const { data: existingByAuth, error: existingByAuthError } = await users
+    .select(USER_PROFILE_COLUMNS)
+    .eq("auth_user_id", user.id)
+    .maybeSingle<UserProfileRow>();
+
+  if (existingByAuthError) {
+    throw existingByAuthError;
+  }
+
+  if (existingByAuth) {
+    return existingByAuth;
+  }
+
+  const { data: legacyById, error: legacyByIdError } = await users
+    .select(USER_PROFILE_COLUMNS)
+    .eq("id", user.id)
+    .maybeSingle<UserProfileRow>();
+
+  if (legacyByIdError) {
+    throw legacyByIdError;
+  }
+
+  if (legacyById) {
+    const { data, error } = await users
+      .update({
+        auth_user_id: user.id,
+        email: user.email ?? legacyById.email,
+        avatar_url: legacyById.avatar_url || DEFAULT_AVATAR_URL,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", legacyById.id)
+      .select(USER_PROFILE_COLUMNS)
+      .maybeSingle<UserProfileRow>();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      throw new Error("Could not load your profile.");
+    }
+
+    return data;
+  }
+
+  const { data, error } = await users
+    .insert({
+      auth_user_id: user.id,
+      email: user.email ?? null,
+      username: normalizeUsernameForProfile(readMetadataString(user.user_metadata?.username)),
+      display_name: null,
+      avatar_url: DEFAULT_AVATAR_URL,
+      configurations: {
+        displayName: "",
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .select(USER_PROFILE_COLUMNS)
+    .maybeSingle<UserProfileRow>();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Could not create your profile.");
+  }
+
+  return data;
 }
 
 async function fetchProfileApi(pathname: string, init: RequestInit) {
@@ -386,12 +569,6 @@ async function fetchProfileApi(pathname: string, init: RequestInit) {
   }
 
   const isExtension = Boolean(getExtensionRuntime()?.runtime?.id);
-  if (isExtension && !remoteApiUrl) {
-    throw new Error(
-      "Profile editing in the extension needs NEXT_PUBLIC_SITE_URL so it can reach the PairPod server.",
-    );
-  }
-
   const target = isExtension && remoteApiUrl ? remoteApiUrl : pathname;
   const response = await fetch(target, {
     ...init,
@@ -423,12 +600,15 @@ type ProfileApiResponse = {
 function toUserProfileRow(profile: ProfileApiResponse): UserProfileRow {
   return {
     id: profile.id,
+    auth_user_id: null,
     email: profile.email,
     username: profile.username,
     configurations: {
       displayName: profile.displayName,
     },
+    display_name: profile.displayName,
     avatar_url: profile.avatarUrl || DEFAULT_AVATAR_URL,
+    updated_at: new Date().toISOString(),
   };
 }
 
@@ -520,6 +700,44 @@ function readConfiguration(configurations: Json) {
 
 function normalizeOptionalText(value: string) {
   return value.trim() || null;
+}
+
+function normalizeUsernameForProfile(value: string | null | undefined) {
+  const normalized = normalizeOptionalText(value ?? "")?.toLowerCase() ?? null;
+  if (!normalized) {
+    return null;
+  }
+
+  if (!/^[a-z0-9_-]{3,24}$/.test(normalized)) {
+    throw new Error(
+      "Username must be 3-24 characters and use only lowercase letters, numbers, underscores, or hyphens.",
+    );
+  }
+
+  return normalized;
+}
+
+function readMetadataString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+async function assertPngBlobSize(file: Blob, expectedSize: number) {
+  const arrayBuffer = await file.arrayBuffer();
+  const view = new DataView(arrayBuffer);
+  const signature = new Uint8Array(arrayBuffer.slice(0, 8));
+  const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  const isPng = pngSignature.every((byte, index) => signature[index] === byte);
+
+  if (!isPng || arrayBuffer.byteLength < 24) {
+    throw new Error("Avatar must be a valid PNG image.");
+  }
+
+  const width = view.getUint32(16);
+  const height = view.getUint32(20);
+
+  if (width !== expectedSize || height !== expectedSize) {
+    throw new Error(`Avatar PNG must be exactly ${expectedSize}x${expectedSize} pixels.`);
+  }
 }
 
 function ProfileBackground() {
