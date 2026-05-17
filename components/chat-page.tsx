@@ -4,8 +4,10 @@ import { FormEvent, useMemo, useState } from "react";
 import {
   formatTimestamp,
   getDisplayName,
+  getRoomDisplayName,
   postJson,
   splitContentLines,
+  type UserProfileRecord,
   usePageBundle,
 } from "@/lib/client/page-api";
 
@@ -19,8 +21,19 @@ type Member = {
 };
 
 export function ChatPage({ currentUsername }: ChatPageProps) {
-  const { bundle, commentsByPost, loading, error, refresh, buildScopedHref } =
-    usePageBundle();
+  const {
+    bundle,
+    commentsByPost,
+    usersById,
+    loading,
+    error,
+    refresh,
+    buildRoomHref,
+    buildScopedHref,
+    domainUrl,
+    roomScope,
+  } = usePageBundle();
+  const domainName = getRoomDisplayName(domainUrl);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -50,7 +63,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     }
 
     for (const post of bundle?.posts ?? []) {
-      const fallbackName = getDisplayName(post.user_id);
+      const fallbackName = getDisplayName(post.user_id, usersById);
       const name =
         currentUsername?.trim() && fallbackName === "Anonymous"
           ? currentUsername
@@ -65,7 +78,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     }
 
     for (const comment of bundle?.comments ?? []) {
-      const fallbackName = getDisplayName(comment.user_id);
+      const fallbackName = getDisplayName(comment.user_id, usersById);
       const name =
         currentUsername?.trim() && fallbackName === "Anonymous"
           ? currentUsername
@@ -80,7 +93,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     }
 
     return [...values.values()].slice(0, 8);
-  }, [bundle?.comments, bundle?.posts, currentUsername]);
+  }, [bundle?.comments, bundle?.posts, currentUsername, usersById]);
 
   const recentCommentActivity = useMemo(
     () => (bundle?.comments ?? []).slice(-4).reverse(),
@@ -142,8 +155,18 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
             <a href={buildScopedHref("/chat")} className="chat-nav__active">
               Chat
             </a>
-            <a href={buildScopedHref("/posts")}>Questions</a>
-            <a href={buildScopedHref("/")}>Help</a>
+            <a
+              href={buildRoomHref("/chat", "global")}
+              className={roomScope === "global" ? "chat-nav__active" : ""}
+            >
+              Global
+            </a>
+            <a
+              href={buildRoomHref("/chat", "domain")}
+              className={roomScope === "domain" ? "chat-nav__active" : ""}
+            >
+              {domainName}
+            </a>
           </nav>
 
           <div className="chat-layout">
@@ -245,7 +268,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                             <strong
                               className={`chat-name chat-name--${pickTone(index)}`}
                             >
-                              {getDisplayName(post.user_id)}:
+                              {getDisplayName(post.user_id, usersById)}:
                             </strong>{" "}
                             {lines[0] ?? post.content}
                           </p>
@@ -357,6 +380,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                 title="Recent Activity"
                 action={buildScopedHref("/posts")}
                 items={recentCommentActivity}
+                usersById={usersById}
               />
             </aside>
           </div>
@@ -403,14 +427,10 @@ function ChatSceneBackground() {
 
 function getChatTitle(bundle: ReturnType<typeof usePageBundle>["bundle"]) {
   if (!bundle) {
-    return "current-page";
+    return "Global";
   }
 
-  try {
-    return new URL(bundle.page.normalized_url).hostname;
-  } catch {
-    return bundle.page.normalized_url;
-  }
+  return getRoomDisplayName(bundle.page.normalized_url);
 }
 
 function pickTone(index: number) {
@@ -469,9 +489,11 @@ function CommentPanel({
   title,
   action,
   items,
+  usersById,
 }: {
   title: string;
   action: string;
+  usersById: Record<string, UserProfileRecord>;
   items: Array<{
     id: string;
     content: string;
@@ -486,7 +508,7 @@ function CommentPanel({
         {items.length > 0 ? (
           items.map((item) => (
             <article className="chat-rail-item" key={item.id}>
-              <h3>{getDisplayName(item.user_id)}</h3>
+              <h3>{getDisplayName(item.user_id, usersById)}</h3>
               <p>
                 {item.content} <span>{formatTimestamp(item.created_at)}</span>
               </p>

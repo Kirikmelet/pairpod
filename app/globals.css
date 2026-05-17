@@ -1345,6 +1345,36 @@ body {
   text-shadow: 0 1px 0 rgba(255,255,255,0.75);
 }
 
+.room-scope-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding-top: var(--space-xs);
+}
+
+.room-scope-tabs a {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-md);
+  border: 1.5px solid var(--cube-border);
+  border-radius: var(--radius-pill);
+  background: var(--cube-bg);
+  color: var(--text-mid);
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  text-decoration: none;
+  box-shadow: var(--shadow-cube);
+}
+
+.room-scope-tabs a.active {
+  background: linear-gradient(180deg, var(--accent-blue-light), var(--accent-blue));
+  border-color: #0042c8;
+  color: white;
+  text-shadow: 0 1px 1px rgba(0,0,80,0.20);
+}
+
 .pod-list {
   display: grid;
   gap: var(--space-lg);
@@ -1427,6 +1457,13 @@ body {
 .pod-icon svg {
   width: 48px;
   height: 48px;
+}
+
+.pod-icon img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
 }
 
 .pod-icon--reddit {
@@ -3305,6 +3342,34 @@ textarea.post-compose-input {
 .profile-field input[type="file"] {
   padding: 8px 10px;
   background: rgba(255,255,255,0.68);
+}
+
+.profile-upload-link {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-md);
+  border: 1.5px solid var(--cube-border);
+  border-radius: var(--radius-lg);
+  background: var(--cube-bg);
+  color: var(--text-link);
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-extrabold);
+  text-decoration: none;
+  box-shadow: var(--shadow-cube);
+}
+
+.profile-upload-link:hover {
+  background: var(--cube-bg-hover);
+  color: var(--text-link-hover);
+}
+
+.profile-field-note {
+  color: var(--text-light);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
 }
 
 .profile-save-button {

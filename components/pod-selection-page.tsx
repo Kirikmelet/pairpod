@@ -1,9 +1,13 @@
 "use client";
 
 import {
+  DEFAULT_AVATAR_URL,
   formatTimestamp,
   getDisplayName,
+  getRoomDisplayName,
   type PageBundle,
+  type UserProfileRecord,
+  useCurrentUserProfile,
   usePageBundle,
 } from "@/lib/client/page-api";
 import { createClient } from "@/utils/supabase/client";
@@ -20,12 +24,28 @@ type PodSelectionPageProps = {
   onSignOut?: () => void;
 };
 
-export function PodSelectionPage({ userEmail = null, onSignOut }: PodSelectionPageProps) {
-  const { bundle, loading, error, buildScopedHref, currentUrl } = usePageBundle();
+export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
+  const {
+    bundle,
+    usersById,
+    loading,
+    error,
+    buildRoomHref,
+    buildScopedHref,
+    currentUrl,
+    domainUrl,
+    roomScope,
+  } =
+    usePageBundle();
+  const { profile } = useCurrentUserProfile();
 
   const posts = bundle?.posts ?? [];
   const comments = bundle?.comments ?? [];
   const pageDomain = getPageDomain(bundle);
+  const domainName = getRoomDisplayName(domainUrl);
+  const currentUserName = profile
+    ? getDisplayName(profile.id, { [profile.id]: profile })
+    : (userEmail ?? "Signed in user");
 
   const recentPosts: Activity[] = posts.slice(-3).reverse().map((post) => ({
     domain: pageDomain,
@@ -83,8 +103,22 @@ export function PodSelectionPage({ userEmail = null, onSignOut }: PodSelectionPa
                 <p className="app-copy">
                   {loading
                     ? "Loading the current page room..."
-                    : `Connected to ${currentUrl}`}
+                    : `Connected to ${getRoomDisplayName(currentUrl)}`}
                 </p>
+                <div className="room-scope-tabs" aria-label="Room scope">
+                  <a
+                    className={roomScope === "global" ? "active" : ""}
+                    href={buildRoomHref("/", "global")}
+                  >
+                    Global
+                  </a>
+                  <a
+                    className={roomScope === "domain" ? "active" : ""}
+                    href={buildRoomHref("/", "domain")}
+                  >
+                    {domainName}
+                  </a>
+                </div>
               </header>
 
               {error ? (
@@ -93,7 +127,7 @@ export function PodSelectionPage({ userEmail = null, onSignOut }: PodSelectionPa
 
               <div className="pod-list">
                 <article className="pod-card pod-card--blue">
-                  <PodIcon icon="globe" />
+                  <PodIcon icon="globe" imageUrl={getDomainIconUrl(bundle?.page.normalized_url)} />
                   <div className="pod-card__content">
                     <h2 className="pod-card__title">{pageDomain}</h2>
                     <p className="pod-card__copy">
@@ -109,7 +143,7 @@ export function PodSelectionPage({ userEmail = null, onSignOut }: PodSelectionPa
                     ) : null}
                   </div>
                   <div className="pod-avatars" aria-label={`${pageDomain} active members`}>
-                    {getAuthorBadges(bundle).map((member, index) => (
+                    {getAuthorBadges(bundle, usersById).map((member, index) => (
                       <span className={`pod-avatar pod-avatar--${(index % 5) + 1}`} key={member}>
                         {member}
                       </span>
@@ -146,7 +180,12 @@ export function PodSelectionPage({ userEmail = null, onSignOut }: PodSelectionPa
             </section>
 
             <aside className="pod-sidebar" aria-label="Pod activity">
-              <UserTile email={userEmail} onSignOut={onSignOut} />
+              <UserTile
+                email={userEmail}
+                profileHref={buildScopedHref("/profile")}
+                avatarUrl={profile?.avatar_url ?? DEFAULT_AVATAR_URL}
+                displayName={currentUserName}
+              />
               <ActivityPanel title="Recent Posts" actionLabel="Open posts" href={buildScopedHref("/posts")} items={recentPosts} />
               <ActivityPanel title="Recent Comments" actionLabel="Open chat" href={buildScopedHref("/chat")} items={recentComments} />
               <ActivityPanel title="Past Pod Activity" actionLabel="Refresh context" href={buildScopedHref("/")} items={history} compact />
@@ -160,25 +199,24 @@ export function PodSelectionPage({ userEmail = null, onSignOut }: PodSelectionPa
 
 function getPageDomain(bundle: PageBundle | null) {
   if (!bundle) {
-    return "current-page";
+    return "Global";
   }
 
-  try {
-    return new URL(bundle.page.normalized_url).hostname;
-  } catch {
-    return bundle.page.normalized_url;
-  }
+  return getRoomDisplayName(bundle.page.normalized_url);
 }
 
-function getAuthorBadges(bundle: PageBundle | null) {
+function getAuthorBadges(
+  bundle: PageBundle | null,
+  usersById: Record<string, UserProfileRecord>,
+) {
   const authors = new Set<string>();
 
   for (const post of bundle?.posts ?? []) {
-    authors.add(getDisplayName(post.user_id).charAt(0).toUpperCase());
+    authors.add(getDisplayName(post.user_id, usersById).charAt(0).toUpperCase());
   }
 
   for (const comment of bundle?.comments ?? []) {
-    authors.add(getDisplayName(comment.user_id).charAt(0).toUpperCase());
+    authors.add(getDisplayName(comment.user_id, usersById).charAt(0).toUpperCase());
   }
 
   if (authors.size === 0) {
@@ -245,37 +283,32 @@ function ActivityPanel({
   );
 }
 
-function UserTile({ email, onSignOut }: { email: string | null; onSignOut?: () => void }) {
-  const handleSignOut = async () => {
-    if (onSignOut) {
-      onSignOut();
-      return;
-    }
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    window.location.href = "/";
-  };
-
+function UserTile({
+  email,
+  profileHref,
+  avatarUrl,
+  displayName,
+}: {
+  email: string | null;
+  profileHref: string;
+  avatarUrl: string;
+  displayName: string;
+}) {
   return (
     <section className="pod-user-tile" aria-label="Current user">
       <span className="pod-user-avatar" aria-hidden="true">
-        <PodFace />
+        <img src={avatarUrl} alt="" />
       </span>
       <div>
-        <h2>{email ?? "Signed in user"}</h2>
+        <h2>{displayName}</h2>
+        {email ? <p className="pod-user-email">{email}</p> : null}
         <p>
           <span className="live-dot" /> Online
         </p>
       </div>
-      <button
-        className="pod-user-menu pod-user-signout"
-        type="button"
-        aria-label="Sign out"
-        onClick={() => void handleSignOut()}
-        title="Sign out"
-      >
-        <span aria-hidden="true">↩</span>
-      </button>
+      <a className="pod-user-menu" href={profileHref} aria-label="Open profile settings">
+        <span aria-hidden="true">v</span>
+      </a>
     </section>
   );
 }
@@ -327,12 +360,26 @@ function PodTitleIcon() {
   );
 }
 
-function PodIcon({ icon }: { icon: "globe" | "plus" }) {
+function PodIcon({
+  icon,
+  imageUrl,
+}: {
+  icon: "globe" | "plus";
+  imageUrl?: string | null;
+}) {
   return (
     <span className={`pod-icon pod-icon--${icon}`} aria-hidden="true">
-      <IconShape icon={icon} />
+      {imageUrl ? <img src={imageUrl} alt="" /> : <IconShape icon={icon} />}
     </span>
   );
+}
+
+function getDomainIconUrl(url: string | undefined) {
+  if (!url || getRoomDisplayName(url) === "Global") {
+    return null;
+  }
+
+  return `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(url)}&sz=64`;
 }
 
 function PodMiniIcon({ icon }: { icon: "globe" | "wiki" }) {

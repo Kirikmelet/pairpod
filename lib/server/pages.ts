@@ -2,6 +2,7 @@ import 'server-only'
 
 import { cookies } from 'next/headers'
 import { normalizeUrl } from '@/lib/server/helpers/normalizeUrl'
+import { loadUserProfiles, type UserProfileRow } from '@/lib/server/profiles'
 import { createClient } from '@/utils/supabase/server'
 
 export type PageRow = {
@@ -46,6 +47,7 @@ export type PageBundle = {
   room: RoomRow
   posts: PostRow[]
   comments: CommentRow[]
+  users: UserProfileRow[]
 }
 
 export async function loadOrCreatePageRoom(url: string): Promise<PageBundle> {
@@ -168,10 +170,16 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
       })) ?? []
   }
 
+  const users = await loadUserProfiles([
+    ...posts.map((post) => post.user_id).filter((userId): userId is string => Boolean(userId)),
+    ...comments.map((comment) => comment.user_id).filter((userId): userId is string => Boolean(userId)),
+  ])
+
   return {
     page: pageResult.data,
     room: roomResult.data,
     posts,
     comments,
+    users,
   }
 }

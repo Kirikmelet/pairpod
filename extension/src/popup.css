@@ -148,6 +148,12 @@ body {
   font-size: var(--fs-xxl);
 }
 
+.extension-app .room-scope-tabs a {
+  min-height: 24px;
+  padding: 0 var(--space-sm);
+  font-size: var(--fs-xs);
+}
+
 .extension-app .pod-list {
   gap: var(--space-sm);
 }
@@ -165,6 +171,11 @@ body {
 }
 
 .extension-app .pod-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.extension-app .pod-icon img {
   width: 28px;
   height: 28px;
 }
@@ -258,7 +269,7 @@ body {
   height: 100%;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .extension-app .post-filterbar {
@@ -290,15 +301,81 @@ body {
   background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(236,242,248,0.86));
 }
 
+.extension-app .post-compose-strip {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  border-bottom: 1px solid var(--glass-border);
+  background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(236,242,248,0.92));
+}
+
+.extension-app .post-compose-strip__row {
+  display: grid;
+  grid-template-columns: 98px minmax(0, 1fr);
+  gap: var(--space-xs);
+}
+
+.extension-app .post-compose-strip select,
+.extension-app .post-compose-strip input,
+.extension-app .post-compose-strip textarea {
+  width: 100%;
+  border: 1.5px solid var(--cube-border);
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.72);
+  color: var(--text-dark);
+  font-family: var(--font-body);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  outline: none;
+  padding: 6px 8px;
+  box-shadow: var(--shadow-inset);
+}
+
+.extension-app .post-compose-strip textarea {
+  min-height: 48px;
+  resize: none;
+}
+
+.extension-app .post-compose-strip button {
+  min-height: 30px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, var(--btn-green-top), var(--btn-green-bot));
+  color: white;
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-extrabold);
+  cursor: pointer;
+  box-shadow: var(--shadow-btn-green);
+}
+
+.extension-app .post-compose-strip button:disabled {
+  opacity: 0.62;
+  cursor: default;
+}
+
 .extension-app .post-card {
-  grid-template-columns: 42px minmax(0, 1fr);
-  align-content: start;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  align-content: center;
+  text-align: center;
   gap: var(--space-sm);
   padding: var(--space-sm);
-  min-height: 390px;
+  min-height: 300px;
   scroll-snap-align: start;
   background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(232,244,255,0.92));
   border-color: rgba(50,110,200,0.48);
+}
+
+.extension-app .post-votes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.extension-app .post-card__body {
+  width: 100%;
+  justify-items: center;
 }
 
 .extension-app .post-votes button {
@@ -323,12 +400,62 @@ body {
 }
 
 .extension-app .post-card footer {
+  justify-content: center;
   gap: var(--space-sm);
 }
 
 .extension-app .post-detail-main,
 .extension-app .post-comments {
   min-width: 0;
+}
+
+.extension-app .profile-scene,
+.extension-app .profile-scene__content {
+  width: 100%;
+  min-height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+.extension-app .profile-scene__content {
+  padding: var(--space-xs);
+}
+
+.extension-app .profile-window {
+  width: 100%;
+  max-width: 100%;
+  height: calc(100vh - 8px);
+  border-width: 1px;
+}
+
+.extension-app .profile-window__body {
+  max-height: calc(100vh - 72px);
+  overflow: auto;
+  padding: var(--space-sm);
+  gap: var(--space-sm);
+}
+
+.extension-app .profile-header {
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+}
+
+.extension-app .profile-avatar {
+  width: 56px;
+  height: 56px;
+}
+
+.extension-app .profile-title {
+  font-size: var(--fs-xl);
+}
+
+.extension-app .profile-form {
+  gap: var(--space-sm);
+}
+
+.extension-app .profile-field input {
+  min-height: 36px;
 }
 
 /* Hard popup-only forum sizing. This stylesheet only ships in the extension. */
@@ -361,7 +488,7 @@ body {
 .post-stream {
   min-height: 0 !important;
   height: 100% !important;
-  grid-template-rows: 34px minmax(0, 1fr) !important;
+  grid-template-rows: 34px auto minmax(0, 1fr) !important;
   overflow: hidden !important;
 }
 
@@ -375,8 +502,8 @@ body {
 
 .post-list {
   min-height: 0 !important;
-  height: 458px !important;
-  max-height: 458px !important;
+  height: 318px !important;
+  max-height: 318px !important;
   overflow-y: auto !important;
   gap: 12px !important;
   padding: 8px !important;
@@ -384,8 +511,10 @@ body {
 }
 
 .post-card {
-  min-height: 390px !important;
-  grid-template-columns: 42px minmax(0, 1fr) !important;
-  align-content: start !important;
+  min-height: 300px !important;
+  grid-template-columns: 1fr !important;
+  justify-items: center !important;
+  align-content: center !important;
+  text-align: center !important;
   scroll-snap-align: start !important;
 }

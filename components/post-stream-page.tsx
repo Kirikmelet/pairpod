@@ -5,11 +5,13 @@ import type { ReactNode } from "react";
 import {
   formatTimestamp,
   getDisplayName,
+  getRoomDisplayName,
   postJson,
   updateCommentLikes,
   updatePostLikes,
   type PostRecord,
   type CommentRecord,
+  type UserProfileRecord,
   usePageBundle,
 } from "@/lib/client/page-api";
 
@@ -23,9 +25,20 @@ type PostStreamPageProps = {
 };
 
 export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
-  const { bundle, commentsByPost, loading, error, refresh, buildScopedHref } =
-    usePageBundle();
+  const {
+    bundle,
+    commentsByPost,
+    usersById,
+    loading,
+    error,
+    refresh,
+    buildRoomHref,
+    buildScopedHref,
+    domainUrl,
+    roomScope,
+  } = usePageBundle();
   const isPopup = variant === "popup";
+  const domainName = getRoomDisplayName(domainUrl);
   const [mode, setMode] = useState<"question" | "guide">("question");
   const [header, setHeader] = useState("");
   const [content, setContent] = useState("");
@@ -111,6 +124,10 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
       chatHref={buildScopedHref("/chat")}
       postsHref={buildScopedHref("/posts")}
       podsHref={buildScopedHref("/")}
+      globalHref={buildRoomHref("/posts", "global")}
+      domainHref={buildRoomHref("/posts", "domain")}
+      domainName={domainName}
+      roomScope={roomScope}
       variant={variant}
     >
       <div className={`post-layout ${isPopup ? "post-layout--popup" : ""}`}>
@@ -131,6 +148,43 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
         ) : null}
         <section className="post-stream" aria-label="Post stream">
           <PanelHeader title="Post Stream" />
+          {isPopup ? (
+            <form
+              className="post-compose-strip"
+              onSubmit={(event) => void handleSubmit(event)}
+            >
+              <div className="post-compose-strip__row">
+                <select
+                  aria-label="Post type"
+                  value={mode}
+                  onChange={(event) =>
+                    setMode(event.target.value as "question" | "guide")
+                  }
+                >
+                  <option value="question">Question</option>
+                  <option value="guide">Guide</option>
+                </select>
+                <input
+                  type="text"
+                  value={header}
+                  onChange={(event) => setHeader(event.target.value)}
+                  placeholder="Title"
+                />
+              </div>
+              <textarea
+                value={content}
+                onChange={(event) => setContent(event.target.value)}
+                placeholder="Write a post..."
+                rows={2}
+              />
+              {submitError ? (
+                <p className="status-note status-note--error">{submitError}</p>
+              ) : null}
+              <button type="submit" disabled={isSubmitting || !content.trim()}>
+                {isSubmitting ? "Posting..." : `Post ${mode}`}
+              </button>
+            </form>
+          ) : null}
           {!isPopup ? (
             <div className="post-filterbar">
               <button type="button" className="active">
@@ -182,7 +236,10 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
                       </h2>
                       <p>
                         posted by{" "}
-                        <strong>{getDisplayName(post.user_id)}</strong> -{" "}
+                        <strong>
+                          {getDisplayName(post.user_id, usersById)}
+                        </strong>{" "}
+                        -{" "}
                         {formatTimestamp(post.created_at)}
                       </p>
                     </header>
@@ -225,8 +282,19 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
 }
 
 export function PostDetailPage({ postId }: { postId: string }) {
-  const { bundle, commentsByPost, loading, error, refresh, buildScopedHref } =
-    usePageBundle();
+  const {
+    bundle,
+    commentsByPost,
+    usersById,
+    loading,
+    error,
+    refresh,
+    buildRoomHref,
+    buildScopedHref,
+    domainUrl,
+    roomScope,
+  } = usePageBundle();
+  const domainName = getRoomDisplayName(domainUrl);
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -302,6 +370,10 @@ export function PostDetailPage({ postId }: { postId: string }) {
         chatHref={buildScopedHref("/chat")}
         postsHref={buildScopedHref("/posts")}
         podsHref={buildScopedHref("/")}
+        globalHref={buildRoomHref("/posts", "global")}
+        domainHref={buildRoomHref("/posts", "domain")}
+        domainName={domainName}
+        roomScope={roomScope}
       >
         <p className="status-note">Loading post...</p>
       </PostShell>
@@ -316,6 +388,10 @@ export function PostDetailPage({ postId }: { postId: string }) {
         chatHref={buildScopedHref("/chat")}
         postsHref={buildScopedHref("/posts")}
         podsHref={buildScopedHref("/")}
+        globalHref={buildRoomHref("/posts", "global")}
+        domainHref={buildRoomHref("/posts", "domain")}
+        domainName={domainName}
+        roomScope={roomScope}
       >
         <p className="status-note status-note--error">{error}</p>
       </PostShell>
@@ -330,6 +406,10 @@ export function PostDetailPage({ postId }: { postId: string }) {
         chatHref={buildScopedHref("/chat")}
         postsHref={buildScopedHref("/posts")}
         podsHref={buildScopedHref("/")}
+        globalHref={buildRoomHref("/posts", "global")}
+        domainHref={buildRoomHref("/posts", "domain")}
+        domainName={domainName}
+        roomScope={roomScope}
       >
         <p className="status-note status-note--error">
           This post could not be found in the current page context.
@@ -345,6 +425,10 @@ export function PostDetailPage({ postId }: { postId: string }) {
       chatHref={buildScopedHref("/chat")}
       postsHref={buildScopedHref("/posts")}
       podsHref={buildScopedHref("/")}
+      globalHref={buildRoomHref("/posts", "global")}
+      domainHref={buildRoomHref("/posts", "domain")}
+      domainName={domainName}
+      roomScope={roomScope}
     >
       <div className="post-detail-layout">
         <section className="post-detail-main">
@@ -368,7 +452,11 @@ export function PostDetailPage({ postId }: { postId: string }) {
                   {post.header || truncate(post.content)}
                 </h1>
                 <p>
-                  posted by <strong>{getDisplayName(post.user_id)}</strong> -{" "}
+                  posted by{" "}
+                  <strong>
+                    {getDisplayName(post.user_id, usersById)}
+                  </strong>{" "}
+                  -{" "}
                   {formatTimestamp(post.created_at)}
                 </p>
               </header>
@@ -393,6 +481,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
                     replies={repliesByParent[comment.id] ?? []}
                     refresh={refresh}
                     parentUser={null}
+                    usersById={usersById}
                   />
                 ))
               ) : (
@@ -460,14 +549,10 @@ function getCommentCount(
 
 function getPageTitle(bundle: ReturnType<typeof usePageBundle>["bundle"]) {
   if (!bundle) {
-    return "current-page";
+    return "Global";
   }
 
-  try {
-    return new URL(bundle.page.normalized_url).hostname;
-  } catch {
-    return bundle.page.normalized_url;
-  }
+  return getRoomDisplayName(bundle.page.normalized_url);
 }
 
 function truncate(content: string) {
@@ -484,6 +569,10 @@ function PostShell({
   chatHref,
   postsHref,
   podsHref,
+  globalHref,
+  domainHref,
+  domainName,
+  roomScope,
   variant = "page",
   children,
 }: {
@@ -492,6 +581,10 @@ function PostShell({
   chatHref: string;
   postsHref: string;
   podsHref: string;
+  globalHref: string;
+  domainHref: string;
+  domainName: string;
+  roomScope: "global" | "domain";
   variant?: "page" | "popup";
   children: ReactNode;
 }) {
@@ -519,9 +612,23 @@ function PostShell({
           <nav className="chat-menu post-nav" aria-label="Post stream menu">
             <a href={chatHref} className="nav-cta">→ Chat</a>
             <a href={podsHref}>Pods</a>
+<<<<<<< Updated upstream
             <a href={postsHref} className="post-nav__active">Posts</a>
-            <a href={postsHref}>Sort</a>
-            <a href={podsHref}>Help</a>
+=======
+            <a href={postsHref}>Posts</a>
+>>>>>>> Stashed changes
+            <a
+              href={globalHref}
+              className={roomScope === "global" ? "chat-nav__active" : ""}
+            >
+              Global
+            </a>
+            <a
+              href={domainHref}
+              className={roomScope === "domain" ? "chat-nav__active" : ""}
+            >
+              {domainName}
+            </a>
           </nav>
           {children}
         </section>
@@ -707,6 +814,7 @@ function CommentCard({
   replies,
   refresh,
   parentUser,
+  usersById,
 }: {
   comment: CommentRecord;
   tone: string;
@@ -714,13 +822,14 @@ function CommentCard({
   replies: CommentRecord[];
   refresh: () => Promise<unknown>;
   parentUser: string | null;
+  usersById: Record<string, UserProfileRecord>;
 }) {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyContent, setReplyContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
-  const displayName = getDisplayName(comment.user_id);
+  const displayName = getDisplayName(comment.user_id, usersById);
 
   const handleReply = async (event: FormEvent) => {
     event.preventDefault();
@@ -837,11 +946,14 @@ function CommentCard({
                 ↳ replying to <strong>@{displayName}</strong>
               </div>
               <div className="post-comment__avatar">
-                {getDisplayName(reply.user_id).charAt(0).toUpperCase()}
+                {getDisplayName(reply.user_id, usersById).charAt(0).toUpperCase()}
               </div>
               <div className="post-comment__body">
                 <header>
-                  <h2>@{getDisplayName(reply.user_id)}</h2>
+                  <h2>
+                    @
+                    {getDisplayName(reply.user_id, usersById)}
+                  </h2>
                   <span>{formatTimestamp(reply.created_at)}</span>
                 </header>
                 <p>{reply.content}</p>

@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "PeerPod",
   "short_name": "PeerPod",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyHCr23riNSQxen0qCEx7UzFO2/AMPAxoQ/DNb1H+kLo2OYDMQASh/8Jy8/asKeLFH7zjnAGYAGAz2a22SUiGaCML8LLQlJX+t463rA/UZms8w9EDZcrqjCrrxCMVxZwwd9TNz963zScQJuxicVRXrsc3sunK0DqNj++IaZe1cdBfO+xK6snQnlxtpWXpVDvV7zoNDKOztDSSa3yydKRT33EPP9jKGD1SudAGQPZnVSI8WObXwZ/WBjaHG0LEWS7N0y0/tpYW4nFkD2Gxgm9hXf2JrMIezdZctfde4gokhCgtW/NE+rmSkX4OWUVABCPjEQjpES6TyktJiY/VAvPKkQIDAQAB",
   "version": "0.1.0",
   "description": "Browser extension shell for the Uncommon Hacks Next.js app.",
   "icons": {

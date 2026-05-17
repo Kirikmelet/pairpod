@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import type { Json, TablesInsert } from "@/utils/database.types";
 
-const FALLBACK_URL = "https://example.com";
+const GLOBAL_ROOM_URL = "https://global.pairpod.local/";
+const FALLBACK_URL = GLOBAL_ROOM_URL;
 const DEFAULT_PORTS = new Map([
   ["http:", "80"],
   ["https:", "443"],
@@ -47,11 +48,20 @@ export type CommentRecord = {
   created_at: string;
 };
 
+export type UserProfileRecord = {
+  id: string;
+  email: string | null;
+  username: string | null;
+  configurations: Json;
+  avatar_url: string | null;
+};
+
 export type PageBundle = {
   page: PageRecord;
   room: RoomRecord;
   posts: PostRecord[];
   comments: CommentRecord[];
+  users: UserProfileRecord[];
 };
 
 type ApiSuccess<T> = {
@@ -69,20 +79,82 @@ type ApiResponse<T> = ApiSuccess<T> | ApiError;
 type UsePageBundleResult = {
   bundle: PageBundle | null;
   commentsByPost: Record<string, CommentRecord[]>;
+  usersById: Record<string, UserProfileRecord>;
   currentUrl: string;
+  domainUrl: string;
   currentTitle: string;
+  roomScope: "global" | "domain";
   loading: boolean;
   error: string | null;
   refresh: () => Promise<PageBundle | null>;
   buildScopedHref: (pathname: string) => string;
+  buildRoomHref: (pathname: string, scope: "global" | "domain") => string;
 };
 
-export function getDisplayName(userId: string | null) {
+type MutableUsersTable = {
+  select(columns: string): {
+    eq(column: string, value: string): {
+      limit(count: number): Promise<{ data: UserProfileRecord[] | null; error: Error | null }>;
+    };
+    in(column: string, value: string[]): Promise<{
+      data: UserProfileRecord[] | null;
+      error: Error | null;
+    }>;
+  };
+  upsert(
+    value: Partial<UserProfileRecord> & { id: string },
+    options?: { onConflict?: string },
+  ): Promise<{ data: unknown; error: Error | null }>;
+};
+
+const USER_PROFILE_COLUMNS = "id,email,username,configurations,avatar_url";
+export const DEFAULT_AVATAR_URL =
+  "https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png";
+
+export function getDisplayName(
+  userId: string | null,
+  usersById: Record<string, UserProfileRecord> = {},
+) {
   if (!userId) {
     return "Anonymous";
   }
 
+  const profile = usersById[userId];
+  const configuration = readProfileConfiguration(profile?.configurations);
+  const displayName = configuration.displayName?.trim();
+
+  if (displayName) {
+    return displayName;
+  }
+
+  if (profile?.username?.trim()) {
+    return profile.username.trim();
+  }
+
   return `user_${userId.slice(0, 8)}`;
+}
+
+export function getProfileAvatarUrl(
+  userId: string | null,
+  usersById: Record<string, UserProfileRecord> = {},
+) {
+  if (!userId) {
+    return DEFAULT_AVATAR_URL;
+  }
+
+  return usersById[userId]?.avatar_url || DEFAULT_AVATAR_URL;
+}
+
+export function getRoomDisplayName(url: string) {
+  if (url === GLOBAL_ROOM_URL) {
+    return "Global";
+  }
+
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
 }
 
 export function formatTimestamp(timestamp: string) {
@@ -161,10 +233,18 @@ export async function updateCommentLikes(comment: CommentRecord, delta: 1 | -1) 
 export function usePageBundle(): UsePageBundleResult {
   const searchParams = useSearchParams();
   const searchString = searchParams.toString();
+  const roomScope = useMemo(
+    () => (searchParams.get("room") === "domain" ? "domain" : "global"),
+    [searchParams, searchString],
+  );
+  const domainUrl = useMemo(
+    () => normalizePageUrl(resolveDomainUrl(searchParams)),
+    [searchParams, searchString],
+  );
 
   const currentUrl = useMemo(
-    () => normalizePageUrl(resolveCurrentUrl(searchParams)),
-    [searchParams, searchString],
+    () => (roomScope === "domain" ? domainUrl : GLOBAL_ROOM_URL),
+    [domainUrl, roomScope],
   );
   const currentTitle = useMemo(
     () => searchParams.get("title")?.trim() || getDocumentTitle(),
@@ -181,6 +261,7 @@ export function usePageBundle(): UsePageBundleResult {
 
     try {
       const params = new URLSearchParams({ url: currentUrl });
+      params.set("room", roomScope);
       if (currentTitle) {
         params.set("title", currentTitle);
       }
@@ -211,7 +292,7 @@ export function usePageBundle(): UsePageBundleResult {
     } finally {
       setLoading(false);
     }
-  }, [currentTitle, currentUrl]);
+  }, [currentTitle, currentUrl, roomScope]);
 
   useEffect(() => {
     void refresh();
@@ -233,9 +314,22 @@ export function usePageBundle(): UsePageBundleResult {
     return next;
   }, [bundle?.comments]);
 
+  const usersById = useMemo(() => {
+    const next: Record<string, UserProfileRecord> = {};
+
+    for (const user of bundle?.users ?? []) {
+      next[user.id] = user;
+    }
+
+    return next;
+  }, [bundle?.users]);
+
   const buildScopedHref = useCallback(
     (pathname: string) => {
-      const params = new URLSearchParams({ url: currentUrl });
+      const params = new URLSearchParams({
+        room: roomScope,
+        url: domainUrl,
+      });
       if (currentTitle) {
         params.set("title", currentTitle);
       }
@@ -246,19 +340,84 @@ export function usePageBundle(): UsePageBundleResult {
 
       return `${pathname}?${params.toString()}`;
     },
-    [currentTitle, currentUrl],
+    [currentTitle, domainUrl, roomScope],
+  );
+
+  const buildRoomHref = useCallback(
+    (pathname: string, scope: "global" | "domain") => {
+      const params = new URLSearchParams({
+        room: scope,
+        url: domainUrl,
+      });
+      if (currentTitle) {
+        params.set("title", currentTitle);
+      }
+
+      if (isExtensionRuntime()) {
+        return `#${pathname}?${params.toString()}`;
+      }
+
+      return `${pathname}?${params.toString()}`;
+    },
+    [currentTitle, domainUrl],
   );
 
   return {
     bundle,
     commentsByPost,
+    usersById,
     currentUrl,
+    domainUrl,
     currentTitle,
+    roomScope,
     loading,
     error,
     refresh,
     buildScopedHref,
+    buildRoomHref,
   };
+}
+
+export function useCurrentUserProfile() {
+  const [profile, setProfile] = useState<UserProfileRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadProfile() {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          if (isMounted) {
+            setProfile(null);
+          }
+          return;
+        }
+
+        const nextProfile = await ensureCurrentUserProfile();
+        if (isMounted) {
+          setProfile(nextProfile);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  return { profile, loading };
 }
 
 async function postDirectToSupabase<TResponse>(
@@ -330,11 +489,14 @@ async function loadOrCreatePageBundle(url: string): Promise<PageBundle> {
     comments = commentsData ?? [];
   }
 
+  const users = await loadProfilesForRecords(posts, comments);
+
   return {
     page,
     room,
     posts,
     comments,
+    users,
   };
 }
 
@@ -440,12 +602,13 @@ async function createPostDirect({
   }
 
   const supabase = createClient();
+  const currentUser = await ensureCurrentUserProfile();
   const payload: TablesInsert<"posts"> = {
     room_id: resolvedRoomId,
     type,
     content: trimmedContent,
     header: header?.trim() || null,
-    user_id: null,
+    user_id: currentUser?.id ?? null,
   };
 
   const { data, error } = await supabase
@@ -480,11 +643,12 @@ async function createCommentDirect({
   }
 
   const supabase = createClient();
+  const currentUser = await ensureCurrentUserProfile();
   const payload: TablesInsert<"comments"> = {
     post_id: postId,
     content: trimmedContent,
     reply_id: replyId,
-    user_id: null,
+    user_id: currentUser?.id ?? null,
   };
 
   const { data, error } = await supabase
@@ -502,6 +666,105 @@ async function createCommentDirect({
   }
 
   return data[0];
+}
+
+async function loadProfilesForRecords(
+  posts: PostRecord[],
+  comments: CommentRecord[],
+) {
+  const userIds = new Set<string>();
+
+  for (const post of posts) {
+    if (post.user_id) {
+      userIds.add(post.user_id);
+    }
+  }
+
+  for (const comment of comments) {
+    if (comment.user_id) {
+      userIds.add(comment.user_id);
+    }
+  }
+
+  if (userIds.size === 0) {
+    return [];
+  }
+
+  const supabase = createClient();
+  const users = supabase.from("users") as unknown as MutableUsersTable;
+  const { data, error } = await users
+    .select(USER_PROFILE_COLUMNS)
+    .in("id", [...userIds]);
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
+}
+
+async function ensureCurrentUserProfile() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return null;
+  }
+
+  const users = supabase.from("users") as unknown as MutableUsersTable;
+  const { data, error } = await users
+    .select(USER_PROFILE_COLUMNS)
+    .eq("id", user.id)
+    .limit(1);
+
+  if (error) {
+    throw error;
+  }
+
+  if (data?.[0]) {
+    return data[0];
+  }
+
+  const profile: UserProfileRecord = {
+    id: user.id,
+    email: user.email ?? null,
+    username: readMetadataString(user.user_metadata.username),
+    configurations: {
+      displayName:
+        readMetadataString(user.user_metadata.full_name) ||
+        readMetadataString(user.user_metadata.name),
+    },
+    avatar_url:
+      readMetadataString(user.user_metadata.avatar_url) || DEFAULT_AVATAR_URL,
+  };
+
+  const { error: upsertError } = await users.upsert(profile, { onConflict: "id" });
+  if (upsertError) {
+    throw upsertError;
+  }
+
+  return profile;
+}
+
+function readProfileConfiguration(configurations: Json | undefined) {
+  if (
+    configurations &&
+    typeof configurations === "object" &&
+    !Array.isArray(configurations)
+  ) {
+    const displayName = configurations.displayName;
+    return {
+      displayName: typeof displayName === "string" ? displayName : "",
+    };
+  }
+
+  return { displayName: "" };
+}
+
+function readMetadataString(value: unknown) {
+  return typeof value === "string" ? value.trim() : null;
 }
 
 function readString(value: unknown) {
@@ -533,13 +796,8 @@ function normalizePageUrl(input: string) {
       url.port = "";
     }
 
-    if (url.pathname !== "/") {
-      url.pathname = url.pathname.replace(/\/+$/, "") || "/";
-    }
-
-    const sortedSearchParams = new URLSearchParams(url.searchParams);
-    sortedSearchParams.sort();
-    url.search = sortedSearchParams.toString();
+    url.pathname = "/";
+    url.search = "";
 
     return url.toString();
   } catch {
@@ -558,7 +816,7 @@ function isExtensionRuntime() {
   return Boolean(runtime?.runtime?.id);
 }
 
-function resolveCurrentUrl(searchParams: ReturnType<typeof useSearchParams>) {
+function resolveDomainUrl(searchParams: ReturnType<typeof useSearchParams>) {
   const explicitUrl = searchParams.get("url")?.trim();
   if (explicitUrl) {
     return explicitUrl;
