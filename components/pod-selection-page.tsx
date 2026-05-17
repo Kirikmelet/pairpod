@@ -212,6 +212,7 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
             <aside className="pod-sidebar" aria-label="Pod activity">
               <UserTile
                 email={userEmail}
+                dmsHref={buildScopedHref("/dms")}
                 profileHref={buildScopedHref("/profile")}
                 avatarUrl={profile?.avatar_url ?? DEFAULT_AVATAR_URL}
                 displayName={currentUserName}
@@ -315,11 +316,13 @@ function ActivityPanel({
 
 function UserTile({
   email,
+  dmsHref,
   profileHref,
   avatarUrl,
   displayName,
 }: {
   email: string | null;
+  dmsHref: string;
   profileHref: string;
   avatarUrl: string;
   displayName: string;
@@ -336,9 +339,12 @@ function UserTile({
           <span className="live-dot" /> Online
         </p>
       </div>
-      <a className="pod-user-menu" href={profileHref} aria-label="Open profile settings">
-        <span aria-hidden="true">v</span>
-      </a>
+      <div className="pod-user-actions">
+        <a href={dmsHref}>DMs</a>
+        <a className="pod-user-menu" href={profileHref} aria-label="Open profile settings">
+          <span aria-hidden="true">v</span>
+        </a>
+      </div>
     </section>
   );
 }
