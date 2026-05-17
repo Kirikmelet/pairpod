@@ -2,20 +2,13 @@ type SupabasePublicConfig = {
   key: string;
   keySource: "NEXT_PUBLIC_SUPABASE_ANON_KEY" | "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY";
   url: string;
-  urlSource: "NEXT_PUBLIC_SUPABASE_URL" | "SUPABASE_URL";
+  urlSource: "NEXT_PUBLIC_SUPABASE_URL";
 };
 
-function getSupabaseUrl():
-  | { value: string; source: "NEXT_PUBLIC_SUPABASE_URL" | "SUPABASE_URL" }
-  | null {
+function getSupabaseUrl(): { value: string; source: "NEXT_PUBLIC_SUPABASE_URL" } | null {
   const nextPublicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   if (nextPublicUrl) {
     return { value: nextPublicUrl, source: "NEXT_PUBLIC_SUPABASE_URL" };
-  }
-
-  const serverUrl = process.env.SUPABASE_URL?.trim();
-  if (serverUrl) {
-    return { value: serverUrl, source: "SUPABASE_URL" };
   }
 
   return null;
@@ -48,9 +41,8 @@ function getSupabasePublicKey():
 function buildMissingConfigMessage(context: string): string {
   return [
     `${context} requires Supabase runtime environment variables.`,
-    "Expected URL: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL.",
+    "Expected URL: NEXT_PUBLIC_SUPABASE_URL.",
     "Expected public key: NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
-    "SUPABASE_SERVICE_ROLE_KEY is only for backend service-role routes and is not valid for SSR/browser clients.",
   ].join(" ");
 }
 

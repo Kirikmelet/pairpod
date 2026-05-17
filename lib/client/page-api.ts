@@ -33,7 +33,7 @@ export type PostRecord = {
 
 export type CommentRecord = {
   id: string;
-  section_id: string | null;
+  post_id: string | null;
   reply_id: string | null;
   content: string;
   likes: number;
@@ -62,7 +62,7 @@ type ApiResponse<T> = ApiSuccess<T> | ApiError;
 
 type UsePageBundleResult = {
   bundle: PageBundle | null;
-  commentsBySection: Record<string, CommentRecord[]>;
+  commentsByPost: Record<string, CommentRecord[]>;
   currentUrl: string;
   currentTitle: string;
   loading: boolean;
@@ -172,17 +172,17 @@ export function usePageBundle(): UsePageBundleResult {
     void refresh();
   }, [refresh]);
 
-  const commentsBySection = useMemo(() => {
+  const commentsByPost = useMemo(() => {
     const next: Record<string, CommentRecord[]> = {};
 
     for (const comment of bundle?.comments ?? []) {
-      const sectionId = comment.section_id;
-      if (!sectionId) {
+      const postId = comment.post_id;
+      if (!postId) {
         continue;
       }
 
-      next[sectionId] ??= [];
-      next[sectionId].push(comment);
+      next[postId] ??= [];
+      next[postId].push(comment);
     }
 
     return next;
@@ -202,7 +202,7 @@ export function usePageBundle(): UsePageBundleResult {
 
   return {
     bundle,
-    commentsBySection,
+    commentsByPost,
     currentUrl,
     currentTitle,
     loading,

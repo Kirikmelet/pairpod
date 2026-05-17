@@ -43,7 +43,6 @@ export default defineConfig({
     "process.env.NEXT_PUBLIC_SITE_URL": JSON.stringify(
       env.NEXT_PUBLIC_SITE_URL ?? "",
     ),
-    "process.env.SUPABASE_URL": JSON.stringify(env.SUPABASE_URL ?? ""),
   },
   build: {
     copyPublicDir: false,

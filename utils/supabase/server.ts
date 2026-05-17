@@ -1,18 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { Database } from "../database.types";
 import { getSupabasePublicConfig } from "./config";
 
-type AppDatabase = Omit<Database, "__InternalSupabase">;
-
 export const createClient = (
   cookieStore: Awaited<ReturnType<typeof cookies>>,
-) => {
+): SupabaseClient<Database> => {
   const { url, key } = getSupabasePublicConfig(
     "utils/supabase/server.ts createClient()",
   );
 
-  return createServerClient<AppDatabase, "public">(url, key, {
+  return createServerClient<Database>(url, key, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -29,5 +28,5 @@ export const createClient = (
         }
       },
     },
-  });
+  }) as unknown as SupabaseClient<Database>;
 };
