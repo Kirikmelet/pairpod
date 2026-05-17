@@ -1,11 +1,12 @@
-import type { NextConfig } from "next";
-import path from "node:path";
+// @ts-check
+const path = require("node:path");
 
 const isExtensionBuild = process.env.BUILD_EXTENSION === "1";
 const isElectronBuild = process.env.BUILD_ELECTRON === "1";
 const isStaticShellBuild = isExtensionBuild || isElectronBuild;
 
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   outputFileTracingRoot: path.resolve(__dirname),
   ...(isStaticShellBuild
     ? {
@@ -19,4 +20,4 @@ const nextConfig: NextConfig = {
     : {}),
 };
 
-export default nextConfig;
+module.exports = nextConfig;
