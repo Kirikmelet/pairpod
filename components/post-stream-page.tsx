@@ -249,6 +249,7 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
                       <a href={buildScopedHref(`/posts/${post.id}`)}>
                         {getCommentCount(commentsByPost, post.id)} replies
                       </a>
+                      <a href={buildScopedHref(`/posts/${post.id}`)}>Reply</a>
                       <button type="button">Save</button>
                     </footer>
                   </div>

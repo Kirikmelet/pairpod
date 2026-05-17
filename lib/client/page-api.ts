@@ -223,12 +223,27 @@ export async function updatePostLikes(post: PostRecord, delta: 1 | -1) {
 
 async function updatePostLikesDirect(post: PostRecord, delta: 1 | -1) {
   const supabase = createClient();
-  const nextLikes = Math.max(0, post.likes + delta);
+  const { data: existingPosts, error: loadError } = await supabase
+    .from("posts")
+    .select("id,likes")
+    .eq("id", post.id)
+    .limit(1);
+
+  if (loadError) {
+    throw loadError;
+  }
+
+  const existingPost = existingPosts?.[0];
+  if (!existingPost) {
+    throw new Error("Could not find post to vote on.");
+  }
+
+  const nextLikes = Math.max(0, existingPost.likes + delta);
   const { data, error } = await supabase
     .from("posts")
     .update({ likes: nextLikes })
     .eq("id", post.id)
-    .select("id")
+    .select("id,likes")
     .limit(1);
 
   if (error) {
@@ -255,12 +270,27 @@ export async function updateCommentLikes(comment: CommentRecord, delta: 1 | -1) 
 
 async function updateCommentLikesDirect(comment: CommentRecord, delta: 1 | -1) {
   const supabase = createClient();
-  const nextLikes = Math.max(0, comment.likes + delta);
+  const { data: existingComments, error: loadError } = await supabase
+    .from("comments")
+    .select("id,likes")
+    .eq("id", comment.id)
+    .limit(1);
+
+  if (loadError) {
+    throw loadError;
+  }
+
+  const existingComment = existingComments?.[0];
+  if (!existingComment) {
+    throw new Error("Could not find comment to vote on.");
+  }
+
+  const nextLikes = Math.max(0, existingComment.likes + delta);
   const { data, error } = await supabase
     .from("comments")
     .update({ likes: nextLikes })
     .eq("id", comment.id)
-    .select("id")
+    .select("id,likes")
     .limit(1);
 
   if (error) {
