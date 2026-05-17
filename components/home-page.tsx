@@ -5,8 +5,9 @@ import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { AuthForm } from "@/components/auth-form";
-import { HomeChatModule } from "@/components/home-chat-module";
+import { ChatPage } from "@/components/chat-page";
 import { PodSelectionPage } from "@/components/pod-selection-page";
+import { PostDetailPage, PostStreamPage } from "@/components/post-stream-page";
 import {
   completeClientSideAuthRedirect,
   createClient,
@@ -114,60 +115,78 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
     return <PodSelectionPage userEmail={user.email ?? null} />;
   }
 
-  return (
-    <AppShell isPopup title="Uncommon Hacks - Home" wide>
-      <AuthenticatedHomeShell
-        user={user}
-        onOpenApp={onOpenApp}
-        onSignOut={() => void handleSignOut()}
-      />
-    </AppShell>
-  );
+  return <ExtensionPopupApp user={user} onSignOut={() => void handleSignOut()} />;
 }
 
-function AuthenticatedHomeShell({
+function ExtensionPopupApp({
   user,
-  onOpenApp,
   onSignOut,
 }: {
   user: User;
-  onOpenApp?: () => void;
   onSignOut: () => void;
 }) {
+  const route = useExtensionHashRoute();
+
   return (
-    <div className="app-stack">
-      <div className="app-user-bar">
-        <p className="app-user-bar__identity">
-          {getDisplayIdentity(user)}
-          {user.app_metadata?.provider === "google" ? " - Google" : null}
-        </p>
-        <button type="button" onClick={onSignOut} className="text-button">
-          Sign out
-        </button>
-      </div>
-      <section className="app-panel">
-        <div className="app-panel__body">
-          <HomeChatModule user={user} />
-          {onOpenApp ? (
-            <div className="app-actions">
-              <button type="button" onClick={onOpenApp} className="btn-primary">
-                Open app
-              </button>
-            </div>
-          ) : null}
-        </div>
-      </section>
+    <div
+      className="extension-app"
+      onClickCapture={(event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+
+        if (target.closest(".xp-title-btn--close")) {
+          event.preventDefault();
+          event.stopPropagation();
+          onSignOut();
+        }
+      }}
+    >
+      {route.kind === "chat" ? (
+        <ChatPage />
+      ) : route.kind === "posts" ? (
+        <PostStreamPage variant="popup" />
+      ) : route.kind === "post-detail" ? (
+        <PostDetailPage postId={route.postId} />
+      ) : (
+        <PodSelectionPage userEmail={user.email ?? null} />
+      )}
     </div>
   );
 }
 
-function getDisplayIdentity(user: User) {
-  const fullName =
-    typeof user.user_metadata?.full_name === "string"
-      ? user.user_metadata.full_name.trim()
-      : "";
+function useExtensionHashRoute():
+  | { kind: "home" }
+  | { kind: "chat" }
+  | { kind: "posts" }
+  | { kind: "post-detail"; postId: string } {
+  const [hash, setHash] = useState(() =>
+    typeof window === "undefined" ? "" : window.location.hash,
+  );
 
-  return fullName || user.email || "Authenticated user";
+  useEffect(() => {
+    const handleHashChange = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  const path = hash.replace(/^#/, "").split("?")[0] || "/";
+  const postMatch = path.match(/^\/posts\/([^/?#]+)$/);
+
+  if (postMatch?.[1]) {
+    return { kind: "post-detail", postId: decodeURIComponent(postMatch[1]) };
+  }
+
+  if (path === "/chat") {
+    return { kind: "chat" };
+  }
+
+  if (path === "/posts") {
+    return { kind: "posts" };
+  }
+
+  return { kind: "home" };
 }
 
 type AppShellProps = {

@@ -6,6 +6,8 @@ import {
   formatTimestamp,
   getDisplayName,
   postJson,
+  updateCommentLikes,
+  updatePostLikes,
   type PostRecord,
   type CommentRecord,
   usePageBundle,
@@ -16,14 +18,20 @@ type SidebarItem = {
   meta: string;
 };
 
-export function PostStreamPage() {
+type PostStreamPageProps = {
+  variant?: "page" | "popup";
+};
+
+export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
   const { bundle, commentsByPost, loading, error, refresh, buildScopedHref } =
     usePageBundle();
+  const isPopup = variant === "popup";
   const [mode, setMode] = useState<"question" | "guide">("question");
   const [header, setHeader] = useState("");
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [voteError, setVoteError] = useState<string | null>(null);
 
   const posts = useMemo(
     () =>
@@ -84,6 +92,18 @@ export function PostStreamPage() {
     }
   };
 
+  const handlePostVote = async (post: PostRecord, delta: 1 | -1) => {
+    setVoteError(null);
+    try {
+      await updatePostLikes(post, delta);
+      await refresh();
+    } catch (voteFailure) {
+      setVoteError(
+        voteFailure instanceof Error ? voteFailure.message : "Failed to update vote",
+      );
+    }
+  };
+
   return (
     <PostShell
       title={`PairPod - ${getPageTitle(bundle)}`}
@@ -91,34 +111,42 @@ export function PostStreamPage() {
       chatHref={buildScopedHref("/chat")}
       postsHref={buildScopedHref("/posts")}
       podsHref={buildScopedHref("/")}
+      variant={variant}
     >
-      <div className="post-layout">
-        <ComposePanel
-          mode={mode}
-          header={header}
-          content={content}
-          isSubmitting={isSubmitting}
-          error={submitError}
-          onModeChange={setMode}
-          onHeaderChange={setHeader}
-          onContentChange={setContent}
-          onSubmit={handleSubmit}
-          roomName={getPageTitle(bundle)}
-          chatHref={buildScopedHref("/chat")}
-        />
+      <div className={`post-layout ${isPopup ? "post-layout--popup" : ""}`}>
+        {!isPopup ? (
+          <ComposePanel
+            mode={mode}
+            header={header}
+            content={content}
+            isSubmitting={isSubmitting}
+            error={submitError}
+            onModeChange={setMode}
+            onHeaderChange={setHeader}
+            onContentChange={setContent}
+            onSubmit={handleSubmit}
+            roomName={getPageTitle(bundle)}
+            chatHref={buildScopedHref("/chat")}
+          />
+        ) : null}
         <section className="post-stream" aria-label="Post stream">
           <PanelHeader title="Post Stream" />
-          <div className="post-filterbar">
-            <button type="button" className="active">
-              Live
-            </button>
-            <button type="button">Questions</button>
-            <button type="button">Guides</button>
-            <button type="button">Following</button>
-          </div>
+          {!isPopup ? (
+            <div className="post-filterbar">
+              <button type="button" className="active">
+                Live
+              </button>
+              <button type="button">Questions</button>
+              <button type="button">Guides</button>
+              <button type="button">Following</button>
+            </div>
+          ) : null}
 
           {error ? (
             <p className="status-note status-note--error">{error}</p>
+          ) : null}
+          {voteError ? (
+            <p className="status-note status-note--error">{voteError}</p>
           ) : null}
           {loading ? <p className="status-note">Loading posts...</p> : null}
 
@@ -130,9 +158,19 @@ export function PostStreamPage() {
                   key={post.id}
                 >
                   <div className="post-votes">
-                    <button type="button">+</button>
+                    <button
+                      type="button"
+                      onClick={() => void handlePostVote(post, 1)}
+                    >
+                      +
+                    </button>
                     <strong>{post.likes}</strong>
-                    <button type="button">-</button>
+                    <button
+                      type="button"
+                      onClick={() => void handlePostVote(post, -1)}
+                    >
+                      -
+                    </button>
                   </div>
                   <div className="post-card__body">
                     <header>
@@ -172,13 +210,15 @@ export function PostStreamPage() {
             ) : null}
           </div>
         </section>
-        <PostSidebar
-          hotThreads={hotThreads}
-          roomStats={roomStats}
-          chatHref={buildScopedHref("/chat")}
-          postsHref={buildScopedHref("/posts")}
-          podsHref={buildScopedHref("/")}
-        />
+        {!isPopup ? (
+          <PostSidebar
+            hotThreads={hotThreads}
+            roomStats={roomStats}
+            chatHref={buildScopedHref("/chat")}
+            postsHref={buildScopedHref("/posts")}
+            podsHref={buildScopedHref("/")}
+          />
+        ) : null}
       </div>
     </PostShell>
   );
@@ -190,6 +230,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [voteError, setVoteError] = useState<string | null>(null);
 
   const post = useMemo(
     () => (bundle?.posts ?? []).find((entry) => entry.id === postId),
@@ -238,6 +279,18 @@ export function PostDetailPage({ postId }: { postId: string }) {
       );
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handlePostVote = async (postToUpdate: PostRecord, delta: 1 | -1) => {
+    setVoteError(null);
+    try {
+      await updatePostLikes(postToUpdate, delta);
+      await refresh();
+    } catch (voteFailure) {
+      setVoteError(
+        voteFailure instanceof Error ? voteFailure.message : "Failed to update vote",
+      );
     }
   };
 
@@ -300,9 +353,13 @@ export function PostDetailPage({ postId }: { postId: string }) {
             className={`post-card post-card--full post-card--${pickTone(0)}`}
           >
             <div className="post-votes">
-              <button type="button">+</button>
+              <button type="button" onClick={() => void handlePostVote(post, 1)}>
+                +
+              </button>
               <strong>{post.likes}</strong>
-              <button type="button">-</button>
+              <button type="button" onClick={() => void handlePostVote(post, -1)}>
+                -
+              </button>
             </div>
             <div className="post-card__body">
               <header>
@@ -367,6 +424,9 @@ export function PostDetailPage({ postId }: { postId: string }) {
               {submitError ? (
                 <p className="status-note status-note--error">{submitError}</p>
               ) : null}
+              {voteError ? (
+                <p className="status-note status-note--error">{voteError}</p>
+              ) : null}
               <button
                 type="submit"
                 className="post-compose-submit"
@@ -424,6 +484,7 @@ function PostShell({
   chatHref,
   postsHref,
   podsHref,
+  variant = "page",
   children,
 }: {
   title: string;
@@ -431,14 +492,19 @@ function PostShell({
   chatHref: string;
   postsHref: string;
   podsHref: string;
+  variant?: "page" | "popup";
   children: ReactNode;
 }) {
+  const isPopup = variant === "popup";
+
   return (
-    <main className="post-shell">
+    <main className={`post-shell ${isPopup ? "post-shell--popup" : ""}`}>
       <PostSceneBackground />
       <div className="post-shell__content">
         <section
-          className="post-window xp-window post-window--animate"
+          className={`post-window xp-window post-window--animate ${
+            isPopup ? "post-window--popup" : ""
+          }`}
           aria-labelledby={labelledBy}
         >
           <div className="xp-title-bar chat-titlebar">
@@ -653,6 +719,7 @@ function CommentCard({
   const [replyContent, setReplyContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
+  const [voteError, setVoteError] = useState<string | null>(null);
   const displayName = getDisplayName(comment.user_id);
 
   const handleReply = async (event: FormEvent) => {
@@ -676,6 +743,18 @@ function CommentCard({
     }
   };
 
+  const handleCommentVote = async (commentToUpdate: CommentRecord, delta: 1 | -1) => {
+    setVoteError(null);
+    try {
+      await updateCommentLikes(commentToUpdate, delta);
+      await refresh();
+    } catch (voteFailure) {
+      setVoteError(
+        voteFailure instanceof Error ? voteFailure.message : "Failed to update vote",
+      );
+    }
+  };
+
   return (
     <div className="post-thread-item">
       <article className={`post-comment post-comment--${tone}`}>
@@ -694,9 +773,13 @@ function CommentCard({
           </header>
           <p>{comment.content}</p>
           <div className="post-comment__votes" aria-label="Comment votes">
-            <button type="button">Like</button>
+            <button type="button" onClick={() => void handleCommentVote(comment, 1)}>
+              Like
+            </button>
             <strong>{comment.likes}</strong>
-            <button type="button">Dislike</button>
+            <button type="button" onClick={() => void handleCommentVote(comment, -1)}>
+              Dislike
+            </button>
             <strong>0</strong>
             <button
               type="button"
@@ -709,6 +792,9 @@ function CommentCard({
               {showReplyForm ? "Cancel" : "Reply"}
             </button>
           </div>
+          {voteError ? (
+            <p className="status-note status-note--error">{voteError}</p>
+          ) : null}
         </div>
       </article>
 
@@ -760,9 +846,19 @@ function CommentCard({
                 </header>
                 <p>{reply.content}</p>
                 <div className="post-comment__votes" aria-label="Reply votes">
-                  <button type="button">Like</button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCommentVote(reply, 1)}
+                  >
+                    Like
+                  </button>
                   <strong>{reply.likes}</strong>
-                  <button type="button">Dislike</button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCommentVote(reply, -1)}
+                  >
+                    Dislike
+                  </button>
                   <strong>0</strong>
                 </div>
               </div>

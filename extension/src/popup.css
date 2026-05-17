@@ -7,5 +7,385 @@
 html,
 body {
   margin: 0;
-  min-width: 320px;
+  width: 380px;
+  min-width: 380px;
+  max-width: 380px;
+}
+
+body {
+  height: 560px;
+  min-height: 560px;
+  max-height: 560px;
+  overflow: hidden;
+}
+
+#root,
+.app-scene--popup,
+.extension-app {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.app-scene--popup {
+  width: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+.app-scene--popup .app-scene__content {
+  min-height: 100vh;
+  width: 100%;
+  padding: var(--space-sm);
+  align-items: stretch;
+}
+
+.app-window--popup {
+  width: 100%;
+  max-width: none;
+  align-self: center;
+}
+
+.app-window--popup .xp-window-body {
+  max-height: calc(100vh - 34px);
+  overflow: auto;
+  padding: var(--space-md);
+}
+
+.app-window--popup .app-stack {
+  width: 100%;
+}
+
+.app-window--popup .xp-title-btn {
+  cursor: not-allowed;
+  filter: grayscale(0.45) brightness(0.9);
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+.extension-app {
+  position: relative;
+  background: var(--sky-zenith);
+}
+
+.extension-app .pod-scene,
+.extension-app .post-shell,
+.extension-app .chat-shell {
+  width: 100%;
+  min-height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+.extension-app .pod-scene {
+  align-items: flex-start;
+  padding: var(--space-xs);
+}
+
+.extension-app .pod-window,
+.extension-app .chat-window,
+.extension-app .post-window {
+  width: 100%;
+  max-width: 100%;
+  min-height: auto;
+  height: calc(100vh - 8px);
+  max-height: calc(100vh - 8px);
+  border-width: 1px;
+  border-radius: var(--radius-sm);
+}
+
+.extension-app .post-shell__content,
+.extension-app .chat-shell__content {
+  width: 100%;
+  min-height: 100vh;
+  padding: var(--space-xs);
+}
+
+.extension-app .chat-layout,
+.extension-app .post-layout,
+.extension-app .post-detail-layout,
+.extension-app .pod-window__body {
+  max-height: calc(100vh - 58px);
+  overflow: auto;
+}
+
+.extension-app .xp-title-btn--min,
+.extension-app .xp-title-btn--max {
+  cursor: not-allowed;
+  filter: grayscale(0.35) brightness(0.92);
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.extension-app .xp-title-btn--close {
+  cursor: pointer;
+}
+
+.extension-app .pod-dashboard,
+.extension-app .post-layout,
+.extension-app .post-detail-layout {
+  grid-template-columns: 1fr;
+}
+
+.extension-app .pod-dashboard {
+  gap: var(--space-sm);
+}
+
+.extension-app .pod-window__body {
+  padding: var(--space-sm);
+}
+
+.extension-app .pod-main {
+  gap: var(--space-sm);
+}
+
+.extension-app .pod-page-header {
+  padding: var(--space-xs) var(--space-sm) 0;
+}
+
+.extension-app .pod-page-title {
+  font-size: var(--fs-xxl);
+}
+
+.extension-app .pod-list {
+  gap: var(--space-sm);
+}
+
+.extension-app .pod-card {
+  min-height: 82px;
+  grid-template-columns: 44px minmax(0, 1fr) 32px;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border-radius: var(--radius-lg);
+}
+
+.extension-app .pod-icon {
+  width: 44px;
+}
+
+.extension-app .pod-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.extension-app .pod-avatars {
+  display: none;
+}
+
+.extension-app .pod-card__button {
+  width: 32px;
+  height: 32px;
+}
+
+.extension-app .pod-sidebar {
+  gap: var(--space-sm);
+}
+
+.extension-app .pod-user-tile,
+.extension-app .activity-panel {
+  border-radius: var(--radius-lg);
+}
+
+.extension-app .post-window,
+.extension-app .chat-window {
+  min-height: calc(100vh - 8px);
+}
+
+.extension-app .chat-layout {
+  grid-template-columns: 1fr;
+}
+
+.extension-app .chat-members,
+.extension-app .chat-rail {
+  display: none;
+}
+
+.extension-app .post-window {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.extension-app .chat-titlebar .xp-title-text {
+  font-family: var(--font-body) !important;
+  font-size: var(--fs-sm) !important;
+}
+
+.extension-app .chat-titlebar {
+  min-height: 30px !important;
+  padding: 3px 5px 3px 8px !important;
+}
+
+.extension-app .chat-titlebar .xp-title-icon {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.extension-app .chat-titlebar .xp-title-btn {
+  width: 22px !important;
+  height: 22px !important;
+  font-size: var(--fs-sm) !important;
+}
+
+.extension-app .chat-menu {
+  min-height: 32px;
+  gap: var(--space-md);
+  padding: 0 var(--space-sm);
+  overflow-x: auto;
+  font-size: var(--fs-sm);
+  scrollbar-width: none;
+}
+
+.extension-app .chat-menu::-webkit-scrollbar {
+  display: none;
+}
+
+.extension-app .post-layout {
+  display: grid;
+  height: calc(100vh - 62px);
+  max-height: calc(100vh - 62px);
+  overflow: hidden;
+  padding: var(--space-xs);
+}
+
+.extension-app .post-compose-panel,
+.extension-app .post-sidebar {
+  display: none;
+}
+
+.extension-app .post-stream {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.extension-app .post-filterbar {
+  display: none;
+}
+
+.extension-app .post-stream .chat-panel-header {
+  min-height: 36px;
+}
+
+.extension-app .post-stream .chat-panel-header h2 {
+  font-size: var(--fs-xl);
+}
+
+.extension-app .post-list,
+.extension-app .chat-transcript,
+.extension-app .post-comments__list {
+  max-height: none;
+}
+
+.extension-app .post-list {
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  gap: var(--space-md);
+  padding: var(--space-sm);
+  scroll-snap-type: y mandatory;
+  scroll-padding: var(--space-sm);
+  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(236,242,248,0.86));
+}
+
+.extension-app .post-card {
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  min-height: 390px;
+  scroll-snap-align: start;
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(232,244,255,0.92));
+  border-color: rgba(50,110,200,0.48);
+}
+
+.extension-app .post-votes button {
+  width: 30px;
+  height: 26px;
+  font-size: var(--fs-lg);
+}
+
+.extension-app .post-votes strong {
+  font-size: var(--fs-md);
+}
+
+.extension-app .post-card h2 {
+  font-size: var(--fs-lg);
+}
+
+.extension-app .post-card header p,
+.extension-app .post-card__body > p,
+.extension-app .post-card footer a,
+.extension-app .post-card footer button {
+  font-size: var(--fs-xs);
+}
+
+.extension-app .post-card footer {
+  gap: var(--space-sm);
+}
+
+.extension-app .post-detail-main,
+.extension-app .post-comments {
+  min-width: 0;
+}
+
+/* Hard popup-only forum sizing. This stylesheet only ships in the extension. */
+.post-window {
+  height: 552px !important;
+  min-height: 552px !important;
+  max-height: 552px !important;
+}
+
+.post-shell__content {
+  min-height: 560px !important;
+  padding: 4px !important;
+}
+
+.post-layout {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  height: 492px !important;
+  max-height: 492px !important;
+  overflow: hidden !important;
+  padding: 4px !important;
+}
+
+.post-compose-panel,
+.post-sidebar,
+.post-filterbar {
+  display: none !important;
+}
+
+.post-stream {
+  min-height: 0 !important;
+  height: 100% !important;
+  grid-template-rows: 34px minmax(0, 1fr) !important;
+  overflow: hidden !important;
+}
+
+.post-stream .chat-panel-header {
+  min-height: 34px !important;
+}
+
+.post-stream .chat-panel-header h2 {
+  font-size: 18px !important;
+}
+
+.post-list {
+  min-height: 0 !important;
+  height: 458px !important;
+  max-height: 458px !important;
+  overflow-y: auto !important;
+  gap: 12px !important;
+  padding: 8px !important;
+  scroll-snap-type: y mandatory !important;
+}
+
+.post-card {
+  min-height: 390px !important;
+  grid-template-columns: 42px minmax(0, 1fr) !important;
+  align-content: start !important;
+  scroll-snap-align: start !important;
 }

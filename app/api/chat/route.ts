@@ -2,6 +2,7 @@ import { logEvent } from '@/lib/server/helpers/logEvent'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
 import { createPost } from '@/lib/server/discussions'
 import { findOrCreateDefaultRoom } from '@/lib/server/pages'
+import { getCurrentUserProfile } from '@/lib/server/profiles'
 
 type ChatRequestBody = {
   roomId?: unknown
@@ -24,7 +25,7 @@ export async function POST(request: Request): Promise<Response> {
   const roomId = typeof body.roomId === 'string' ? body.roomId.trim() : ''
   const message = typeof body.message === 'string' ? body.message.trim() : ''
   const sectionId = typeof body.sectionId === 'string' ? body.sectionId.trim() : null
-  const userId = typeof body.userId === 'string' ? body.userId.trim() : null
+  const requestUserId = typeof body.userId === 'string' ? body.userId.trim() : null
 
   if ((!roomId && !pageId) || !message) {
     return jsonError('roomId or pageId, and message are required', 400)
@@ -32,6 +33,8 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const resolvedRoomId = roomId || (await findOrCreateDefaultRoom(pageId)).id
+    const profile = await getCurrentUserProfile()
+    const userId = profile?.id ?? requestUserId
 
     const data = await createPost({
       roomId: resolvedRoomId,

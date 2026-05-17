@@ -2,9 +2,13 @@
   "name": "uncommonhacks",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "build:electron": "node scripts/build-electron.mjs",
+    "dist:electron": "npm run build:electron && electron-builder",
     "build:extension": "node scripts/generate-extension-icons.mjs && node scripts/build-extension.mjs",
     "bundle:extension-popup": "vite build --config extension/vite.config.ts && node scripts/update-extension-manifest.mjs",
     "start": "next start",
@@ -22,11 +26,40 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
+    "electron": "^42.1.0",
+    "electron-builder": "^26.8.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "postcss": "^8.5.4",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vite": "^7.3.3"
+    "vite": "^7.3.3",
+    "wait-on": "^9.0.10"
+  },
+  "build": {
+    "appId": "com.uncommonhacks.app",
+    "productName": "UncommonHacks",
+    "files": [
+      "electron/**/*",
+      "out/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "public",
+      "output": "dist-electron"
+    },
+    "extraMetadata": {
+      "main": "electron/main.cjs"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }
