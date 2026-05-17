@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
+import { AuthForm } from "@/components/auth-form";
 import { ChatPage } from "@/components/chat-page";
 import { PodSelectionPage } from "@/components/pod-selection-page";
 import { PostDetailPage, PostStreamPage } from "@/components/post-stream-page";
@@ -101,19 +102,14 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
 
   if (!user) {
     if (isPopup) {
-      redirectToStaticLogin();
-      return (
-        <AppShell isPopup={isPopup} title="PairPod - Sign in">
-          <p className="status-note">Opening sign in...</p>
-        </AppShell>
-      );
+      return <StaticLoginRedirect isPopup={isPopup} />;
     }
 
     return (
       <AppShell isPopup={isPopup} title="PairPod - Sign in">
         <AuthForm
           variant={variant}
-          initialStatus={authError}
+          initialStatus={null}
           onSuccess={() => void refreshUser()}
         />
       </AppShell>
