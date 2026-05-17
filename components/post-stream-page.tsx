@@ -180,6 +180,21 @@ export function PostDetailPage({ postId }: { postId: string }) {
 
   const comments = commentsBySection[`post:${postId}`] ?? [];
 
+  const topLevelComments = useMemo(
+    () => comments.filter((c) => c.reply_id === null),
+    [comments],
+  );
+
+  const repliesByParent = useMemo(() => {
+    const map: Record<string, CommentRecord[]> = {};
+    for (const c of comments) {
+      if (c.reply_id) {
+        (map[c.reply_id] ??= []).push(c);
+      }
+    }
+    return map;
+  }, [comments]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -287,9 +302,17 @@ export function PostDetailPage({ postId }: { postId: string }) {
           <section className="post-comments" aria-label="Comments">
             <PanelHeader title={`Comments (${comments.length})`} />
             <div className="post-comments__list">
-              {comments.length > 0 ? (
-                comments.map((comment, index) => (
-                  <CommentCard comment={comment} key={comment.id} tone={pickTone(index)} />
+              {topLevelComments.length > 0 ? (
+                topLevelComments.map((comment, index) => (
+                  <CommentCard
+                    key={comment.id}
+                    comment={comment}
+                    tone={pickTone(index)}
+                    postId={postId}
+                    replies={repliesByParent[comment.id] ?? []}
+                    refresh={refresh}
+                    parentUser={null}
+                  />
                 ))
               ) : (
                 <article className="post-comment post-comment--blue">
@@ -548,29 +571,140 @@ function PostSidebar({
 function CommentCard({
   comment,
   tone,
+  postId,
+  replies,
+  refresh,
+  parentUser,
 }: {
   comment: CommentRecord;
   tone: string;
+  postId: string;
+  replies: CommentRecord[];
+  refresh: () => Promise<unknown>;
+  parentUser: string | null;
 }) {
+  const [showReplyForm, setShowReplyForm] = useState(false);
+  const [replyContent, setReplyContent] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const displayName = getDisplayName(comment.user_id);
+
+  const handleReply = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!replyContent.trim()) return;
+    setIsSubmitting(true);
+    setReplyError(null);
+    try {
+      await postJson("/api/answers", {
+        postId,
+        content: replyContent.trim(),
+        replyId: comment.id,
+      });
+      setReplyContent("");
+      setShowReplyForm(false);
+      await refresh();
+    } catch (err) {
+      setReplyError(err instanceof Error ? err.message : "Failed to post reply");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <article className={`post-comment post-comment--${tone}`}>
-      <div className="post-comment__avatar">
-        {getDisplayName(comment.user_id).charAt(0).toUpperCase()}
-      </div>
-      <div className="post-comment__body">
-        <header>
-          <h2>{getDisplayName(comment.user_id)}</h2>
-          <span>{formatTimestamp(comment.created_at)}</span>
-        </header>
-        <p>{comment.content}</p>
-        <div className="post-comment__votes" aria-label="Comment votes">
-          <button type="button">Like</button>
-          <strong>{comment.likes}</strong>
-          <button type="button">Dislike</button>
-          <strong>0</strong>
+    <div className="post-thread-item">
+      <article className={`post-comment post-comment--${tone}`}>
+        {parentUser ? (
+          <div className="post-reply-badge">
+            ↳ replying to <strong>@{parentUser}</strong>
+          </div>
+        ) : null}
+        <div className="post-comment__avatar">
+          {displayName.charAt(0).toUpperCase()}
         </div>
-      </div>
-    </article>
+        <div className="post-comment__body">
+          <header>
+            <h2>@{displayName}</h2>
+            <span>{formatTimestamp(comment.created_at)}</span>
+          </header>
+          <p>{comment.content}</p>
+          <div className="post-comment__votes" aria-label="Comment votes">
+            <button type="button">Like</button>
+            <strong>{comment.likes}</strong>
+            <button type="button">Dislike</button>
+            <strong>0</strong>
+            <button
+              type="button"
+              className="post-reply-btn"
+              onClick={() => {
+                setShowReplyForm((prev) => !prev);
+                setReplyError(null);
+              }}
+            >
+              {showReplyForm ? "Cancel" : "Reply"}
+            </button>
+          </div>
+        </div>
+      </article>
+
+      {showReplyForm ? (
+        <form
+          className="post-reply-form"
+          onSubmit={(event) => void handleReply(event)}
+        >
+          <div className="post-reply-form__label">
+            Replying to <strong>@{displayName}</strong>
+          </div>
+          <textarea
+            className="post-compose-input"
+            value={replyContent}
+            onChange={(event) => setReplyContent(event.target.value)}
+            placeholder={`Reply to @${displayName}...`}
+            rows={3}
+          />
+          {replyError ? (
+            <p className="status-note status-note--error">{replyError}</p>
+          ) : null}
+          <button
+            type="submit"
+            className="post-compose-submit"
+            disabled={isSubmitting || !replyContent.trim()}
+          >
+            {isSubmitting ? "Posting..." : "Post Reply"}
+          </button>
+        </form>
+      ) : null}
+
+      {replies.length > 0 ? (
+        <div className="post-thread-replies">
+          {replies.map((reply, index) => (
+            <article
+              key={reply.id}
+              className={`post-comment post-comment--${pickTone(index)}`}
+            >
+              <div className="post-reply-badge post-reply-badge--nested">
+                ↳ replying to <strong>@{displayName}</strong>
+              </div>
+              <div className="post-comment__avatar">
+                {getDisplayName(reply.user_id).charAt(0).toUpperCase()}
+              </div>
+              <div className="post-comment__body">
+                <header>
+                  <h2>@{getDisplayName(reply.user_id)}</h2>
+                  <span>{formatTimestamp(reply.created_at)}</span>
+                </header>
+                <p>{reply.content}</p>
+                <div className="post-comment__votes" aria-label="Reply votes">
+                  <button type="button">Like</button>
+                  <strong>{reply.likes}</strong>
+                  <button type="button">Dislike</button>
+                  <strong>0</strong>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
