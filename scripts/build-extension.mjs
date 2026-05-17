@@ -45,7 +45,7 @@ try {
       stashedRoutes.push(stashedRoute);
     }
   }
-  await run("npm", ["run", "build"], { BUILD_EXTENSION: "1" });
+  await run("npx", ["next", "build", "--webpack"], { BUILD_EXTENSION: "1" });
 } finally {
   while (stashedRoutes.length > 0) {
     await restoreRoute(stashedRoutes.pop());

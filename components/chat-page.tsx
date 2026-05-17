@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   formatTimestamp,
   getDisplayName,
@@ -8,14 +8,22 @@ import {
   postJson,
   splitContentLines,
   type UserProfileRecord,
+  useCurrentUserProfile,
   usePageBundle,
 } from "@/lib/client/page-api";
+import { createHumanFakeChatDirect } from "@/lib/client/fake-chat";
+import { DmNotificationBadge } from "@/components/dm-notification-badge";
+import { getDmPath, startDirectMessage } from "@/lib/client/dms";
+import { playSfx, useErrorSfx } from "@/lib/client/sfx";
+import { getUserProfilePath } from "@/lib/client/users";
 
 type ChatPageProps = {
   currentUsername?: string;
 };
 
 type Member = {
+  id: string | null;
+  avatarUrl: string | null;
   name: string;
   status: "Online" | "Away";
 };
@@ -33,10 +41,18 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     domainUrl,
     roomScope,
   } = usePageBundle();
+  const { profile } = useCurrentUserProfile();
   const domainName = getRoomDisplayName(domainUrl);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingPeers, setIsGeneratingPeers] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const seenChatPostIdsRef = useRef<Set<string> | null>(null);
+  const sentChatPostIdsRef = useRef<Set<string>>(new Set());
+  const { profile: currentProfile } = useCurrentUserProfile();
+  useErrorSfx(error);
+  useErrorSfx(submitError);
 
   const chatPosts = useMemo(
     () => (bundle?.posts ?? []).filter((post) => post.type === "chat"),
@@ -57,12 +73,15 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
 
     if (currentUsername?.trim()) {
       values.set(currentUsername, {
+        id: null,
+        avatarUrl: null,
         name: currentUsername,
         status: "Online",
       });
     }
 
     for (const post of bundle?.posts ?? []) {
+      const authorProfile = post.user_id ? usersById[post.user_id] : null;
       const fallbackName = getDisplayName(post.user_id, usersById);
       const name =
         currentUsername?.trim() && fallbackName === "Anonymous"
@@ -71,6 +90,8 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
 
       if (!values.has(name)) {
         values.set(name, {
+          id: post.user_id,
+          avatarUrl: authorProfile?.avatar_url ?? null,
           name,
           status: post.type === "chat" ? "Online" : "Away",
         });
@@ -78,6 +99,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     }
 
     for (const comment of bundle?.comments ?? []) {
+      const authorProfile = comment.user_id ? usersById[comment.user_id] : null;
       const fallbackName = getDisplayName(comment.user_id, usersById);
       const name =
         currentUsername?.trim() && fallbackName === "Anonymous"
@@ -86,6 +108,8 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
 
       if (!values.has(name)) {
         values.set(name, {
+          id: comment.user_id,
+          avatarUrl: authorProfile?.avatar_url ?? null,
           name,
           status: "Away",
         });
@@ -100,6 +124,41 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     [bundle?.comments],
   );
 
+  useEffect(() => {
+    const transcript = transcriptRef.current;
+    if (!transcript) {
+      return;
+    }
+
+    transcript.scrollTo({
+      top: transcript.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [chatPosts.length]);
+
+  useEffect(() => {
+    const knownIds = seenChatPostIdsRef.current;
+    const nextIds = new Set(chatPosts.map((post) => post.id));
+
+    if (!knownIds) {
+      seenChatPostIdsRef.current = nextIds;
+      return;
+    }
+
+    const hasRemoteIncomingMessage = chatPosts.some(
+      (post) =>
+        !knownIds.has(post.id) &&
+        !sentChatPostIdsRef.current.has(post.id) &&
+        (!currentProfile?.id || post.user_id !== currentProfile.id),
+    );
+
+    seenChatPostIdsRef.current = nextIds;
+
+    if (hasRemoteIncomingMessage) {
+      playSfx("im");
+    }
+  }, [chatPosts, currentProfile?.id]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -111,13 +170,16 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     setSubmitError(null);
 
     try {
-      await postJson("/api/chat", {
+      const createdPost = await postJson("/api/chat", {
         roomId: bundle.room.id,
         pageId: bundle.page.id,
         message: message.trim(),
       });
+      if (isRecordWithId(createdPost)) {
+        sentChatPostIdsRef.current.add(createdPost.id);
+      }
       setMessage("");
-      await refresh();
+      await refresh({ silent: true });
     } catch (sendError) {
       setSubmitError(
         sendError instanceof Error
@@ -126,6 +188,45 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
       );
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleGeneratePeers = async () => {
+    if (!bundle || isGeneratingPeers) {
+      return;
+    }
+
+    setIsGeneratingPeers(true);
+    setSubmitError(null);
+
+    try {
+      if (isExtensionRuntime()) {
+        await createHumanFakeChatDirect({
+          roomId: bundle.room.id,
+          scope: roomScope,
+          title: getChatTitle(bundle),
+          userCount: 3,
+          messageCount: 5,
+        });
+      } else {
+        await postJson("/api/ai/fake-chat", {
+          scope: roomScope,
+          domainUrl,
+          topic: getChatTitle(bundle),
+          userCount: 3,
+          messageCount: 5,
+        });
+      }
+
+      await refresh({ silent: true });
+    } catch (generateError) {
+      setSubmitError(
+        generateError instanceof Error
+          ? generateError.message
+          : "Failed to create AI peers",
+      );
+    } finally {
+      setIsGeneratingPeers(false);
     }
   };
 
@@ -169,6 +270,11 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
             >
               {domainName}
             </a>
+            <a className="nav-with-badge" href={getDmPath("/dms")}>
+              DMs
+              <DmNotificationBadge />
+            </a>
+            <a href={buildScopedHref("/peers")}>3D Peers</a>
           </nav>
 
           <div className="chat-layout">
@@ -177,14 +283,22 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
               <div className="chat-members__list">
                 {authors.length > 0 ? (
                   authors.map((member, index) => (
-                    <article className="chat-member" key={member.name}>
+                    <article className="chat-member" key={`${member.id ?? "anon"}-${member.name}`}>
                       <span
                         className={`chat-avatar chat-avatar--${(index % 8) + 1}`}
                       >
-                        {member.name.charAt(0).toUpperCase()}
+                        {member.avatarUrl ? (
+                          <img src={member.avatarUrl} alt="" />
+                        ) : (
+                          member.name.charAt(0).toUpperCase()
+                        )}
                       </span>
                       <div>
-                        <h2>{member.name}</h2>
+                        <DmUserMenu
+                          currentUserId={profile?.id ?? null}
+                          userId={member.id}
+                          userName={member.name}
+                        />
                         <p>
                           <span
                             className={`chat-status-dot chat-status-dot--${
@@ -219,6 +333,17 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   </span>
                   Open Posts
                 </a>
+                <button
+                  type="button"
+                  className="chat-side-button"
+                  disabled={!bundle || isGeneratingPeers}
+                  onClick={() => void handleGeneratePeers()}
+                >
+                  <span className="chat-side-icon" aria-hidden="true">
+                    <SparkIcon />
+                  </span>
+                  {isGeneratingPeers ? "Creating..." : "AI peers"}
+                </button>
                 <a href={buildScopedHref("/")} className="chat-side-button">
                   <span className="chat-side-icon" aria-hidden="true">
                     <HomeIcon />
@@ -246,8 +371,8 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
               {error ? <p className="chat-error">{error}</p> : null}
               {submitError ? <p className="chat-error">{submitError}</p> : null}
 
-              <div className="chat-transcript">
-                {loading ? (
+              <div className="chat-transcript" ref={transcriptRef}>
+                {loading && !bundle ? (
                   <article className="chat-message">
                     <div className="chat-message__body">
                       <p>Loading chat history...</p>
@@ -268,7 +393,11 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                             <strong
                               className={`chat-name chat-name--${pickTone(index)}`}
                             >
-                              {getDisplayName(post.user_id, usersById)}:
+                              <DmInlineUser
+                                userId={post.user_id}
+                                userName={getDisplayName(post.user_id, usersById)}
+                              />
+                              :
                             </strong>{" "}
                             {lines[0] ?? post.content}
                           </p>
@@ -367,6 +496,20 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   </p>
                 </div>
               </section>
+              <section className="chat-rail-panel">
+                <PanelHeader title="Peer Tools" />
+                <div className="chat-rail-panel__body">
+                  <button
+                    type="button"
+                    className="chat-tool-button"
+                    disabled={!bundle || isGeneratingPeers}
+                    onClick={() => void handleGeneratePeers()}
+                  >
+                    {isGeneratingPeers ? "Creating AI peers..." : "Create AI peer chat"}
+                  </button>
+                  <a href={buildScopedHref("/peers")}>Open 3D peer map</a>
+                </div>
+              </section>
               <RailPanel
                 title="Recent Posts"
                 action={buildScopedHref("/posts")}
@@ -383,6 +526,25 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
         </section>
       </div>
     </main>
+  );
+}
+
+function isExtensionRuntime() {
+  const globalWithExtensionApis = globalThis as typeof globalThis & {
+    browser?: { runtime?: { id?: string } };
+    chrome?: { runtime?: { id?: string } };
+  };
+  const runtime = globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
+
+  return Boolean(runtime?.runtime?.id);
+}
+
+function isRecordWithId(value: unknown): value is { id: string } {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "id" in value &&
+    typeof value.id === "string"
   );
 }
 
@@ -536,6 +698,75 @@ function CommentPanel({
   );
 }
 
+function DmUserMenu({
+  currentUserId,
+  userId,
+  userName,
+}: {
+  currentUserId: string | null;
+  userId: string | null;
+  userName: string;
+}) {
+  const [isStarting, setIsStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canStartDm = Boolean(userId && userId !== currentUserId);
+  const profileHref = getUserProfilePath(userId);
+
+  const handleStartDm = async () => {
+    if (!userId || isStarting) {
+      return;
+    }
+
+    setIsStarting(true);
+    setError(null);
+
+    try {
+      const thread = await startDirectMessage(userId);
+      window.location.href = getDmPath(`/dms/${thread.id}`);
+    } catch (startError) {
+      setError(startError instanceof Error ? startError.message : "Could not start DM.");
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  return (
+    <div className="dm-user-menu">
+      {profileHref ? (
+        <a className="dm-user-menu__trigger" href={profileHref}>
+          {userName}
+        </a>
+      ) : (
+        <strong>{userName}</strong>
+      )}
+      <button type="button" disabled={!canStartDm || isStarting} onClick={handleStartDm}>
+        {isStarting ? "Opening..." : "DM"}
+      </button>
+      {error ? (
+        <div className="dm-user-menu__popup">
+          <p>{error}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DmInlineUser({
+  userId,
+  userName,
+}: {
+  userId: string | null;
+  userName: string;
+}) {
+  const profileHref = getUserProfilePath(userId);
+
+  if (!profileHref) {
+    return <span>{userName}</span>;
+  }
+
+  return <a href={profileHref}>{userName}</a>;
+}
+
 function PodGlyph() {
   return (
     <svg
@@ -605,6 +836,17 @@ function HomeIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
       <path d="M10 3L3 9h2v8h4v-5h2v5h4V9h2L10 3z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function SparkIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+      <path
+        d="M10 2l1.5 5.2L17 9l-5.5 1.8L10 16l-1.5-5.2L3 9l5.5-1.8L10 2z"
+        fill="currentColor"
+      />
     </svg>
   );
 }

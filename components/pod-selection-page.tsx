@@ -1,5 +1,6 @@
 "use client";
 
+import { FormEvent, useMemo, useState } from "react";
 import {
   DEFAULT_AVATAR_URL,
   formatTimestamp,
@@ -10,6 +11,8 @@ import {
   useCurrentUserProfile,
   usePageBundle,
 } from "@/lib/client/page-api";
+import { DmNotificationBadge } from "@/components/dm-notification-badge";
+import { useErrorSfx } from "@/lib/client/sfx";
 import { createClient } from "@/utils/supabase/client";
 
 type Activity = {
@@ -31,6 +34,7 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
     loading,
     error,
     buildRoomHref,
+    buildDomainHref,
     buildScopedHref,
     currentUrl,
     domainUrl,
@@ -38,6 +42,11 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
   } =
     usePageBundle();
   const { profile } = useCurrentUserProfile();
+  const [customDomain, setCustomDomain] = useState("");
+  const [podName, setPodName] = useState("");
+  const [podSlug, setPodSlug] = useState("");
+  const [didEditPodSlug, setDidEditPodSlug] = useState(false);
+  useErrorSfx(error);
 
   const posts = bundle?.posts ?? [];
   const comments = bundle?.comments ?? [];
@@ -46,6 +55,36 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
   const currentUserName = profile
     ? getDisplayName(profile.id, { [profile.id]: profile })
     : (userEmail ?? "Signed in user");
+  const normalizedPodSlug = normalizePodSlug(podSlug || podName);
+  const createdPodUrl = normalizedPodSlug ? `https://${normalizedPodSlug}.pairpod.local/` : "";
+  const createdPodHref = useMemo(
+    () =>
+      createdPodUrl
+        ? buildCreatedPodHref("/", createdPodUrl, podName.trim() || normalizedPodSlug)
+        : "",
+    [createdPodUrl, normalizedPodSlug, podName],
+  );
+
+  const handleCustomDomainSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextDomain = customDomain.trim();
+    if (!nextDomain || typeof window === "undefined") {
+      return;
+    }
+
+    window.location.href = buildDomainHref("/", nextDomain);
+  };
+
+  const handleCreatePodSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const name = podName.trim();
+    const slug = normalizePodSlug(podSlug || name);
+    if (!slug || !createdPodHref || typeof window === "undefined") {
+      return;
+    }
+
+    window.location.href = createdPodHref;
+  };
 
   const recentPosts: Activity[] = posts.slice(-3).reverse().map((post) => ({
     domain: pageDomain,
@@ -118,7 +157,66 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
                   >
                     {domainName}
                   </a>
+                  <a className="room-scope-tabs__dm" href={buildScopedHref("/dms")}>
+                    DMs
+                    <DmNotificationBadge />
+                  </a>
+                  <a href={buildScopedHref("/peers")}>3D Peers</a>
                 </div>
+                <form
+                  className="domain-picker"
+                  onSubmit={(event) => handleCustomDomainSubmit(event)}
+                >
+                  <label className="sr-only" htmlFor="domain-picker-input">
+                    Set domain
+                  </label>
+                  <input
+                    id="domain-picker-input"
+                    value={customDomain}
+                    onChange={(event) => setCustomDomain(event.target.value)}
+                    placeholder="example.com"
+                  />
+                  <button type="submit" disabled={!customDomain.trim()}>
+                    Open
+                  </button>
+                </form>
+                <form
+                  className="pod-create-form"
+                  onSubmit={(event) => handleCreatePodSubmit(event)}
+                >
+                  <div>
+                    <label htmlFor="pod-name-input">Create pod or map</label>
+                    <input
+                      id="pod-name-input"
+                      value={podName}
+                      onChange={(event) => {
+                        const nextName = event.target.value;
+                        setPodName(nextName);
+                        if (!didEditPodSlug) {
+                          setPodSlug(normalizePodSlug(nextName));
+                        }
+                      }}
+                      placeholder="Late night build room"
+                      maxLength={48}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="pod-slug-input">Pod slug</label>
+                    <input
+                      id="pod-slug-input"
+                      value={podSlug}
+                      onChange={(event) => {
+                        setDidEditPodSlug(true);
+                        setPodSlug(normalizePodSlug(event.target.value));
+                      }}
+                      placeholder="late-night-build"
+                      maxLength={36}
+                    />
+                  </div>
+                  <button type="submit" disabled={!createdPodHref}>
+                    Create
+                  </button>
+                </form>
               </header>
 
               {error ? (
@@ -176,6 +274,32 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
                     <span aria-hidden="true">&gt;</span>
                   </a>
                 </article>
+                <article className="pod-card pod-card--green">
+                  <PodIcon icon="plus" />
+                  <div className="pod-card__content">
+                    <h2 className="pod-card__title">Your Own Map</h2>
+                    <p className="pod-card__copy">
+                      Make a named room that behaves like its own tiny world for chat, posts, and peers.
+                    </p>
+                    <p className="pod-card__meta">
+                      {normalizedPodSlug || "custom"} · pairpod.local
+                    </p>
+                  </div>
+                  <div className="pod-avatars" aria-hidden="true" />
+                  <a
+                    className="pod-card__button"
+                    aria-label="Create pod"
+                    href={createdPodHref || "#"}
+                    aria-disabled={!createdPodHref}
+                    onClick={(event) => {
+                      if (!createdPodHref) {
+                        event.preventDefault();
+                      }
+                    }}
+                  >
+                    <span aria-hidden="true">+</span>
+                  </a>
+                </article>
               </div>
             </section>
 
@@ -195,6 +319,40 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
       </section>
     </main>
   );
+}
+
+function buildCreatedPodHref(pathname: string, url: string, title: string) {
+  const params = new URLSearchParams({
+    room: "domain",
+    url,
+    title,
+  });
+
+  if (isExtensionRuntime()) {
+    return `#${pathname}?${params.toString()}`;
+  }
+
+  return `${pathname}?${params.toString()}`;
+}
+
+function isExtensionRuntime() {
+  const globalWithExtensionApis = globalThis as typeof globalThis & {
+    browser?: { runtime?: { id?: string } };
+    chrome?: { runtime?: { id?: string } };
+  };
+  const runtime =
+    globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
+
+  return Boolean(runtime?.runtime?.id);
+}
+
+function normalizePodSlug(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 36);
 }
 
 function getPageDomain(bundle: PageBundle | null) {
@@ -306,9 +464,11 @@ function UserTile({
           <span className="live-dot" /> Online
         </p>
       </div>
-      <a className="pod-user-menu" href={profileHref} aria-label="Open profile settings">
-        <span aria-hidden="true">v</span>
-      </a>
+      <div className="pod-user-actions">
+        <a className="pod-user-menu" href={profileHref} aria-label="Open profile settings">
+          <span aria-hidden="true">v</span>
+        </a>
+      </div>
     </section>
   );
 }

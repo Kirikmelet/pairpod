@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { normalizeUrl } from '@/lib/server/helpers/normalizeUrl'
-import { loadUserProfiles, type UserProfileRow } from '@/lib/server/profiles'
+import type { UserProfileRow } from '@/lib/server/profile'
 import { getSupabaseAdmin } from '@/lib/server/supabaseAdmin'
 
 export type PageRow = {
@@ -18,6 +18,13 @@ export type RoomRow = {
   created_at: string
 }
 
+export type AuthorProfile = {
+  id: string
+  username: string | null
+  displayName: string | null
+  avatarUrl: string | null
+}
+
 export type PostRow = {
   id: string
   room_id: string
@@ -28,7 +35,10 @@ export type PostRow = {
   likes: number
   user_id: string | null
   created_at: string
+  author: AuthorProfile | null
 }
+
+type PostRecord = Omit<PostRow, 'author'>
 
 export type CommentRow = {
   id: string
@@ -39,7 +49,10 @@ export type CommentRow = {
   user_id: string | null
   created_at: string
   section_id: string | null
+  author: AuthorProfile | null
 }
+
+type CommentRecord = Omit<CommentRow, 'author' | 'section_id'>
 
 export type PageBundle = {
   page: PageRow
@@ -48,6 +61,9 @@ export type PageBundle = {
   comments: CommentRow[]
   users: UserProfileRow[]
 }
+
+const USER_PROFILE_COLUMNS =
+  'id,auth_user_id,email,username,configurations,avatar_url,display_name,updated_at,created_at,url'
 
 export async function loadOrCreatePageRoom(url: string): Promise<PageBundle> {
   const page = await findOrCreatePage(url)
@@ -130,7 +146,12 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
   const [pageResult, roomResult, postsResult] = await Promise.all([
     supabase.from('pages').select('*').eq('id', pageId).single<PageRow>(),
     supabase.from('rooms').select('*').eq('id', roomId).single<RoomRow>(),
-    supabase.from('posts').select('*').eq('room_id', roomId).order('created_at', { ascending: true }).returns<PostRow[]>(),
+    supabase
+      .from('posts')
+      .select('*')
+      .eq('room_id', roomId)
+      .order('created_at', { ascending: true })
+      .returns<PostRecord[]>(),
   ])
 
   if (pageResult.error) {
@@ -156,7 +177,7 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
       .select('*')
       .in('post_id', postIds)
       .order('created_at', { ascending: true })
-      .returns<Array<Omit<CommentRow, 'section_id'>>>()
+      .returns<CommentRecord[]>()
 
     if (commentsError) {
       throw new Error(`Failed to load comments: ${commentsError.message}`)
@@ -166,19 +187,90 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
       commentsData?.map((comment) => ({
         ...comment,
         section_id: `post:${comment.post_id}`,
+        author: null,
       })) ?? []
   }
 
-  const users = await loadUserProfiles([
-    ...posts.map((post) => post.user_id).filter((userId): userId is string => Boolean(userId)),
-    ...comments.map((comment) => comment.user_id).filter((userId): userId is string => Boolean(userId)),
+  const userIds = [...posts, ...comments]
+    .map((entry) => entry.user_id)
+    .filter((userId): userId is string => Boolean(userId))
+  const [authorById, users] = await Promise.all([
+    getAuthorProfilesById(userIds),
+    loadProfilesById(userIds),
   ])
+
+  const enrichedPosts = posts.map((post) => ({
+    ...post,
+    author: post.user_id ? authorById.get(post.user_id) ?? null : null,
+  }))
+
+  const enrichedComments = comments.map((comment) => ({
+    ...comment,
+    author: comment.user_id ? authorById.get(comment.user_id) ?? null : null,
+  }))
 
   return {
     page: pageResult.data,
     room: roomResult.data,
-    posts,
-    comments,
+    posts: enrichedPosts,
+    comments: enrichedComments,
     users,
   }
+}
+
+async function getAuthorProfilesById(userIds: string[]): Promise<Map<string, AuthorProfile>> {
+  const uniqueUserIds = [...new Set(userIds.map((userId) => userId.trim()).filter(Boolean))]
+  if (uniqueUserIds.length === 0) {
+    return new Map<string, AuthorProfile>()
+  }
+
+  const supabase = getSupabaseAdmin()
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, username, display_name, avatar_url')
+    .in('id', uniqueUserIds)
+    .returns<
+      Array<{
+        id: string
+        username: string | null
+        display_name: string | null
+        avatar_url: string | null
+      }>
+    >()
+
+  if (error) {
+    throw new Error(`Failed to load author profiles: ${error.message}`)
+  }
+
+  return new Map(
+    (data ?? []).map((profile) => [
+      profile.id,
+      {
+        id: profile.id,
+        username: profile.username,
+        displayName: profile.display_name,
+        avatarUrl: profile.avatar_url,
+      },
+    ]),
+  )
+}
+
+async function loadProfilesById(userIds: string[]): Promise<UserProfileRow[]> {
+  const uniqueUserIds = [...new Set(userIds.map((userId) => userId.trim()).filter(Boolean))]
+  if (uniqueUserIds.length === 0) {
+    return []
+  }
+
+  const supabase = getSupabaseAdmin()
+  const { data, error } = await supabase
+    .from('users')
+    .select(USER_PROFILE_COLUMNS)
+    .in('id', uniqueUserIds)
+    .returns<UserProfileRow[]>()
+
+  if (error) {
+    throw new Error(`Failed to load user profiles: ${error.message}`)
+  }
+
+  return data ?? []
 }

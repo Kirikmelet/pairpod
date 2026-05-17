@@ -154,6 +154,33 @@ body {
   font-size: var(--fs-xs);
 }
 
+.extension-app .domain-picker {
+  grid-template-columns: minmax(0, 1fr) 58px;
+  max-width: none;
+}
+
+.extension-app .domain-picker input,
+.extension-app .domain-picker button {
+  min-height: 26px;
+  font-size: var(--fs-xs);
+}
+
+.extension-app .domain-picker button {
+  padding: 0 var(--space-sm);
+}
+
+.extension-app .pod-create-form {
+  grid-template-columns: 1fr;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+}
+
+.extension-app .pod-create-form input,
+.extension-app .pod-create-form button {
+  min-height: 30px;
+  font-size: var(--fs-xs);
+}
+
 .extension-app .pod-list {
   gap: var(--space-sm);
 }
@@ -402,6 +429,7 @@ body {
 .extension-app .post-card footer {
   justify-content: center;
   gap: var(--space-sm);
+  flex-wrap: wrap;
 }
 
 .extension-app .post-detail-main,
@@ -437,6 +465,26 @@ body {
 
 .extension-app .post-comments {
   padding-bottom: var(--space-sm);
+}
+
+.extension-app .post-mobile-composer {
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+}
+
+.extension-app .post-mobile-composer__input {
+  gap: var(--space-xs);
+}
+
+.extension-app .post-mobile-composer__input textarea {
+  min-height: 38px;
+  font-size: var(--fs-xs);
+}
+
+.extension-app .post-mobile-composer__input button {
+  min-width: 54px;
+  min-height: 38px;
+  padding: 0 var(--space-sm);
 }
 
 .extension-app .post-comments__list {
@@ -480,6 +528,18 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 28px;
+  padding: 0 var(--space-sm);
+  white-space: nowrap;
+}
+
+.extension-app .post-card footer .post-reply-btn {
+  border: 1.5px solid rgba(24,104,208,0.48);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(206,226,255,0.92));
+  color: var(--accent-blue);
+  font-weight: var(--fw-extrabold);
+  text-decoration: none;
 }
 
 .extension-app .post-reply-form,
@@ -488,6 +548,20 @@ body {
   gap: var(--space-sm);
   margin-left: 0;
   padding: var(--space-sm);
+}
+
+.extension-app .post-compose--reply {
+  margin: var(--space-sm);
+}
+
+.extension-app .post-reply-open {
+  margin: var(--space-sm);
+  min-height: 34px;
+}
+
+.extension-app .post-reply-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
 
 .extension-app .post-thread-replies {
@@ -540,6 +614,142 @@ body {
   gap: var(--space-sm);
 }
 
+.extension-app .profile-editor-grid {
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
+}
+
+.extension-app .avatar-creator {
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+}
+
+.extension-app .avatar-creator__preview {
+  min-height: 132px;
+}
+
+.extension-app .avatar-creator__preview img {
+  width: 104px;
+  height: 104px;
+}
+
+.extension-app .character-preview {
+  transform: scale(0.82);
+}
+
+.extension-app .avatar-creator__controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .extension-app .profile-field input {
   min-height: 36px;
+}
+
+.extension-app .peer-map-shell {
+  width: 100%;
+  min-height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  padding: var(--space-xs);
+}
+
+.extension-app .peer-map-window {
+  width: 100%;
+  max-width: 100%;
+  height: calc(100vh - 8px);
+  border-width: 1px;
+}
+
+.extension-app .peer-map-body {
+  max-height: calc(100vh - 72px);
+  padding: var(--space-xs);
+  gap: var(--space-xs);
+  overflow: auto;
+}
+
+.extension-app .peer-map-stage,
+.extension-app .peer-map-canvas {
+  min-height: 360px;
+  height: 410px;
+}
+
+.extension-app .peer-map-hud {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--fs-xs);
+}
+
+.extension-app .peer-map-door-link {
+  min-height: 24px;
+  padding: 0 var(--space-sm);
+}
+
+.extension-app .peer-map-controls button {
+  min-height: 28px;
+  font-size: var(--fs-xs);
+}
+
+.extension-app .user-profile-window {
+  width: 100%;
+  max-width: 100%;
+  height: calc(100vh - 8px);
+  margin: 0;
+  border-width: 1px;
+}
+
+.extension-app .user-profile-body {
+  max-height: calc(100vh - 72px);
+  overflow: auto;
+  padding: var(--space-sm);
+  gap: var(--space-sm);
+}
+
+.extension-app .user-profile-card {
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+}
+
+.extension-app .user-profile-card h1 {
+  font-size: var(--fs-xl);
+}
+
+.extension-app .user-profile-avatar {
+  width: 56px;
+  height: 56px;
+}
+
+.extension-app .user-profile-facts div {
+  grid-template-columns: 1fr;
+  gap: var(--space-xxs);
+}
+
+.extension-app .dm-shell,
+.extension-app .dm-window {
+  width: 100%;
+  min-height: 100vh;
+  max-height: 100vh;
+  margin: 0;
+  border-width: 1px;
+}
+
+.extension-app .dm-layout {
+  grid-template-columns: 1fr;
+  max-height: calc(100vh - 72px);
+  overflow: auto;
+}
+
+.extension-app .dm-sidebar {
+  max-height: 190px;
+}
+
+.extension-app .dm-thread-list {
+  max-height: 150px;
+}
+
+.extension-app .dm-conversation__header h1 {
+  font-size: var(--fs-xl);
+}
+
+.extension-app .dm-message {
+  max-width: 92%;
 }

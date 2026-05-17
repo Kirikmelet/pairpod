@@ -15,10 +15,13 @@ const supabaseOrigin = new URL(supabaseUrl).origin;
 const supabaseRealtimeOrigin = supabaseOrigin.replace(/^https:/, "wss:");
 const siteUrl = env.NEXT_PUBLIC_SITE_URL?.trim();
 const hostPermissions = [`${supabaseOrigin}/*`];
+const connectSrc = ["'self'", supabaseOrigin, supabaseRealtimeOrigin];
+const mediaSrc = ["'self'", supabaseOrigin];
 
 if (siteUrl) {
   const siteOrigin = new URL(siteUrl).origin;
   hostPermissions.push(`${siteOrigin}/*`);
+  connectSrc.push(siteOrigin);
 }
 
 manifest.host_permissions = Array.from(new Set(hostPermissions));
@@ -34,7 +37,8 @@ manifest.content_security_policy = {
   extension_pages: [
     "script-src 'self'",
     "object-src 'self'",
-    `connect-src 'self' ${supabaseOrigin} ${supabaseRealtimeOrigin}`,
+    `connect-src ${Array.from(new Set(connectSrc)).join(" ")}`,
+    `media-src ${Array.from(new Set(mediaSrc)).join(" ")}`,
   ].join("; "),
 };
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -78,6 +82,7 @@ function buildExtensionLoginScript() {
   return `const SUPABASE_URL = ${JSON.stringify(supabaseUrl)};
 const SUPABASE_KEY = ${JSON.stringify(supabaseKey)};
 const STORAGE_KEY = ${JSON.stringify(storageKey)};
+const SFX_BASE_URL = \`\${SUPABASE_URL.replace(/\\/+$/, "")}/storage/v1/object/public/sfx\`;
 const runtime = globalThis.chrome ?? globalThis.browser;
 
 const windowBody = document.getElementById("windowBody");
@@ -96,6 +101,70 @@ const googleBtn = document.getElementById("googleBtn");
 const homeBtn = document.getElementById("homeBtn");
 
 let currentMode = "signin";
+let didPrimeSfx = false;
+
+const SFX = {
+  error: "erro.mp3",
+  goodbye: "Goodbye.mp3",
+  im: "IM.mp3",
+  welcome: "Welcome.mp3",
+};
+
+const audioCache = new Map();
+
+function getSfxAudio(name) {
+  const fileName = SFX[name];
+  if (!fileName) return null;
+  const cached = audioCache.get(name);
+  if (cached) return cached;
+  const audio = new Audio(\`\${SFX_BASE_URL}/\${encodeURIComponent(fileName)}\`);
+  audio.preload = "auto";
+  audioCache.set(name, audio);
+  return audio;
+}
+
+function primeSfx() {
+  if (didPrimeSfx) return;
+  didPrimeSfx = true;
+  for (const name of Object.keys(SFX)) {
+    try {
+      const audio = getSfxAudio(name);
+      if (!audio) continue;
+      audio.muted = true;
+      audio.volume = 0;
+      void audio.play()
+        .then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.muted = false;
+          audio.volume = 1;
+        })
+        .catch(() => {
+          audio.muted = false;
+          audio.volume = 1;
+        });
+    } catch {}
+  }
+}
+
+async function playSfx(name) {
+  try {
+    const audio = getSfxAudio(name);
+    if (!audio) return;
+    audio.muted = false;
+    audio.volume = 1;
+    audio.currentTime = 0;
+    await audio.play();
+  } catch {}
+}
+
+async function playSfxAndWait(name, delayMs = 650) {
+  await playSfx(name);
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+window.addEventListener("pointerdown", primeSfx, { passive: true });
+window.addEventListener("keydown", primeSfx);
 
 function supabaseHeaders(accessToken) {
   return {
@@ -106,6 +175,9 @@ function supabaseHeaders(accessToken) {
 }
 
 function showToast(message, type = "info") {
+  if (type === "error") {
+    playSfx("error");
+  }
   const container = document.getElementById("toastContainer");
   const toast = document.createElement("div");
   toast.className = \`toast toast--\${type}\`;
@@ -259,12 +331,12 @@ async function upsertUserProfile(session, username) {
     },
     body: JSON.stringify({
       id: user.id,
+      auth_user_id: user.id,
       email: user.email ?? null,
       username: username || user.user_metadata?.username || null,
       configurations: {
         displayName: user.user_metadata?.full_name || user.user_metadata?.name || null,
       },
-      avatar_url: user.user_metadata?.avatar_url || undefined,
     }),
   });
   if (!response.ok) {
@@ -293,6 +365,8 @@ homeBtn?.addEventListener("click", (event) => {
 });
 
 logoutBtn?.addEventListener("click", async () => {
+  primeSfx();
+  await playSfxAndWait("goodbye", 1200);
   await clearSession();
   showLoggedOut();
   showToast("Signed out", "info");
@@ -300,6 +374,7 @@ logoutBtn?.addEventListener("click", async () => {
 
 googleBtn?.addEventListener("click", async (event) => {
   event.preventDefault();
+  primeSfx();
   if (!runtime?.runtime?.sendMessage) {
     showToast("Extension Google auth is unavailable.", "error");
     return;
@@ -331,6 +406,7 @@ googleBtn?.addEventListener("click", async (event) => {
       }
     });
     if (!response?.ok) throw new Error(response?.error || "Google sign-in failed.");
+    await playSfxAndWait("welcome");
     showToast("Signed in with Google", "success");
     await restoreSession();
   } catch (error) {
@@ -342,6 +418,7 @@ googleBtn?.addEventListener("click", async (event) => {
 
 authForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
+  primeSfx();
   const email = emailInput.value.trim();
   const password = passwordInput.value;
   const username = usernameInput.value.trim();
@@ -362,6 +439,7 @@ authForm?.addEventListener("submit", async (event) => {
     }
     await saveSession(session);
     await upsertUserProfile(session, username);
+    await playSfxAndWait("welcome");
     showToast(currentMode === "register" ? "Account created" : "Signed in", "success");
     showLoggedIn(session.user?.email || email, username || session.user?.email || "");
   } catch (error) {

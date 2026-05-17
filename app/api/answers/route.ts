@@ -1,8 +1,8 @@
 import { cookies } from 'next/headers'
 import { logEvent } from '@/lib/server/helpers/logEvent'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
+import { resolveAuthenticatedProfileIdOrFallback } from '@/lib/server/profile'
 import { createComment } from '@/lib/server/discussions'
-import { getCurrentUserProfile } from '@/lib/server/profile'
 import { createClient } from '@/utils/supabase/server'
 
 type AnswerRequestBody = {
@@ -38,8 +38,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     let resolvedPostId = postId || sectionId?.replace(/^post:/, '') || ''
-    const profile = await getCurrentUserProfile()
-    const userId = profile?.id ?? requestUserId
+    const resolvedUserId = await resolveAuthenticatedProfileIdOrFallback(requestUserId)
 
     if (!resolvedPostId && replyId) {
       const supabase = createClient(await cookies())
@@ -62,14 +61,14 @@ export async function POST(request: Request): Promise<Response> {
 
     const data = await createComment({
       postId: resolvedPostId,
-      userId,
+      userId: resolvedUserId,
       content,
       replyId,
     })
 
     await logEvent({
       eventType: 'answer.created',
-      userId,
+      userId: resolvedUserId,
       postId: resolvedPostId,
       commentId: data.id,
       payload: {

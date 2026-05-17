@@ -72,7 +72,6 @@ export async function createPost({
   }
 
   const supabase = getSupabaseAdmin()
-
   const { data, error } = await supabase
     .from('posts')
     .insert({

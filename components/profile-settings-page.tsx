@@ -1,8 +1,10 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { useErrorSfx } from "@/lib/client/sfx";
 import { createClient } from "@/utils/supabase/client";
 import type { Json } from "@/utils/database.types";
+import type { User } from "@supabase/supabase-js";
 
 type ProfileSettingsPageProps = {
   variant?: "page" | "popup";
@@ -17,13 +19,38 @@ type ExtensionRuntime = {
 
 type UserProfileRow = {
   id: string;
+  auth_user_id: string | null;
   email: string | null;
   username: string | null;
   configurations: Json;
+  display_name: string | null;
   avatar_url: string | null;
+  updated_at: string;
+};
+
+type Character3dConfig = {
+  body: string;
+  accent: string;
+  head: string;
+  style: "pod" | "runner" | "bot";
+};
+
+type ProfileConfiguration = {
+  displayName: string;
+  character3d: Character3dConfig;
+};
+
+const DEFAULT_CHARACTER_3D: Character3dConfig = {
+  body: "#6ebe44",
+  accent: "#2d90ff",
+  head: "#f7ffe8",
+  style: "pod",
 };
 const DEFAULT_AVATAR_URL =
   "https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png";
+const AVATAR_BUCKET = "profile_pictures";
+const USER_PROFILE_COLUMNS =
+  "id,auth_user_id,email,username,configurations,display_name,avatar_url,updated_at";
 
 export function ProfileSettingsPage({
   variant = "page",
@@ -36,11 +63,16 @@ export function ProfileSettingsPage({
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState(DEFAULT_AVATAR_URL);
+  const [characterBody, setCharacterBody] = useState(DEFAULT_CHARACTER_3D.body);
+  const [characterAccent, setCharacterAccent] = useState(DEFAULT_CHARACTER_3D.accent);
+  const [characterHead, setCharacterHead] = useState(DEFAULT_CHARACTER_3D.head);
+  const [characterStyle, setCharacterStyle] = useState<Character3dConfig["style"]>(DEFAULT_CHARACTER_3D.style);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useErrorSfx(error);
 
   const title = useMemo(
     () => displayName.trim() || username.trim() || authEmail || "Your profile",
@@ -51,8 +83,12 @@ export function ProfileSettingsPage({
     const configuration = readConfiguration(nextProfile.configurations);
     setProfile(nextProfile);
     setUsername(nextProfile.username ?? "");
-    setDisplayName(configuration.displayName ?? "");
+    setDisplayName(nextProfile.display_name ?? configuration.displayName ?? "");
     setAvatarUrl(nextProfile.avatar_url || DEFAULT_AVATAR_URL);
+    setCharacterBody(configuration.character3d.body);
+    setCharacterAccent(configuration.character3d.accent);
+    setCharacterHead(configuration.character3d.head);
+    setCharacterStyle(configuration.character3d.style);
   }
 
   useEffect(() => {
@@ -151,6 +187,37 @@ export function ProfileSettingsPage({
     }
   };
 
+  const handleCharacterSave = async () => {
+    if (!profile) {
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setStatus(null);
+
+    try {
+      const nextProfile = await updateProfile({
+        character3d: {
+          body: characterBody,
+          accent: characterAccent,
+          head: characterHead,
+          style: characterStyle,
+        },
+      });
+      hydrateForm(nextProfile);
+      setStatus("3D character updated.");
+    } catch (avatarError) {
+      setError(
+        avatarError instanceof Error
+          ? avatarError.message
+          : "Could not save 3D character.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <main className={`app-scene profile-scene ${isPopup ? "profile-scene--popup" : ""}`}>
       <ProfileBackground />
@@ -196,62 +263,124 @@ export function ProfileSettingsPage({
             {error ? <p className="status-note status-note--error">{error}</p> : null}
             {status ? <p className="status-note status-note--success">{status}</p> : null}
 
-            <form className="profile-form" onSubmit={handleSubmit}>
-              <label className="profile-field">
-                <span>Username</span>
-                <input
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                  placeholder="coolbuilder"
-                  maxLength={40}
-                />
-              </label>
-
-              <label className="profile-field">
-                <span>Display name</span>
-                <input
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder="Cool Builder"
-                  maxLength={80}
-                />
-              </label>
-
-              {canUseFilePicker ? (
+            <div className="profile-editor-grid">
+              <form className="profile-form" onSubmit={handleSubmit}>
                 <label className="profile-field">
-                  <span>Avatar PNG</span>
+                  <span>Username</span>
                   <input
-                    type="file"
-                    accept="image/png"
-                    onChange={(event) => void handleAvatarChange(event)}
-                    disabled={!profile || uploading}
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    placeholder="coolbuilder"
+                    maxLength={40}
                   />
                 </label>
-              ) : (
-                <div className="profile-field">
-                  <span>Avatar PNG</span>
-                  <a
-                    className="profile-upload-link"
-                    href={nav.fullProfileHref}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open avatar editor
-                  </a>
-                  <p className="profile-field-note">
-                    Opens in a normal tab so the file picker can stay open.
-                  </p>
-                </div>
-              )}
 
-              <button
-                className="profile-save-button"
-                type="submit"
-                disabled={!profile || saving || uploading}
-              >
-                {saving ? "Saving..." : uploading ? "Uploading..." : "Save profile"}
-              </button>
-            </form>
+                <label className="profile-field">
+                  <span>Display name</span>
+                  <input
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                    placeholder="Cool Builder"
+                    maxLength={80}
+                  />
+                </label>
+
+                {canUseFilePicker ? (
+                  <label className="profile-field">
+                    <span>Avatar PNG</span>
+                    <input
+                      type="file"
+                      accept="image/png"
+                      onChange={(event) => void handleAvatarChange(event)}
+                      disabled={!profile || uploading}
+                    />
+                  </label>
+                ) : (
+                  <div className="profile-field">
+                    <span>Avatar PNG</span>
+                    <a
+                      className="profile-upload-link"
+                      href={nav.fullProfileHref}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open avatar editor
+                    </a>
+                    <p className="profile-field-note">
+                      Opens in a normal tab so the file picker can stay open.
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  className="profile-save-button"
+                  type="submit"
+                  disabled={!profile || saving || uploading}
+                >
+                  {saving ? "Saving..." : uploading ? "Uploading..." : "Save profile"}
+                </button>
+              </form>
+
+              <section className="avatar-creator" aria-label="Avatar creator">
+                <header>
+                  <p className="app-eyebrow">3D character</p>
+                  <h2>PeerScape look</h2>
+                </header>
+                <div className="avatar-creator__preview">
+                  <CharacterPreview
+                    body={characterBody}
+                    accent={characterAccent}
+                    head={characterHead}
+                    style={characterStyle}
+                  />
+                </div>
+                <div className="avatar-creator__controls">
+                  <label>
+                    <span>Body</span>
+                    <input
+                      type="color"
+                      value={characterBody}
+                      onChange={(event) => setCharacterBody(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Accent</span>
+                    <input
+                      type="color"
+                      value={characterAccent}
+                      onChange={(event) => setCharacterAccent(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Head</span>
+                    <input
+                      type="color"
+                      value={characterHead}
+                      onChange={(event) => setCharacterHead(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Shape</span>
+                    <select
+                      value={characterStyle}
+                      onChange={(event) => setCharacterStyle(event.target.value as Character3dConfig["style"])}
+                    >
+                      <option value="pod">Pod</option>
+                      <option value="runner">Runner</option>
+                      <option value="bot">Bot</option>
+                    </select>
+                  </label>
+                </div>
+                <button
+                  className="profile-save-button avatar-creator__save"
+                  type="button"
+                  disabled={!profile || uploading || saving}
+                  onClick={() => void handleCharacterSave()}
+                >
+                  {saving ? "Saving..." : "Save 3D character"}
+                </button>
+              </section>
+            </div>
           </div>
         </section>
       </div>
@@ -288,7 +417,10 @@ function useProfileNavLinks() {
     fullParams.set("fullProfile", "1");
     const fullSuffix = `?${fullParams.toString()}`;
     const extensionProfilePath = `popup.html#/profile${fullSuffix}`;
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+    const fullProfileHref = siteUrl
+      ? `${siteUrl.replace(/\/+$/, "")}/profile${fullSuffix}`
+      : `/profile${fullSuffix}`;
 
     setLinks({
       backHref: isExtension ? `#/${suffix}` : `/pods${suffix}`,
@@ -298,12 +430,31 @@ function useProfileNavLinks() {
       roomHref: isExtension ? `#/${suffix}` : `/pods${suffix}`,
       fullProfileHref: isExtension
         ? (runtime?.runtime?.getURL?.(extensionProfilePath) ?? extensionProfilePath)
-        : `${siteUrl.replace(/\/+$/, "")}/profile${fullSuffix}`,
+        : fullProfileHref,
       isFullProfileEditor,
     });
   }, []);
 
   return links;
+}
+
+function CharacterPreview({
+  body,
+  accent,
+  head,
+  style,
+}: Character3dConfig) {
+  return (
+    <div className={`character-preview character-preview--${style}`}>
+      <span className="character-preview__antenna" style={{ backgroundColor: accent }} />
+      <span className="character-preview__head" style={{ backgroundColor: head }}>
+        <i style={{ backgroundColor: accent }} />
+        <i style={{ backgroundColor: accent }} />
+      </span>
+      <span className="character-preview__body" style={{ backgroundColor: body }} />
+      <span className="character-preview__ring" style={{ borderColor: accent }} />
+    </div>
+  );
 }
 
 function getExtensionRuntime() {
@@ -335,6 +486,10 @@ function goBack(fallbackHref: string) {
 }
 
 async function loadProfileRequest() {
+  if (shouldUseDirectProfileAccess()) {
+    return await loadProfileDirect();
+  }
+
   const response = await fetchProfileApi("/api/profile", {
     method: "GET",
   });
@@ -346,7 +501,12 @@ async function updateProfile(patch: {
   username?: string | null;
   displayName?: string | null;
   avatarUrl?: string | null;
+  character3d?: Character3dConfig;
 }) {
+  if (shouldUseDirectProfileAccess()) {
+    return await updateProfileDirect(patch);
+  }
+
   const response = await fetchProfileApi("/api/profile", {
     method: "PATCH",
     body: JSON.stringify(patch),
@@ -359,6 +519,10 @@ async function updateProfile(patch: {
 }
 
 async function uploadAvatar(file: Blob) {
+  if (shouldUseDirectProfileAccess()) {
+    return await uploadAvatarDirect(file);
+  }
+
   const formData = new FormData();
   formData.set("file", file, "avatar.png");
 
@@ -368,6 +532,206 @@ async function uploadAvatar(file: Blob) {
   });
 
   return toUserProfileRow(response);
+}
+
+function shouldUseDirectProfileAccess() {
+  return Boolean(getExtensionRuntime()?.runtime?.id) && !getRemoteApiUrl("/api/profile");
+}
+
+async function loadProfileDirect() {
+  const { supabase, user } = await getAuthenticatedDirectProfileClient();
+  return await ensureDirectProfile(supabase, user);
+}
+
+async function updateProfileDirect(patch: {
+  username?: string | null;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  character3d?: Character3dConfig;
+}) {
+  const { supabase, user } = await getAuthenticatedDirectProfileClient();
+  const profile = await ensureDirectProfile(supabase, user);
+  const nextConfiguration = readConfiguration(profile.configurations);
+  const nextPatch: Partial<UserProfileRow> = {
+    auth_user_id: user.id,
+    email: user.email ?? profile.email,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (Object.prototype.hasOwnProperty.call(patch, "username")) {
+    nextPatch.username = normalizeUsernameForProfile(patch.username);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(patch, "displayName")) {
+    const nextDisplayName = normalizeOptionalText(patch.displayName ?? "");
+    nextConfiguration.displayName = nextDisplayName ?? "";
+    nextPatch.display_name = nextDisplayName;
+    nextPatch.configurations = nextConfiguration;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(patch, "avatarUrl")) {
+    nextPatch.avatar_url = patch.avatarUrl || profile.avatar_url || DEFAULT_AVATAR_URL;
+  }
+
+  if (patch.character3d) {
+    nextConfiguration.character3d = normalizeCharacter3d(patch.character3d);
+    nextPatch.configurations = nextConfiguration;
+  }
+
+  const { data, error } = await supabase
+    .from("users")
+    .update(nextPatch)
+    .eq("id", profile.id)
+    .select(USER_PROFILE_COLUMNS)
+    .maybeSingle<UserProfileRow>();
+
+  if (error) {
+    throw new Error(`Could not save profile: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Could not save profile.");
+  }
+
+  return data;
+}
+
+async function uploadAvatarDirect(file: Blob) {
+  await assertPngBlobSize(file, 128);
+
+  const { supabase, user } = await getAuthenticatedDirectProfileClient();
+  const storagePath = `${user.id}/avatar.png`;
+  const { error: uploadError } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .upload(storagePath, file, {
+      cacheControl: "3600",
+      contentType: "image/png",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw new Error(`Could not upload avatar: ${uploadError.message}`);
+  }
+
+  const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(storagePath);
+  return await updateProfileDirect({
+    avatarUrl: `${data.publicUrl}?v=${Date.now()}`,
+  });
+}
+
+async function getAuthenticatedDirectProfileClient() {
+  const supabase = createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!user) {
+    throw new Error("You must be signed in to edit your profile.");
+  }
+
+  return { supabase, user };
+}
+
+async function ensureDirectProfile(
+  supabase: ReturnType<typeof createClient>,
+  user: User,
+) {
+  const users = supabase.from("users");
+  const { data: existingByAuth, error: existingByAuthError } = await users
+    .select(USER_PROFILE_COLUMNS)
+    .eq("auth_user_id", user.id)
+    .maybeSingle<UserProfileRow>();
+
+  if (existingByAuthError) {
+    throw existingByAuthError;
+  }
+
+  if (existingByAuth) {
+    return await syncDirectProfileSeed(supabase, existingByAuth, user);
+  }
+
+  const { data: legacyById, error: legacyByIdError } = await users
+    .select(USER_PROFILE_COLUMNS)
+    .eq("id", user.id)
+    .maybeSingle<UserProfileRow>();
+
+  if (legacyByIdError) {
+    throw legacyByIdError;
+  }
+
+  if (legacyById) {
+    return await syncDirectProfileSeed(supabase, legacyById, user);
+  }
+
+  const displayName = readOAuthDisplayName(user);
+  const { data, error } = await users
+    .insert({
+      auth_user_id: user.id,
+      email: user.email ?? null,
+      username: normalizeUsernameForProfile(readMetadataString(user.user_metadata?.username)),
+      display_name: displayName,
+      avatar_url: DEFAULT_AVATAR_URL,
+      configurations: {
+        displayName: displayName ?? "",
+        character3d: DEFAULT_CHARACTER_3D,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .select(USER_PROFILE_COLUMNS)
+    .maybeSingle<UserProfileRow>();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Could not create your profile.");
+  }
+
+  return data;
+}
+
+async function syncDirectProfileSeed(
+  supabase: ReturnType<typeof createClient>,
+  profile: UserProfileRow,
+  user: User,
+) {
+  const users = supabase.from("users");
+  const configurations = readConfiguration(profile.configurations);
+  const displayName = readOAuthDisplayName(user);
+  const avatarUrl = getStoredAvatarUrl(profile.avatar_url, user);
+
+  if (!configurations.displayName && displayName) {
+    configurations.displayName = displayName;
+  }
+
+  const { data, error } = await users
+    .update({
+      auth_user_id: user.id,
+      email: user.email ?? profile.email,
+      display_name: profile.display_name || displayName,
+      avatar_url: avatarUrl,
+      configurations,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", profile.id)
+    .select(USER_PROFILE_COLUMNS)
+    .maybeSingle<UserProfileRow>();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Could not load your profile.");
+  }
+
+  return data;
 }
 
 async function fetchProfileApi(pathname: string, init: RequestInit) {
@@ -412,17 +776,22 @@ type ProfileApiResponse = {
   username: string | null;
   displayName: string | null;
   avatarUrl: string;
+  character3d?: Character3dConfig;
 };
 
 function toUserProfileRow(profile: ProfileApiResponse): UserProfileRow {
   return {
     id: profile.id,
+    auth_user_id: null,
     email: profile.email,
     username: profile.username,
     configurations: {
       displayName: profile.displayName,
+      character3d: profile.character3d ?? DEFAULT_CHARACTER_3D,
     },
+    display_name: profile.displayName,
     avatar_url: profile.avatarUrl || DEFAULT_AVATAR_URL,
+    updated_at: new Date().toISOString(),
   };
 }
 
@@ -449,6 +818,153 @@ function buildProfileRequestHeaders(
   return nextHeaders;
 }
 
+type GeneratedAvatarOptions = {
+  body: string;
+  accent: string;
+  face: "smile" | "focus" | "star";
+};
+
+async function createGeneratedAvatarBlob(options: GeneratedAvatarOptions) {
+  const canvas = document.createElement("canvas");
+  const size = 128;
+  canvas.width = size;
+  canvas.height = size;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Could not create avatar.");
+  }
+
+  context.clearRect(0, 0, size, size);
+  const background = context.createLinearGradient(0, 0, size, size);
+  background.addColorStop(0, "#eff8ff");
+  background.addColorStop(1, "#b9dcff");
+  context.fillStyle = background;
+  roundedRect(context, 0, 0, size, size, 26);
+  context.fill();
+
+  context.save();
+  context.translate(64, 68);
+  context.fillStyle = options.body;
+  context.shadowColor = "rgba(0, 60, 140, 0.28)";
+  context.shadowBlur = 10;
+  context.beginPath();
+  context.ellipse(0, 8, 39, 43, 0, 0, Math.PI * 2);
+  context.fill();
+  context.shadowBlur = 0;
+
+  context.fillStyle = "rgba(255,255,255,0.48)";
+  context.beginPath();
+  context.ellipse(-15, -9, 12, 17, -0.7, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = options.accent;
+  context.beginPath();
+  context.ellipse(17, -47, 10, 20, 0.65, 0, Math.PI * 2);
+  context.fill();
+  context.strokeStyle = "#2d5018";
+  context.lineWidth = 4;
+  context.beginPath();
+  context.moveTo(0, -36);
+  context.quadraticCurveTo(3, -49, 15, -56);
+  context.stroke();
+
+  drawAvatarFace(context, options.face);
+  context.restore();
+
+  return await canvasToPngBlob(canvas);
+}
+
+function drawAvatarFace(
+  context: CanvasRenderingContext2D,
+  face: GeneratedAvatarOptions["face"],
+) {
+  context.fillStyle = "#ffffff";
+  context.beginPath();
+  context.arc(-14, -2, 9, 0, Math.PI * 2);
+  context.arc(14, -2, 9, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#182746";
+  context.beginPath();
+  if (face === "star") {
+    drawStar(context, -14, -2, 5, 9, 4);
+    drawStar(context, 14, -2, 5, 9, 4);
+  } else {
+    context.arc(-14, face === "focus" ? -1 : -2, 4, 0, Math.PI * 2);
+    context.arc(14, face === "focus" ? -1 : -2, 4, 0, Math.PI * 2);
+  }
+  context.fill();
+
+  context.strokeStyle = "#2d5018";
+  context.lineWidth = 4;
+  context.lineCap = "round";
+  context.beginPath();
+  if (face === "focus") {
+    context.moveTo(-16, 23);
+    context.lineTo(16, 23);
+  } else {
+    context.arc(0, 16, 17, 0.18 * Math.PI, 0.82 * Math.PI);
+  }
+  context.stroke();
+}
+
+function drawStar(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  points: number,
+  outerRadius: number,
+  innerRadius: number,
+) {
+  context.moveTo(x, y - outerRadius);
+  for (let i = 1; i < points * 2; i += 1) {
+    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+    const angle = (i * Math.PI) / points - Math.PI / 2;
+    context.lineTo(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius);
+  }
+  context.closePath();
+}
+
+function roundedRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.arcTo(x + width, y, x + width, y + height, radius);
+  context.arcTo(x + width, y + height, x, y + height, radius);
+  context.arcTo(x, y + height, x, y, radius);
+  context.arcTo(x, y, x + width, y, radius);
+  context.closePath();
+}
+
+async function canvasToPngBlob(canvas: HTMLCanvasElement) {
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Could not export avatar PNG."));
+        return;
+      }
+
+      resolve(blob);
+    }, "image/png");
+  });
+}
+
+async function blobToDataUrl(blob: Blob) {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("Could not preview avatar."));
+    reader.readAsDataURL(blob);
+  });
+}
+
 async function resizePngToAvatar(file: File) {
   const imageUrl = URL.createObjectURL(file);
 
@@ -472,16 +988,7 @@ async function resizePngToAvatar(file: File) {
     const y = Math.round((size - height) / 2);
     context.drawImage(image, x, y, width, height);
 
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          reject(new Error("Could not export resized PNG."));
-          return;
-        }
-
-        resolve(blob);
-      }, "image/png");
-    });
+    return await canvasToPngBlob(canvas);
   } finally {
     URL.revokeObjectURL(imageUrl);
   }
@@ -496,24 +1003,124 @@ async function loadImage(src: string) {
   return image;
 }
 
-function readConfiguration(configurations: Json) {
+function readConfiguration(configurations: Json): ProfileConfiguration {
   if (
     configurations &&
     typeof configurations === "object" &&
     !Array.isArray(configurations)
   ) {
     const displayName = configurations.displayName;
+    const character3d = normalizeCharacter3d(configurations.character3d);
     return {
       ...configurations,
       displayName: typeof displayName === "string" ? displayName : "",
+      character3d,
     };
   }
 
-  return { displayName: "" };
+  return { displayName: "", character3d: DEFAULT_CHARACTER_3D };
+}
+
+function normalizeCharacter3d(value: unknown): Character3dConfig {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return DEFAULT_CHARACTER_3D;
+  }
+
+  const candidate = value as Partial<Character3dConfig>;
+  return {
+    body: normalizeColor(candidate.body) ?? DEFAULT_CHARACTER_3D.body,
+    accent: normalizeColor(candidate.accent) ?? DEFAULT_CHARACTER_3D.accent,
+    head: normalizeColor(candidate.head) ?? DEFAULT_CHARACTER_3D.head,
+    style: candidate.style === "runner" || candidate.style === "bot" ? candidate.style : "pod",
+  };
+}
+
+function normalizeColor(value: unknown) {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value) ? value : null;
 }
 
 function normalizeOptionalText(value: string) {
   return value.trim() || null;
+}
+
+function normalizeUsernameForProfile(value: string | null | undefined) {
+  const normalized = normalizeOptionalText(value ?? "")?.toLowerCase() ?? null;
+  if (!normalized) {
+    return null;
+  }
+
+  if (!/^[a-z0-9_-]{3,24}$/.test(normalized)) {
+    throw new Error(
+      "Username must be 3-24 characters and use only lowercase letters, numbers, underscores, or hyphens.",
+    );
+  }
+
+  return normalized;
+}
+
+function readMetadataString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readOAuthDisplayName(user: User) {
+  return (
+    readMetadataString(user.user_metadata?.full_name) ||
+    readMetadataString(user.user_metadata?.display_name) ||
+    readMetadataString(user.user_metadata?.name) ||
+    null
+  );
+}
+
+function readOAuthAvatarUrl(user: User) {
+  return (
+    readMetadataString(user.user_metadata?.avatar_url) ||
+    readMetadataString(user.user_metadata?.picture) ||
+    null
+  );
+}
+
+function hasCustomAvatar(avatarUrl: string | null) {
+  return Boolean(avatarUrl && avatarUrl !== DEFAULT_AVATAR_URL);
+}
+
+function getStoredAvatarUrl(avatarUrl: string | null, user: User) {
+  if (!hasCustomAvatar(avatarUrl)) {
+    return DEFAULT_AVATAR_URL;
+  }
+
+  return isOAuthAvatarUrl(avatarUrl, user) ? DEFAULT_AVATAR_URL : avatarUrl;
+}
+
+function isOAuthAvatarUrl(avatarUrl: string | null, user: User) {
+  const oauthAvatarUrl = readOAuthAvatarUrl(user);
+  return Boolean(
+    avatarUrl &&
+      oauthAvatarUrl &&
+      stripCacheBuster(avatarUrl) === stripCacheBuster(oauthAvatarUrl),
+  );
+}
+
+function stripCacheBuster(value: string) {
+  return value.split("?")[0];
+}
+
+async function assertPngBlobSize(file: Blob, expectedSize: number) {
+  const arrayBuffer = await file.arrayBuffer();
+  const view = new DataView(arrayBuffer);
+  const signature = new Uint8Array(arrayBuffer.slice(0, 8));
+  const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  const isPng = pngSignature.every((byte, index) => signature[index] === byte);
+
+  if (!isPng || arrayBuffer.byteLength < 24) {
+    throw new Error("Avatar must be a valid PNG image.");
+  }
+
+  const width = view.getUint32(16);
+  const height = view.getUint32(20);
+
+  if (width !== expectedSize || height !== expectedSize) {
+    throw new Error(`Avatar PNG must be exactly ${expectedSize}x${expectedSize} pixels.`);
+  }
 }
 
 function ProfileBackground() {

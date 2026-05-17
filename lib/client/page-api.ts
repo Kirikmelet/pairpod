@@ -1,12 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import type { Json, TablesInsert } from "@/utils/database.types";
 
 const GLOBAL_ROOM_URL = "https://global.pairpod.local/";
 const FALLBACK_URL = GLOBAL_ROOM_URL;
+const LOCAL_POST_VOTES_KEY = "pairpod.postVotes";
+const LOCAL_COMMENT_VOTES_KEY = "pairpod.commentVotes";
+const REALTIME_REFRESH_DEBOUNCE_MS = 150;
+const ACTIVE_POLL_INTERVAL_MS = 2500;
 const DEFAULT_PORTS = new Map([
   ["http:", "80"],
   ["https:", "443"],
@@ -57,6 +61,19 @@ export type UserProfileRecord = {
   display_name?: string | null;
   avatar_url: string | null;
   updated_at?: string | null;
+  created_at?: string | null;
+};
+
+export type PostVoteRecord = {
+  post_id: string;
+  user_id: string;
+  value: 1 | -1;
+};
+
+export type CommentVoteRecord = {
+  comment_id: string;
+  user_id: string;
+  value: 1 | -1;
 };
 
 export type PageBundle = {
@@ -65,6 +82,8 @@ export type PageBundle = {
   posts: PostRecord[];
   comments: CommentRecord[];
   users: UserProfileRecord[];
+  postVotes: PostVoteRecord[];
+  commentVotes: CommentVoteRecord[];
 };
 
 type ApiSuccess<T> = {
@@ -82,6 +101,8 @@ type ApiResponse<T> = ApiSuccess<T> | ApiError;
 type UsePageBundleResult = {
   bundle: PageBundle | null;
   commentsByPost: Record<string, CommentRecord[]>;
+  currentPostVotesById: Record<string, 1 | -1>;
+  currentCommentVotesById: Record<string, 1 | -1>;
   usersById: Record<string, UserProfileRecord>;
   currentUrl: string;
   domainUrl: string;
@@ -92,6 +113,7 @@ type UsePageBundleResult = {
   refresh: (options?: { silent?: boolean }) => Promise<PageBundle | null>;
   buildScopedHref: (pathname: string) => string;
   buildRoomHref: (pathname: string, scope: "global" | "domain") => string;
+  buildDomainHref: (pathname: string, url: string) => string;
 };
 
 type MutableUsersTable = {
@@ -108,6 +130,22 @@ type MutableUsersTable = {
     value: Partial<UserProfileRecord> & { id: string },
     options?: { onConflict?: string },
   ): Promise<{ data: unknown; error: Error | null }>;
+};
+
+type VoteSelectTable<TVote> = {
+  select(columns: string): {
+    eq(column: string, value: string): {
+      in(column: string, value: string[]): Promise<{
+        data: TVote[] | null;
+        error: Error | null;
+      }>;
+    };
+  };
+};
+
+type VoteSelectClient = {
+  from(table: "post_votes"): VoteSelectTable<PostVoteRecord>;
+  from(table: "comment_votes"): VoteSelectTable<CommentVoteRecord>;
 };
 
 type VoteRow = {
@@ -230,10 +268,25 @@ export async function postJson<TResponse>(
 }
 
 export async function updatePostLikes(post: PostRecord, delta: 1 | -1) {
+  const userId = await getCurrentAuthUserId();
+  if (userId && getLocalVote(LOCAL_POST_VOTES_KEY, userId, post.id) === delta) {
+    throw new Error(
+      delta === 1
+        ? "You already upvoted this post."
+        : "You already downvoted this post.",
+    );
+  }
+
   try {
     await updatePostLikesDirect(post, delta);
+    if (userId) {
+      setLocalVote(LOCAL_POST_VOTES_KEY, userId, post.id, delta);
+    }
   } catch (error) {
     await updateVoteThroughApi("post", post.id, delta, error);
+    if (userId) {
+      setLocalVote(LOCAL_POST_VOTES_KEY, userId, post.id, delta);
+    }
   }
 }
 
@@ -266,10 +319,28 @@ async function updatePostLikesViaRpc(
 }
 
 export async function updateCommentLikes(comment: CommentRecord, delta: 1 | -1) {
+  const userId = await getCurrentAuthUserId();
+  if (
+    userId &&
+    getLocalVote(LOCAL_COMMENT_VOTES_KEY, userId, comment.id) === delta
+  ) {
+    throw new Error(
+      delta === 1
+        ? "You already liked this reply."
+        : "You already disliked this reply.",
+    );
+  }
+
   try {
     await updateCommentLikesDirect(comment, delta);
+    if (userId) {
+      setLocalVote(LOCAL_COMMENT_VOTES_KEY, userId, comment.id, delta);
+    }
   } catch (error) {
     await updateVoteThroughApi("comment", comment.id, delta, error);
+    if (userId) {
+      setLocalVote(LOCAL_COMMENT_VOTES_KEY, userId, comment.id, delta);
+    }
   }
 }
 
@@ -389,6 +460,7 @@ export function usePageBundle(): UsePageBundleResult {
   const [bundle, setBundle] = useState<PageBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const bundleRef = useRef<PageBundle | null>(null);
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     if (!options?.silent) {
@@ -404,7 +476,10 @@ export function usePageBundle(): UsePageBundleResult {
       }
 
       if (isExtensionRuntime()) {
-        const data = await loadOrCreatePageBundle(currentUrl);
+        const data = await withCurrentUserVotes(
+          await loadOrCreatePageBundle(currentUrl),
+        );
+        bundleRef.current = data;
         setBundle(data);
         return data;
       }
@@ -418,12 +493,20 @@ export function usePageBundle(): UsePageBundleResult {
         throw new Error(payload.ok ? "Failed to load page data" : payload.error);
       }
 
-      setBundle(payload.data);
-      return payload.data;
+      const data = await withCurrentUserVotes(payload.data);
+      bundleRef.current = data;
+      setBundle(data);
+      return data;
     } catch (loadError) {
       const message =
         loadError instanceof Error ? loadError.message : "Failed to load page data";
+      if (options?.silent && bundleRef.current) {
+        console.warn("Silent page data refresh failed.", loadError);
+        return bundleRef.current;
+      }
+
       setError(message);
+      bundleRef.current = null;
       setBundle(null);
       return null;
     } finally {
@@ -453,7 +536,7 @@ export function usePageBundle(): UsePageBundleResult {
 
       refreshTimeout = setTimeout(() => {
         void refresh({ silent: true });
-      }, 250);
+      }, REALTIME_REFRESH_DEBOUNCE_MS);
     };
 
     const channel = supabase
@@ -479,15 +562,37 @@ export function usePageBundle(): UsePageBundleResult {
       )
       .subscribe();
 
-    const pollInterval = setInterval(() => {
+    const refreshIfVisible = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+
       void refresh({ silent: true });
-    }, 15000);
+    };
+
+    const pollInterval = setInterval(
+      refreshIfVisible,
+      ACTIVE_POLL_INTERVAL_MS,
+    );
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refresh({ silent: true });
+      }
+    };
+    const handleFocus = () => {
+      void refresh({ silent: true });
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       if (refreshTimeout) {
         clearTimeout(refreshTimeout);
       }
       clearInterval(pollInterval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
       void supabase.removeChannel(channel);
     };
   }, [bundle?.room.id, refresh]);
@@ -507,6 +612,26 @@ export function usePageBundle(): UsePageBundleResult {
 
     return next;
   }, [bundle?.comments]);
+
+  const currentPostVotesById = useMemo(() => {
+    const next: Record<string, 1 | -1> = {};
+
+    for (const vote of bundle?.postVotes ?? []) {
+      next[vote.post_id] = vote.value;
+    }
+
+    return next;
+  }, [bundle?.postVotes]);
+
+  const currentCommentVotesById = useMemo(() => {
+    const next: Record<string, 1 | -1> = {};
+
+    for (const vote of bundle?.commentVotes ?? []) {
+      next[vote.comment_id] = vote.value;
+    }
+
+    return next;
+  }, [bundle?.commentVotes]);
 
   const usersById = useMemo(() => {
     const next: Record<string, UserProfileRecord> = {};
@@ -556,9 +681,31 @@ export function usePageBundle(): UsePageBundleResult {
     [currentTitle, domainUrl],
   );
 
+  const buildDomainHref = useCallback(
+    (pathname: string, url: string) => {
+      const normalizedUrl = normalizePageUrl(url);
+      const params = new URLSearchParams({
+        room: "domain",
+        url: normalizedUrl,
+      });
+      if (currentTitle) {
+        params.set("title", currentTitle);
+      }
+
+      if (isExtensionRuntime()) {
+        return `#${pathname}?${params.toString()}`;
+      }
+
+      return `${pathname}?${params.toString()}`;
+    },
+    [currentTitle],
+  );
+
   return {
     bundle,
     commentsByPost,
+    currentPostVotesById,
+    currentCommentVotesById,
     usersById,
     currentUrl,
     domainUrl,
@@ -569,6 +716,7 @@ export function usePageBundle(): UsePageBundleResult {
     refresh,
     buildScopedHref,
     buildRoomHref,
+    buildDomainHref,
   };
 }
 
@@ -691,7 +839,179 @@ async function loadOrCreatePageBundle(url: string): Promise<PageBundle> {
     posts,
     comments,
     users,
+    postVotes: [],
+    commentVotes: [],
   };
+}
+
+async function withCurrentUserVotes(bundle: PageBundle): Promise<PageBundle> {
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return {
+      ...bundle,
+      postVotes: [],
+      commentVotes: [],
+    };
+  }
+
+  const postIds = bundle.posts.map((post) => post.id);
+  const commentIds = bundle.comments.map((comment) => comment.id);
+  let postVotes: PostVoteRecord[] = [];
+  let commentVotes: CommentVoteRecord[] = [];
+
+  try {
+    [postVotes, commentVotes] = await Promise.all([
+      loadPostVotesForUser(user.id, postIds),
+      loadCommentVotesForUser(user.id, commentIds),
+    ]);
+  } catch (voteLoadError) {
+    console.warn("Could not load current user votes.", voteLoadError);
+  }
+
+  postVotes = mergeLocalPostVotes(user.id, postIds, postVotes);
+  commentVotes = mergeLocalCommentVotes(user.id, commentIds, commentVotes);
+
+  return {
+    ...bundle,
+    postVotes,
+    commentVotes,
+  };
+}
+
+async function getCurrentAuthUserId() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return user?.id ?? null;
+}
+
+function mergeLocalPostVotes(
+  userId: string,
+  postIds: string[],
+  votes: PostVoteRecord[],
+) {
+  const next = new Map(votes.map((vote) => [vote.post_id, vote]));
+
+  for (const postId of postIds) {
+    const value = getLocalVote(LOCAL_POST_VOTES_KEY, userId, postId);
+    if (value) {
+      next.set(postId, { post_id: postId, user_id: userId, value });
+    }
+  }
+
+  return [...next.values()];
+}
+
+function mergeLocalCommentVotes(
+  userId: string,
+  commentIds: string[],
+  votes: CommentVoteRecord[],
+) {
+  const next = new Map(votes.map((vote) => [vote.comment_id, vote]));
+
+  for (const commentId of commentIds) {
+    const value = getLocalVote(LOCAL_COMMENT_VOTES_KEY, userId, commentId);
+    if (value) {
+      next.set(commentId, { comment_id: commentId, user_id: userId, value });
+    }
+  }
+
+  return [...next.values()];
+}
+
+function getLocalVote(
+  storageKey: string,
+  userId: string,
+  targetId: string,
+): 1 | -1 | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(storageKey) ?? "{}",
+    ) as Record<string, Record<string, number>>;
+    const value = stored[userId]?.[targetId];
+    return value === 1 || value === -1 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function setLocalVote(
+  storageKey: string,
+  userId: string,
+  targetId: string,
+  value: 1 | -1,
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(storageKey) ?? "{}",
+    ) as Record<string, Record<string, number>>;
+    stored[userId] = {
+      ...(stored[userId] ?? {}),
+      [targetId]: value,
+    };
+    window.localStorage.setItem(storageKey, JSON.stringify(stored));
+  } catch {
+    // Local vote memory is a UI guard only; the database remains authoritative.
+  }
+}
+
+async function loadPostVotesForUser(userId: string, postIds: string[]) {
+  if (postIds.length === 0) {
+    return [];
+  }
+
+  const supabase = createClient();
+  const postVotes = (supabase as unknown as VoteSelectClient).from("post_votes");
+  const { data, error } = await postVotes
+    .select("post_id,user_id,value")
+    .eq("user_id", userId)
+    .in("post_id", postIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).filter(isVoteValue);
+}
+
+async function loadCommentVotesForUser(userId: string, commentIds: string[]) {
+  if (commentIds.length === 0) {
+    return [];
+  }
+
+  const supabase = createClient();
+  const commentVotes = (supabase as unknown as VoteSelectClient).from("comment_votes");
+  const { data, error } = await commentVotes
+    .select("comment_id,user_id,value")
+    .eq("user_id", userId)
+    .in("comment_id", commentIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).filter(isVoteValue);
+}
+
+function isVoteValue<TVote extends { value: number }>(
+  vote: TVote,
+): vote is TVote & { value: 1 | -1 } {
+  return vote.value === 1 || vote.value === -1;
 }
 
 async function findOrCreatePage(url: string): Promise<PageRecord> {
@@ -932,9 +1252,9 @@ async function ensureCurrentUserProfile() {
 
   const nextDisplayName =
     readMetadataString(user.user_metadata.full_name) ||
+    readMetadataString(user.user_metadata.display_name) ||
     readMetadataString(user.user_metadata.name);
-  const nextAvatarUrl =
-    readMetadataString(user.user_metadata.avatar_url) || DEFAULT_AVATAR_URL;
+  const nextAvatarUrl = DEFAULT_AVATAR_URL;
 
   if (legacyById) {
     const nextConfigurations = readProfileConfiguration(legacyById.configurations);

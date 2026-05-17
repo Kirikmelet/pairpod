@@ -14,30 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      TrainingData: {
+        Row: {
+          contentID: number | null
+          created_at: string
+          source_type: string
+          trainingID: number
+        }
+        Insert: {
+          contentID?: number | null
+          created_at?: string
+          source_type: string
+          trainingID?: number
+        }
+        Update: {
+          contentID?: number | null
+          created_at?: string
+          source_type?: string
+          trainingID?: number
+        }
+        Relationships: []
+      }
       chat: {
         Row: {
           body: string | null
+          chat_id: string
           created_at: string
-          page_id: string
+          room_id: string
           user_id: string | null
         }
         Insert: {
           body?: string | null
+          chat_id?: string
           created_at?: string
-          page_id: string
+          room_id: string
           user_id?: string | null
         }
         Update: {
           body?: string | null
+          chat_id?: string
           created_at?: string
-          page_id?: string
+          room_id?: string
           user_id?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "chat_page_id_fkey"
-            columns: ["page_id"]
-            isOneToOne: true
+            columns: ["room_id"]
+            isOneToOne: false
             referencedRelation: "pages"
             referencedColumns: ["id"]
           },
@@ -56,7 +80,7 @@ export type Database = {
           created_at: string
           id: string
           likes: number
-          post_id: string
+          post_id: string | null
           reply_id: string | null
           user_id: string | null
         }
@@ -65,7 +89,7 @@ export type Database = {
           created_at?: string
           id?: string
           likes?: number
-          post_id: string
+          post_id?: string | null
           reply_id?: string | null
           user_id?: string | null
         }
@@ -96,6 +120,146 @@ export type Database = {
           {
             foreignKeyName: "comments_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          sender_id: string | null
+          thread_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          sender_id?: string | null
+          thread_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          sender_id?: string | null
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "dm_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_thread_members: {
+        Row: {
+          created_at: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_thread_members_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "dm_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_thread_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_thread_reads: {
+        Row: {
+          created_at: string
+          last_opened_at: string
+          thread_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          last_opened_at?: string
+          thread_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          last_opened_at?: string
+          thread_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_thread_reads_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "dm_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_thread_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_threads: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_threads_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -284,6 +448,7 @@ export type Database = {
           display_name: string | null
           email: string | null
           id: string
+          password: string | null
           updated_at: string
           url: string | null
           username: string | null
@@ -296,6 +461,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          password?: string | null
           updated_at?: string
           url?: string | null
           username?: string | null
@@ -308,11 +474,20 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          password?: string | null
           updated_at?: string
           url?: string | null
           username?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_auth_user_id_fkey"
+            columns: ["auth_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
