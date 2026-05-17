@@ -734,16 +734,25 @@ export function useCurrentUserProfile() {
           data: { user },
         } = await supabase.auth.getUser();
 
-        if (!user) {
+        if (user) {
+          const nextProfile = await ensureCurrentUserProfile();
           if (isMounted) {
-            setProfile(null);
+            setProfile(nextProfile);
           }
           return;
         }
 
-        const nextProfile = await ensureCurrentUserProfile();
+        // Fallback: check login.html's custom localStorage session
+        const legacyUser = readLegacySession();
+        if (legacyUser) {
+          if (isMounted) {
+            setProfile(legacyUser);
+          }
+          return;
+        }
+
         if (isMounted) {
-          setProfile(nextProfile);
+          setProfile(null);
         }
       } finally {
         if (isMounted) {
@@ -760,6 +769,29 @@ export function useCurrentUserProfile() {
   }, []);
 
   return { profile, loading };
+}
+
+function readLegacySession(): UserProfileRecord | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem("uh_session");
+    if (!raw) return null;
+    const session = JSON.parse(raw) as {
+      user?: { id?: string; email?: string; username?: string };
+    };
+    const u = session?.user;
+    if (!u?.id) return null;
+    return {
+      id: u.id,
+      email: u.email ?? null,
+      username: u.username ?? null,
+      display_name: u.username ?? null,
+      avatar_url: null,
+      configurations: {},
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function postDirectToSupabase<TResponse>(

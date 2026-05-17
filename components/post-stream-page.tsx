@@ -122,6 +122,7 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
         sectionId,
         header,
         content,
+        userId: currentProfile.id,
       });
 
       setHeader("");
@@ -456,6 +457,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
         postId: post.id,
         content,
         replyId: replyTarget.commentId,
+        userId: currentProfile.id,
       });
 
       setContent("");
