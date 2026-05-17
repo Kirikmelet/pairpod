@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import { logEvent } from '@/lib/server/helpers/logEvent'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
 import { createComment } from '@/lib/server/discussions'
-import { getCurrentUserProfile } from '@/lib/server/profiles'
+import { getCurrentUserProfile } from '@/lib/server/profile'
 import { createClient } from '@/utils/supabase/server'
 
 type AnswerRequestBody = {
