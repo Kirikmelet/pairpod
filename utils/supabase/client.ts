@@ -1,8 +1,13 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import {
+  createClient as createSupabaseClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 import type { Database } from "../database.types";
 import { getSupabasePublicConfig } from "./config";
 
 export type AppDatabase = Omit<Database, "__InternalSupabase">;
+type AppBrowserClient = SupabaseClient<Database>;
 
 type ExtensionStorageArea = {
   get(
@@ -35,24 +40,24 @@ const globalWithExtensionApis = globalThis as typeof globalThis & {
   chrome?: ExtensionRuntime;
 };
 
-export const createClient = () => {
+export const createClient = (): AppBrowserClient => {
   const { url, key } = getSupabasePublicConfig(
     "utils/supabase/client.ts createClient()",
   );
   const extensionStorage = createExtensionStorageAdapter();
 
   if (extensionStorage) {
-    return createSupabaseClient<AppDatabase>(url, key, {
+    return createSupabaseClient<Database>(url, key, {
       auth: {
         autoRefreshToken: true,
         detectSessionInUrl: false,
         persistSession: true,
         storage: extensionStorage,
       },
-    });
+    }) as unknown as AppBrowserClient;
   }
 
-  return createSupabaseClient<AppDatabase>(url, key);
+  return createBrowserClient<Database>(url, key) as unknown as AppBrowserClient;
 };
 
 export function getSupabaseBrowserAuthConfig() {

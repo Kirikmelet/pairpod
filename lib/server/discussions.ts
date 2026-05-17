@@ -1,6 +1,7 @@
 import 'server-only'
 
-import { getSupabaseAdmin } from '@/lib/server/supabaseAdmin'
+import { cookies } from 'next/headers'
+import { createClient } from '@/utils/supabase/server'
 
 const ALLOWED_POST_TYPES = ['chat', 'question', 'guide'] as const
 
@@ -71,7 +72,7 @@ export async function createPost({
     throw new Error('content is required')
   }
 
-  const supabase = getSupabaseAdmin()
+  const supabase = createClient(await cookies())
 
   const { data, error } = await supabase
     .from('posts')
@@ -112,7 +113,7 @@ export async function createComment({
     throw new Error('content is required')
   }
 
-  const supabase = getSupabaseAdmin()
+  const supabase = createClient(await cookies())
 
   if (trimmedReplyId) {
     const { data: parentComment, error: parentError } = await supabase

@@ -18,6 +18,9 @@ export function getSiteUrl(requestOrigin?: string) {
 export const GOOGLE_LOGIN_PATH = "/auth/login/google";
 
 type ExtensionRuntimeApi = {
+  identity?: {
+    getRedirectURL(path?: string): string;
+  };
   runtime?: {
     getURL(path: string): string;
   };
@@ -30,14 +33,26 @@ const globalWithExtensionApis = globalThis as typeof globalThis & {
 
 export function getStaticEmailAuthRedirectUrl(variant: "page" | "popup") {
   if (variant === "popup") {
-    const runtime =
-      globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
-    const extensionUrl = runtime?.runtime?.getURL("app/index.html");
-
+    const extensionUrl = getExtensionAuthRedirectUrl();
     if (extensionUrl) {
       return extensionUrl;
     }
   }
 
   return getSiteUrl();
+}
+
+export function getExtensionAuthRedirectUrl(path = "auth/callback") {
+  const runtime =
+    globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
+
+  if (runtime?.identity?.getRedirectURL) {
+    return runtime.identity.getRedirectURL(path);
+  }
+
+  if (runtime?.runtime?.getURL) {
+    return runtime.runtime.getURL("popup.html");
+  }
+
+  return null;
 }

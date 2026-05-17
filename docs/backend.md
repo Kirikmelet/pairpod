@@ -1,17 +1,17 @@
 # Backend Setup
 
-This project keeps backend code in `app/api/**` and `lib/server/**`. The backend uses a Supabase service-role client on the server and simple Next.js App Router route handlers.
+This project keeps backend code in `app/api/**` and `lib/server/**`. The backend uses the same Supabase project URL and public key as the browser, plus the authenticated user's server cookies for protected data.
 
 ## Environment Variables
 
 Add these values to your local environment:
 
-- `SUPABASE_URL`: Supabase project URL.
-- `SUPABASE_SERVICE_ROLE_KEY`: Server-only service role key. Do not expose this in client code.
+- `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL. The browser, extension, and server clients all use this same value.
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase public key used by the browser, extension, and server-authenticated routes.
 - `ELEVENLABS_API_KEY`: Server-only ElevenLabs API key used by `/api/audio`.
 - `ELEVENLABS_VOICE_ID`: Default ElevenLabs voice ID used by `/api/audio`.
 
-The backend reads these values at request time. Keep the service role key and ElevenLabs key out of frontend code.
+The backend reads these values at request time. Keep the ElevenLabs key out of frontend code.
 
 ## Supabase Schema
 
@@ -28,7 +28,7 @@ Tables:
 
 Each table uses UUID primary keys and `created_at` timestamps. `rooms` cascade with `pages`, `posts` cascade with `rooms`, and `comments.reply_id` cascades through reply chains. Foreign keys in `events` and user links use `on delete set null`.
 
-The SQL file is a hackathon reset script. It drops the old and new backend tables first, recreates the simplified schema, and enables RLS on every table. Writes are expected to happen through backend API routes using `SUPABASE_SERVICE_ROLE_KEY`.
+The SQL file is a hackathon reset script. It drops the old and new backend tables first, recreates the simplified schema, and enables RLS on every table. Writes are expected to happen as authenticated Supabase users, either directly from the extension or through server routes that read the user's auth cookies.
 
 ## API Routes
 
