@@ -84,7 +84,7 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
       <section className="pod-window xp-window pop-in" aria-labelledby="pod-title">
         <div className="xp-title-bar">
           <PodTitleIcon />
-          <span className="xp-title-text">Uncommon Hacks - Your Pods</span>
+          <span className="xp-title-text">PairPod - Your Pods</span>
           <div className="xp-title-controls" aria-hidden="true">
             <span className="xp-title-btn xp-title-btn--min">_</span>
             <span className="xp-title-btn xp-title-btn--max">[]</span>

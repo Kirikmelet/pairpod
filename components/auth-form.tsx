@@ -74,8 +74,8 @@ export function AuthForm({
         <div className="brand-row">
           <PodLogo />
           <div className="brand-name">
-            <span className="peer">Uncommon</span>{" "}
-            <span className="pod">Hacks</span>
+            <span className="peer">Pair</span>
+            <span className="pod">Pod</span>
           </div>
         </div>
         <p className="brand-tagline">

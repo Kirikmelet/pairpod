@@ -93,17 +93,30 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
 
   if (isLoading) {
     return (
-      <AppShell isPopup={isPopup} title="Uncommon Hacks - Loading">
+      <AppShell isPopup={isPopup} title="PairPod - Loading">
         <p className="status-note">Loading...</p>
       </AppShell>
     );
   }
 
   if (!user) {
+    if (isPopup) {
+      redirectToStaticLogin();
+      return (
+        <AppShell isPopup={isPopup} title="PairPod - Sign in">
+          <p className="status-note">Opening sign in...</p>
+        </AppShell>
+      );
+    }
+
     return (
-      <StaticLoginRedirect
-        isPopup={isPopup}
-      />
+      <AppShell isPopup={isPopup} title="PairPod - Sign in">
+        <AuthForm
+          variant={variant}
+          initialStatus={authError}
+          onSuccess={() => void refreshUser()}
+        />
+      </AppShell>
     );
   }
 

@@ -11,7 +11,7 @@ function createWindow() {
     minWidth: 960,
     minHeight: 640,
     backgroundColor: "#0f172a",
-    title: "UncommonHacks",
+    title: "PairPod",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
