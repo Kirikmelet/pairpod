@@ -80,6 +80,30 @@
         color: #666;
         margin-bottom: 24px;
       }
+      .logged-in-actions {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .btn-home {
+        display: inline-block;
+        padding: 10px 28px;
+        border: 2px solid #3d8e22;
+        border-radius: 8px;
+        background: transparent;
+        color: #3d8e22;
+        font-family: 'Nunito', sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn-home:hover {
+        background: #3d8e22;
+        color: #fff;
+      }
       .btn-logout {
         display: inline-block;
         padding: 10px 28px;
@@ -186,7 +210,10 @@
           <div class="logged-in-view" id="loggedInView">
             <div class="welcome-msg" id="welcomeMsg">Welcome back!</div>
             <div class="user-email" id="userEmail"></div>
-            <button class="btn-logout" id="logoutBtn" type="button">Sign Out</button>
+            <div class="logged-in-actions">
+              <a class="btn-home" href="/" id="homeBtn">Home</a>
+              <button class="btn-logout" id="logoutBtn" type="button">Sign Out</button>
+            </div>
           </div>
 
           <div class="tabs pop-in" role="tablist" aria-label="Authentication mode">
