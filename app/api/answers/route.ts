@@ -1,5 +1,6 @@
 import { logEvent } from '@/lib/server/helpers/logEvent'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
+import { createComment } from '@/lib/server/discussions'
 import { getSupabaseAdmin } from '@/lib/server/supabaseAdmin'
 
 type AnswerRequestBody = {
@@ -34,54 +35,41 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const supabase = getSupabaseAdmin()
-    let resolvedSectionId = sectionId
+    let resolvedPostId = postId || sectionId?.replace(/^post:/, '') || ''
 
-    if (!resolvedSectionId && replyId) {
-      const { data: parentComment, error: parentError } = await supabase
+    if (!resolvedPostId && replyId) {
+      const { data: parentComment, error: parentError } = await getSupabaseAdmin()
         .from('comments')
-        .select('section_id')
+        .select('post_id')
         .eq('id', replyId)
-        .single<{ section_id: string | null }>()
+        .single<{ post_id: string }>()
 
       if (parentError) {
         throw new Error(`Failed to load parent comment: ${parentError.message}`)
       }
 
-      resolvedSectionId = parentComment.section_id
+      resolvedPostId = parentComment.post_id
     }
 
-    if (!resolvedSectionId && postId) {
-      resolvedSectionId = `post:${postId}`
-    }
-
-    if (!resolvedSectionId) {
+    if (!resolvedPostId) {
       return jsonError('Could not resolve sectionId for comment', 400)
     }
 
-    const { data, error } = await supabase
-      .from('comments')
-      .insert({
-        section_id: resolvedSectionId,
-        reply_id: replyId,
-        content,
-        user_id: userId,
-      })
-      .select('*')
-      .single()
-
-    if (error) {
-      throw new Error(error.message)
-    }
+    const data = await createComment({
+      postId: resolvedPostId,
+      userId,
+      content,
+      replyId,
+    })
 
     await logEvent({
       eventType: 'answer.created',
       userId,
-      postId,
+      postId: resolvedPostId,
       commentId: data.id,
       payload: {
         replyId,
-        sectionId: resolvedSectionId,
+        sectionId: data.section_id,
       },
     })
 

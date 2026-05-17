@@ -1,7 +1,7 @@
 import { logEvent } from '@/lib/server/helpers/logEvent'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
+import { createPost } from '@/lib/server/discussions'
 import { findOrCreateDefaultRoom } from '@/lib/server/pages'
-import { getSupabaseAdmin } from '@/lib/server/supabaseAdmin'
 
 type QuestionRequestBody = {
   roomId?: unknown
@@ -41,25 +41,16 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const supabase = getSupabaseAdmin()
     const resolvedRoomId = roomId || (await findOrCreateDefaultRoom(pageId)).id
 
-    const { data, error } = await supabase
-      .from('posts')
-      .insert({
-        room_id: resolvedRoomId,
-        type: 'question',
-        section_id: sectionId,
-        header,
-        content,
-        user_id: userId,
-      })
-      .select('*')
-      .single()
-
-    if (error) {
-      throw new Error(error.message)
-    }
+    const data = await createPost({
+      roomId: resolvedRoomId,
+      userId,
+      type: 'question',
+      content,
+      title: header,
+      sectionId,
+    })
 
     await logEvent({
       eventType: 'question.created',

@@ -31,12 +31,13 @@ export type PostRow = {
 
 export type CommentRow = {
   id: string
-  section_id: string | null
+  post_id: string
   reply_id: string | null
   content: string
   likes: number
   user_id: string | null
   created_at: string
+  section_id: string | null
 }
 
 export type PageBundle = {
@@ -44,6 +45,13 @@ export type PageBundle = {
   room: RoomRow
   posts: PostRow[]
   comments: CommentRow[]
+}
+
+export async function loadOrCreatePageRoom(url: string): Promise<PageBundle> {
+  const page = await findOrCreatePage(url)
+  const room = await findOrCreateDefaultRoom(page.id)
+
+  return getPageBundle(page.id, room.id)
 }
 
 export async function findOrCreatePage(url: string): Promise<PageRow> {
@@ -136,23 +144,27 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
   }
 
   const posts = postsResult.data ?? []
-  const commentSectionIds = posts.map((post) => `post:${post.id}`)
+  const postIds = posts.map((post) => post.id)
 
   let comments: CommentRow[] = []
 
-  if (commentSectionIds.length > 0) {
+  if (postIds.length > 0) {
     const { data: commentsData, error: commentsError } = await supabase
       .from('comments')
       .select('*')
-      .in('section_id', commentSectionIds)
+      .in('post_id', postIds)
       .order('created_at', { ascending: true })
-      .returns<CommentRow[]>()
+      .returns<Array<Omit<CommentRow, 'section_id'>>>()
 
     if (commentsError) {
       throw new Error(`Failed to load comments: ${commentsError.message}`)
     }
 
-    comments = commentsData ?? []
+    comments =
+      commentsData?.map((comment) => ({
+        ...comment,
+        section_id: `post:${comment.post_id}`,
+      })) ?? []
   }
 
   return {
