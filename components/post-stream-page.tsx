@@ -612,11 +612,7 @@ function PostShell({
           <nav className="chat-menu post-nav" aria-label="Post stream menu">
             <a href={chatHref} className="nav-cta">→ Chat</a>
             <a href={podsHref}>Pods</a>
-<<<<<<< Updated upstream
             <a href={postsHref} className="post-nav__active">Posts</a>
-=======
-            <a href={postsHref}>Posts</a>
->>>>>>> Stashed changes
             <a
               href={globalHref}
               className={roomScope === "global" ? "chat-nav__active" : ""}
