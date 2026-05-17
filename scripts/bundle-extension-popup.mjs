@@ -41,6 +41,7 @@ await esbuild.build({
     "process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabaseKey),
   },
   logLevel: "info",
+  loader: { ".css": "empty" },
 });
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
