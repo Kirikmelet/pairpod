@@ -10,12 +10,13 @@ const env = await loadEnvLocal(root);
 const { url: supabaseUrl } = requireSupabaseEnv(env);
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const supabaseOrigin = new URL(supabaseUrl).origin;
-const hostPermission = `${supabaseOrigin}/*`;
+const siteOrigin = new URL(env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").origin;
+const hostPermissions = [`${supabaseOrigin}/*`, `${siteOrigin}/*`];
 
-manifest.host_permissions = [hostPermission];
+manifest.host_permissions = Array.from(new Set(hostPermissions));
 manifest.permissions = Array.from(
   new Set([...(manifest.permissions ?? []), "identity", "storage"]),
 );
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
-console.log(`Manifest host_permissions: ${hostPermission}`);
+console.log(`Manifest host_permissions: ${manifest.host_permissions.join(", ")}`);

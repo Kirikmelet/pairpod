@@ -151,7 +151,9 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
 
           <nav className="chat-menu chat-nav" aria-label="Chat menu">
             <a href={buildScopedHref("/")}>Room</a>
-            <a href={buildScopedHref("/posts")} className="nav-cta">→ Posts</a>
+            <a href={buildScopedHref("/posts")} className="nav-cta">
+              Posts
+            </a>
             <a href={buildScopedHref("/chat")} className="chat-nav__active">
               Chat
             </a>
@@ -185,7 +187,9 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                         <h2>{member.name}</h2>
                         <p>
                           <span
-                            className={`chat-status-dot chat-status-dot--${member.status === "Online" ? "online" : "away"}`}
+                            className={`chat-status-dot chat-status-dot--${
+                              member.status === "Online" ? "online" : "away"
+                            }`}
                           />
                           {member.status}
                         </p>
@@ -211,19 +215,13 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   className="chat-side-button"
                 >
                   <span className="chat-side-icon" aria-hidden="true">
-                    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-                      <rect x="3" y="5" width="14" height="2" rx="1" fill="currentColor" />
-                      <rect x="3" y="9" width="10" height="2" rx="1" fill="currentColor" />
-                      <rect x="3" y="13" width="12" height="2" rx="1" fill="currentColor" />
-                    </svg>
+                    <ListIcon />
                   </span>
                   Open Posts
                 </a>
                 <a href={buildScopedHref("/")} className="chat-side-button">
                   <span className="chat-side-icon" aria-hidden="true">
-                    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-                      <path d="M10 3L3 9h2v8h4v-5h2v5h4V9h2L10 3z" fill="currentColor" />
-                    </svg>
+                    <HomeIcon />
                   </span>
                   Back to Pod
                 </a>
@@ -239,7 +237,9 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   ***{" "}
                   {loading
                     ? "Loading..."
-                    : `${chatPosts.length} messages and ${bundle?.comments.length ?? 0} comments`}
+                    : `${chatPosts.length} messages and ${
+                        bundle?.comments.length ?? 0
+                      } comments`}
                 </p>
               </div>
 
@@ -340,11 +340,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   className="chat-composer__posts"
                   aria-label="Open post stream"
                 >
-                  <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-                    <rect x="3" y="4" width="14" height="2" rx="1" fill="currentColor" />
-                    <rect x="3" y="9" width="10" height="2" rx="1" fill="currentColor" />
-                    <rect x="3" y="14" width="12" height="2" rx="1" fill="currentColor" />
-                  </svg>
+                  <ListIcon />
                 </a>
               </form>
             </section>
@@ -410,8 +406,22 @@ function ChatSceneBackground() {
         <ellipse cx="650" cy="520" rx="620" ry="340" fill="#3d8e22" />
         <ellipse cx="600" cy="540" rx="540" ry="300" fill="#4aa828" />
         <ellipse cx="560" cy="530" rx="440" ry="260" fill="#5cb838" />
-        <ellipse cx="520" cy="510" rx="320" ry="190" fill="#6ebe44" opacity="0.7" />
-        <ellipse cx="500" cy="500" rx="200" ry="120" fill="#8cd960" opacity="0.45" />
+        <ellipse
+          cx="520"
+          cy="510"
+          rx="320"
+          ry="190"
+          fill="#6ebe44"
+          opacity="0.7"
+        />
+        <ellipse
+          cx="500"
+          cy="500"
+          rx="200"
+          ry="120"
+          fill="#8cd960"
+          opacity="0.45"
+        />
       </svg>
       <div className="ground" />
       <div className="bubbles">
@@ -578,5 +588,23 @@ function PodRoomIcon() {
         />
       </svg>
     </span>
+  );
+}
+
+function ListIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+      <rect x="3" y="4" width="14" height="2" rx="1" fill="currentColor" />
+      <rect x="3" y="9" width="10" height="2" rx="1" fill="currentColor" />
+      <rect x="3" y="14" width="12" height="2" rx="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+      <path d="M10 3L3 9h2v8h4v-5h2v5h4V9h2L10 3z" fill="currentColor" />
+    </svg>
   );
 }

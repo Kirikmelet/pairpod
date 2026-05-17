@@ -885,7 +885,6 @@ function CommentCard({
             <button type="button" onClick={() => void handleCommentVote(comment, -1)}>
               Dislike
             </button>
-            <strong>0</strong>
             <button
               type="button"
               className="post-reply-btn"
@@ -967,7 +966,6 @@ function CommentCard({
                   >
                     Dislike
                   </button>
-                  <strong>0</strong>
                 </div>
               </div>
             </article>

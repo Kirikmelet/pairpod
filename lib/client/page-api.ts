@@ -183,7 +183,11 @@ export async function postJson<TResponse>(
   input: RequestInfo | URL,
   body: Record<string, unknown>,
 ) {
-  if (isExtensionRuntime() && typeof input === "string") {
+  if (
+    isExtensionRuntime() &&
+    typeof input === "string" &&
+    input.startsWith("/api/")
+  ) {
     return postDirectToSupabase<TResponse>(input, body);
   }
 
@@ -205,29 +209,135 @@ export async function postJson<TResponse>(
 }
 
 export async function updatePostLikes(post: PostRecord, delta: 1 | -1) {
+  if (!isExtensionRuntime()) {
+    await updateVoteThroughApi("post", post.id, delta);
+    return;
+  }
+
+  try {
+    await updatePostLikesDirect(post, delta);
+  } catch (error) {
+    await updateVoteThroughApi("post", post.id, delta, error);
+  }
+}
+
+async function updatePostLikesDirect(post: PostRecord, delta: 1 | -1) {
   const supabase = createClient();
   const nextLikes = Math.max(0, post.likes + delta);
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("posts")
     .update({ likes: nextLikes })
-    .eq("id", post.id);
+    .eq("id", post.id)
+    .select("id")
+    .limit(1);
 
   if (error) {
     throw error;
+  }
+
+  if (!data?.[0]) {
+    throw new Error("Could not update post vote.");
   }
 }
 
 export async function updateCommentLikes(comment: CommentRecord, delta: 1 | -1) {
+  if (!isExtensionRuntime()) {
+    await updateVoteThroughApi("comment", comment.id, delta);
+    return;
+  }
+
+  try {
+    await updateCommentLikesDirect(comment, delta);
+  } catch (error) {
+    await updateVoteThroughApi("comment", comment.id, delta, error);
+  }
+}
+
+async function updateCommentLikesDirect(comment: CommentRecord, delta: 1 | -1) {
   const supabase = createClient();
   const nextLikes = Math.max(0, comment.likes + delta);
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("comments")
     .update({ likes: nextLikes })
-    .eq("id", comment.id);
+    .eq("id", comment.id)
+    .select("id")
+    .limit(1);
 
   if (error) {
     throw error;
   }
+
+  if (!data?.[0]) {
+    throw new Error("Could not update comment vote.");
+  }
+}
+
+async function updateVoteThroughApi(
+  target: "post" | "comment",
+  id: string,
+  delta: 1 | -1,
+  directError?: unknown,
+) {
+  if (!isExtensionRuntime()) {
+    await postJson("/api/votes", {
+      target,
+      id,
+      delta,
+    });
+    return;
+  }
+
+  const remoteVotesUrl = getRemoteApiUrl("/api/votes");
+  if (!remoteVotesUrl) {
+    throw directError instanceof Error
+      ? directError
+      : new Error("Could not update vote.");
+  }
+
+  const supabase = createClient();
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (sessionError) {
+    throw sessionError;
+  }
+
+  if (!session?.access_token) {
+    throw new Error("You must be signed in to vote.");
+  }
+
+  const response = await fetch(remoteVotesUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      target,
+      id,
+      delta,
+    }),
+  });
+
+  const payload = (await response.json()) as ApiResponse<unknown>;
+
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.ok ? "Failed to update vote" : payload.error);
+  }
+}
+
+function getRemoteApiUrl(pathname: string) {
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
+
+  if (!siteUrl) {
+    return null;
+  }
+
+  const url = new URL(pathname, siteUrl.endsWith("/") ? siteUrl : `${siteUrl}/`);
+  return url.toString();
 }
 
 export function usePageBundle(): UsePageBundleResult {
