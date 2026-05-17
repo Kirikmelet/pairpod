@@ -155,8 +155,9 @@ async function generateFakeChatPlan({
             `Room URL: ${targetUrl}.`,
             topic?.trim() ? `Topic: ${topic.trim()}.` : "Topic: casual collaboration.",
             "Schema: {\"users\":[{\"key\":\"short_stable_key\",\"displayName\":\"Name\",\"username\":\"lowercase_username\",\"bio\":\"short persona\"}],\"messages\":[{\"speaker\":\"matching_user_key\",\"body\":\"one concise chat message\"}]}",
-            "Give every user a 2000s to early-2010s internet display name or handle, like AIM/MSN/forum/Xanga era names. Examples of the vibe: xXPixelAngelXx, sk8rByte, neon_ninja_07, LimeWireLarry, sceneQueen42. Usernames must stay lowercase with letters, numbers, underscores, or hyphens.",
-            "Messages should sound like different real teammates: specific, casual, short, and a little opinionated.",
+            "Give every user a 2000s to early-2010s internet display name or handle, like AIM/MSN/forum/Xanga/Myspace era names. Examples of the vibe: xXPixelAngelXx, sk8rByte, neon_ninja_07, LimeWireLarry, sceneQueen42, RawrKitty99, oOAquaMuffinOo. Usernames must stay lowercase with letters, numbers, underscores, or hyphens.",
+            "Messages should sound era-appropriate and casual: short, lowercase is okay, occasional lol/ngl/imo/idk/brb/yknow is okay, but do not overdo it.",
+            "Make the users sound like different real teammates in a chat room, not like polished assistants.",
             "Never claim to be a real person. Avoid generic AI disclaimers.",
           ].join("\n"),
         },
@@ -177,55 +178,20 @@ function buildFallbackFakeChatPlan(
   userCount: number,
   messageCount: number,
 ): FakeChatPlan {
-  const seedUsers: FakeChatUserPlan[] = [
-    {
-      key: "pixel_angel",
-      displayName: "xXPixelAngelXx",
-      username: "xxpixelangelxx",
-      bio: "Forum-era UI tinkerer who spots edge cases.",
-    },
-    {
-      key: "sk8r_byte",
-      displayName: "sk8rByte92",
-      username: "sk8rbyte92",
-      bio: "Early-2010s systems nerd with a taste for concise plans.",
-    },
-    {
-      key: "neon_ninja",
-      displayName: "neon_ninja_07",
-      username: "neon_ninja_07",
-      bio: "Old-school forum regular who cares about flow.",
-    },
-    {
-      key: "limewire_larry",
-      displayName: "LimeWireLarry",
-      username: "limewirelarry",
-      bio: "Calm debugger with a suspiciously specific 2008 vibe.",
-    },
-    {
-      key: "scene_queen",
-      displayName: "sceneQueen42",
-      username: "scenequeen42",
-      bio: "Xanga-coded product thinker who notices empty states.",
-    },
-    {
-      key: "dialup_druid",
-      displayName: "DialUp_Druid",
-      username: "dialup_druid",
-      bio: "Patient helper who treats small polish like real work.",
-    },
-  ].slice(0, userCount);
+  const seedUsers = createRetroFakeUsers(userCount);
   const room = scope === "global" ? "Global" : targetUrl;
   const subject = topic?.trim() || room;
   const seedMessages = [
-    `I am reading ${subject} as a shared room, not just a link. That makes the chat feel way more useful.`,
-    "The next nice touch is making replies feel anchored, so people can skim without losing the thread.",
-    "I would keep the fake peers clearly synthetic, but let them talk like teammates who actually looked at the page.",
-    "This works best when the first message gives people something concrete to react to.",
-    `For ${room}, I would nudge users toward asking a question or opening a small DM when the thread gets specific.`,
-    "The UI should probably show presence without making it feel like a full dashboard.",
-    "Tiny opinion: fewer, better messages beats a flood of fake activity.",
-    "The strongest version is when AI peers seed the room, then get out of the way once humans arrive.",
+    `lol wait ${subject} having its own chat is actually kinda sick`,
+    "brb but my take is the posts need to stay chill and easy to skim",
+    "ngl the tiny room vibe works better when ppl just drop quick notes",
+    "imo this needs one obvious button so nobody has to hunt around",
+    `ok for ${room}, i'd start with a question thread and see who bites`,
+    "this is giving old forum sidebar energy in a good way",
+    "lowkey the 3d room is funny but it helps make the page feel alive",
+    "idk maybe keep the AI ppl useful but not TOO chatty yknow",
+    "same, fewer decent msgs > a wall of random noise",
+    "if someone joins later they should instantly get what happened here",
   ];
 
   return {
@@ -235,6 +201,121 @@ function buildFallbackFakeChatPlan(
       body,
     })),
   };
+}
+
+function createRetroFakeUsers(count: number): FakeChatUserPlan[] {
+  const used = new Set<string>();
+  return Array.from({ length: count }, (_, index) => {
+    let handle = buildRetroHandle();
+    while (used.has(slugify(handle))) {
+      handle = buildRetroHandle();
+    }
+    used.add(slugify(handle));
+
+    return {
+      key: `retro_${index}_${randomSuffix()}`,
+      displayName: handle,
+      username: slugify(handle).slice(0, 24) || `retro_peer_${index}`,
+      bio: RETRO_BIOS[index % RETRO_BIOS.length],
+    };
+  });
+}
+
+function buildRetroHandle() {
+  const prefix = sample(RETRO_PREFIXES);
+  const noun = sample(RETRO_NOUNS);
+  const number = Math.random() > 0.45 ? sample(RETRO_NUMBERS) : "";
+  const style = Math.floor(Math.random() * 10);
+
+  switch (style) {
+    case 0:
+      return `xX${prefix}${noun}Xx${number}`;
+    case 1:
+      return `${prefix}_${noun}_${number || sample(RETRO_NUMBERS)}`;
+    case 2:
+      return `${prefix}${noun}${number || sample(RETRO_NUMBERS)}`;
+    case 3:
+      return `${noun}.${prefix}${number || ""}`;
+    case 4:
+      return `${prefix}-${noun}${number || sample(RETRO_NUMBERS)}`;
+    case 5:
+      return `${sample(RETRO_DECORATORS)}${prefix}${noun}${sample(RETRO_DECORATORS)}${number}`;
+    case 6:
+      return `${prefix}${number || sample(RETRO_NUMBERS)}_${noun}`;
+    case 7:
+      return `${noun}${sample(["4", "x", "z"])}${prefix}${number || ""}`;
+    case 8:
+      return `${sample(RETRO_MOODS)}${noun}${number || sample(RETRO_NUMBERS)}`;
+    default:
+      return `${prefix}${sample(["Rawr", "LOL", "XP", "z"])}${noun}${number}`;
+  }
+}
+
+const RETRO_PREFIXES = [
+  "Aqua",
+  "Astro",
+  "Pixel",
+  "Neon",
+  "Scene",
+  "Sk8r",
+  "DialUp",
+  "LimeWire",
+  "AIM",
+  "Xanga",
+  "Glitch",
+  "Byte",
+  "Nyan",
+  "Emo",
+  "Kandi",
+  "Myspace",
+  "Napster",
+  "Winamp",
+  "Zune",
+  "Geocities",
+  "Moon",
+  "Cyber",
+];
+
+const RETRO_NOUNS = [
+  "Angel",
+  "Bandit",
+  "Bunni",
+  "Ninja",
+  "Wizard",
+  "Raver",
+  "Kid",
+  "Coder",
+  "Ghost",
+  "Toast",
+  "Robot",
+  "Dream",
+  "Tiger",
+  "Star",
+  "Kitty",
+  "Punk",
+  "Sparkle",
+  "Wolf",
+  "Vamp",
+  "Skull",
+  "Bean",
+  "Muffin",
+];
+
+const RETRO_MOODS = ["Rawr", "Epic", "Hyper", "Sad", "Mega", "Lil", "OMG", "Rad"];
+const RETRO_DECORATORS = ["xX", "Xx", "ii", "oO", "Oo", "_"];
+const RETRO_NUMBERS = ["03", "07", "08", "09", "11", "12", "13", "21", "24", "42", "69", "86", "92", "99", "101", "1337"];
+
+const RETRO_BIOS = [
+  "Forum-era regular who types fast and notices weird UI stuff.",
+  "Early-2010s tinkerer with too many tabs open.",
+  "Old chat-room lurker who has opinions but keeps it casual.",
+  "Calm debugger with suspiciously 2008 energy.",
+  "Xanga/Myspace-coded product thinker.",
+  "Patient helper who says lol and still gives useful notes.",
+];
+
+function sample(values: string[]) {
+  return values[Math.floor(Math.random() * values.length)] ?? values[0];
 }
 
 async function createFakeUsers(users: FakeChatUserPlan[]) {

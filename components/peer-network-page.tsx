@@ -6,6 +6,7 @@ import * as THREE from "three";
 import {
   type PageRouteRecord,
   type PostRecord,
+  type UserProfileRecord,
   useCurrentUserProfile,
   usePageBundle,
 } from "@/lib/client/page-api";
@@ -145,7 +146,24 @@ export function PeerNetworkPage() {
       messages.set(comment.user_id, comment.content.trim());
     }
 
-    const online = onlineProfiles.slice(0, 14);
+    const aiProfiles = (bundle?.users ?? [])
+      .filter((user) => user.id !== currentUserId && isAiFakeUser(user))
+      .map((user) => ({
+        id: user.id,
+        username: user.username,
+        display_name: user.display_name ?? null,
+        configurations: user.configurations,
+        avatar_url: user.avatar_url,
+        clothing_url: user.clothing_url,
+      }));
+    const mergedProfiles = new Map<string, OnlinePeerProfile>();
+    for (const onlineProfile of onlineProfiles) {
+      mergedProfiles.set(onlineProfile.id, onlineProfile);
+    }
+    for (const aiProfile of aiProfiles) {
+      mergedProfiles.set(aiProfile.id, aiProfile);
+    }
+    const online = [...mergedProfiles.values()].slice(0, 14);
 
     return online.map((profileForPeer, index) => {
       const angle = (Math.PI * 2 * index) / Math.max(1, online.length);
@@ -168,7 +186,7 @@ export function PeerNetworkPage() {
         z: Math.sin(angle) * radius,
       };
     });
-  }, [bundle?.chats, bundle?.comments, bundle?.posts, onlineProfiles, profile?.id]);
+  }, [bundle?.chats, bundle?.comments, bundle?.posts, bundle?.users, onlineProfiles, profile?.id]);
 
   const doors = useMemo<DoorNode[]>(() => {
     const appDoors: DoorNode[] = [
@@ -384,8 +402,6 @@ export function PeerNetworkPage() {
 
     const peerRoot = new THREE.Group();
     scene.add(peerRoot);
-    const connectionRoot = new THREE.Group();
-    scene.add(connectionRoot);
     const doorRoot = new THREE.Group();
     scene.add(doorRoot);
     const playerMarker = new THREE.Group();
@@ -416,26 +432,9 @@ export function PeerNetworkPage() {
       if (key === currentPeerKey) return;
       currentPeerKey = key;
       peerRoot.clear();
-      connectionRoot.clear();
 
       for (let index = 0; index < peersRef.current.length; index += 1) {
         peerRoot.add(createPeerAvatar(peersRef.current[index], index));
-      }
-
-      const material = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 });
-      for (let i = 0; i < peersRef.current.length; i += 1) {
-        for (let j = i + 1; j < peersRef.current.length; j += 1) {
-          if (Math.abs(i - j) > 3 && !(i === 0 || j === 0)) continue;
-          const a = peersRef.current[i];
-          const b = peersRef.current[j];
-          const geometry = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(a.x, 1.4, a.z),
-            new THREE.Vector3(b.x, 1.4, b.z),
-          ]);
-          const line = new THREE.Line(geometry, material);
-          line.userData.peerIndexes = [i, j];
-          connectionRoot.add(line);
-        }
       }
     };
 
@@ -503,7 +502,6 @@ export function PeerNetworkPage() {
         animatePeer(child, index, performance.now() * 0.001);
       });
       updateSpeechBubbles(peerRoot, Date.now());
-      updateConnectionLines(connectionRoot, peerRoot);
       updateActiveDoor(playerRef.current, doorsRef.current, activeDoorIdRef, setActiveDoor);
       renderer.render(scene, camera);
       animation = window.requestAnimationFrame(render);
@@ -1129,23 +1127,6 @@ function animatePeer(peer: any, index: number, time: number) {
   peer.position.y = Math.sin(time * 1.8 + seed) * 0.05;
 }
 
-function updateConnectionLines(connectionRoot: any, peerRoot: any) {
-  connectionRoot.children.forEach((line: any) => {
-    const [aIndex, bIndex] = line.userData.peerIndexes ?? [];
-    const a = peerRoot.children[aIndex];
-    const b = peerRoot.children[bIndex];
-    if (!a || !b || !line.geometry?.attributes?.position) {
-      return;
-    }
-
-    const positions = line.geometry.attributes.position;
-    positions.setXYZ(0, a.position.x, 1.4, a.position.z);
-    positions.setXYZ(1, b.position.x, 1.4, b.position.z);
-    positions.needsUpdate = true;
-    line.geometry.computeBoundingSphere();
-  });
-}
-
 function updateActiveDoor(
   player: PlayerState,
   doors: DoorNode[],
@@ -1244,6 +1225,16 @@ function isMissingOptionalPresenceTable(error: unknown) {
   const candidate = error as { code?: string; message?: string };
   const message = candidate.message?.toLowerCase() ?? "";
   return candidate.code === "42P01" || message.includes("page_presence");
+}
+
+function isAiFakeUser(user: UserProfileRecord | null | undefined) {
+  const configurations = user?.configurations;
+  return (
+    configurations !== null &&
+    typeof configurations === "object" &&
+    !Array.isArray(configurations) &&
+    configurations.kind === "ai_fake_user"
+  );
 }
 
 function truncateCanvasText(value: string, maxLength: number) {

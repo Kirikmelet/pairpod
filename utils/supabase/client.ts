@@ -35,9 +35,15 @@ type SupabaseStorageAdapter = {
   setItem(key: string, value: string): Promise<void>;
 };
 
+type SupabaseClientCache = {
+  client: AppBrowserClient;
+  cacheKey: string;
+};
+
 const globalWithExtensionApis = globalThis as typeof globalThis & {
   browser?: ExtensionRuntime;
   chrome?: ExtensionRuntime;
+  __pairpodSupabaseClient?: SupabaseClientCache;
 };
 
 export const createClient = (): AppBrowserClient => {
@@ -45,9 +51,14 @@ export const createClient = (): AppBrowserClient => {
     "utils/supabase/client.ts createClient()",
   );
   const extensionStorage = createExtensionStorageAdapter();
+  const cacheKey = `${url}:${key}:${extensionStorage ? "extension" : "browser"}`;
+
+  if (globalWithExtensionApis.__pairpodSupabaseClient?.cacheKey === cacheKey) {
+    return globalWithExtensionApis.__pairpodSupabaseClient.client;
+  }
 
   if (extensionStorage) {
-    return createSupabaseClient<Database>(url, key, {
+    const client = createSupabaseClient<Database>(url, key, {
       auth: {
         autoRefreshToken: true,
         detectSessionInUrl: false,
@@ -55,9 +66,14 @@ export const createClient = (): AppBrowserClient => {
         storage: extensionStorage,
       },
     }) as unknown as AppBrowserClient;
+
+    globalWithExtensionApis.__pairpodSupabaseClient = { cacheKey, client };
+    return client;
   }
 
-  return createBrowserClient<Database>(url, key) as unknown as AppBrowserClient;
+  const client = createBrowserClient<Database>(url, key) as unknown as AppBrowserClient;
+  globalWithExtensionApis.__pairpodSupabaseClient = { cacheKey, client };
+  return client;
 };
 
 export function getSupabaseBrowserAuthConfig() {

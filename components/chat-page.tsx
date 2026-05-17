@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import {
   formatTimestamp,
   getDisplayName,
@@ -17,6 +18,8 @@ import { DmNotificationBadge } from "@/components/dm-notification-badge";
 import { getDmPath, startDirectMessage } from "@/lib/client/dms";
 import { playSfx, useErrorSfx } from "@/lib/client/sfx";
 import { getUserProfilePath } from "@/lib/client/users";
+
+type TextFormat = "bold" | "italic" | "underline";
 
 type ChatPageProps = {
   currentUsername?: string;
@@ -48,6 +51,8 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
   const [isGeneratingPeers, setIsGeneratingPeers] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const composerSelectionRef = useRef({ start: 0, end: 0 });
   const seenChatPostIdsRef = useRef<Set<string> | null>(null);
   const sentChatPostIdsRef = useRef<Set<string>>(new Set());
   const autoAiSeedRef = useRef<string | null>(null);
@@ -179,28 +184,93 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
       return;
     }
 
-    const aiAlreadyPresent = bundle.users.some((user) => {
-      const configurations = user.configurations;
-      return (
-        configurations &&
-        typeof configurations === "object" &&
-        !Array.isArray(configurations) &&
-        configurations.kind === "ai_fake_user"
-      );
-    });
-    if (aiAlreadyPresent || chatMessages.length > 0) {
+    const aiMessageCount = chatMessages.filter((chat) =>
+      chat.user_id ? isAiFakeUser(usersById[chat.user_id]) : false,
+    ).length;
+    if (aiMessageCount >= AUTO_AI_MIN_MESSAGES) {
       return;
     }
 
-    const seedKey = `pairpod.autoAiChat.${roomScope}.${bundle.page.id}`;
+    const seedKey = `pairpod.autoAiChat.v3.${roomScope}.${bundle.page.id}`;
     if (autoAiSeedRef.current === seedKey || wasAutoAiSeededRecently(seedKey)) {
       return;
     }
 
     autoAiSeedRef.current = seedKey;
-    markAutoAiSeeded(seedKey);
-    void handleGeneratePeers({ silent: true });
-  }, [bundle, chatMessages.length, isGeneratingPeers, loading, roomScope]);
+    void handleGeneratePeers({ seedKey, silent: true });
+  }, [bundle, chatMessages, isGeneratingPeers, loading, roomScope, usersById]);
+
+  useEffect(() => {
+    if (!bundle || loading) {
+      return;
+    }
+
+    const pulseKey = `pairpod.autoAiPulse.v1.${roomScope}.${bundle.page.id}`;
+    const pulse = window.setTimeout(() => {
+      if (document.visibilityState === "hidden" || isGeneratingPeers) {
+        return;
+      }
+
+      if (wasAutoAiPulseRecently(pulseKey)) {
+        return;
+      }
+
+      void handleGeneratePeers({
+        messageCount: 1,
+        seedKey: pulseKey,
+        silent: true,
+        userCount: 1,
+      });
+    }, AUTO_AI_PULSE_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(pulse);
+    };
+  }, [bundle?.page.id, chatMessages.length, isGeneratingPeers, loading, roomScope]);
+
+  const rememberComposerSelection = () => {
+    const textarea = composerRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    composerSelectionRef.current = {
+      start: textarea.selectionStart,
+      end: textarea.selectionEnd,
+    };
+  };
+
+  const applyTextFormat = (format: TextFormat) => {
+    const textarea = composerRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    const { startMarker, endMarker, placeholder } = FORMAT_MARKERS[format];
+    const textareaValue = textarea.value;
+    const activeSelection = document.activeElement === textarea
+      ? { start: textarea.selectionStart, end: textarea.selectionEnd }
+      : composerSelectionRef.current;
+    const selectionStart = clampNumber(activeSelection.start, 0, textareaValue.length);
+    const selectionEnd = clampNumber(activeSelection.end, selectionStart, textareaValue.length);
+    const selectedText = textareaValue.slice(selectionStart, selectionEnd);
+    const insertedText = selectedText || placeholder;
+    const nextText =
+      textareaValue.slice(0, selectionStart) +
+      startMarker +
+      insertedText +
+      endMarker +
+      textareaValue.slice(selectionEnd);
+
+    setMessage(nextText);
+    window.setTimeout(() => {
+      textarea.focus();
+      const cursorStart = selectionStart + startMarker.length;
+      const cursorEnd = cursorStart + insertedText.length;
+      textarea.setSelectionRange(cursorStart, cursorEnd);
+      composerSelectionRef.current = { start: cursorStart, end: cursorEnd };
+    }, 0);
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -234,7 +304,12 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     }
   };
 
-  const handleGeneratePeers = async (options?: { silent?: boolean }) => {
+  const handleGeneratePeers = async (options?: {
+    messageCount?: number;
+    seedKey?: string;
+    silent?: boolean;
+    userCount?: number;
+  }) => {
     if (!bundle || isGeneratingPeers) {
       return;
     }
@@ -250,21 +325,28 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
           pageId: bundle.page.id,
           scope: roomScope,
           title: getChatTitle(bundle),
-          userCount: 3,
-          messageCount: 5,
+          userCount: options?.userCount ?? 3,
+          messageCount: options?.messageCount ?? 5,
         });
       } else {
         await postJson("/api/ai/fake-chat", {
           scope: roomScope,
           domainUrl,
           topic: getChatTitle(bundle),
-          userCount: 3,
-          messageCount: 5,
+          userCount: options?.userCount ?? 3,
+          messageCount: options?.messageCount ?? 5,
         });
       }
 
       await refresh({ silent: true });
+      if (options?.seedKey) {
+        markAutoAiSeeded(options.seedKey);
+      }
     } catch (generateError) {
+      if (options?.seedKey && autoAiSeedRef.current === options.seedKey) {
+        autoAiSeedRef.current = null;
+      }
+
       if (!options?.silent) {
         setSubmitError(
           generateError instanceof Error
@@ -447,10 +529,12 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                               />
                               :
                             </strong>{" "}
-                            {lines[0] ?? chat.body}
+                            {renderRichTextLine(lines[0] ?? chat.body ?? "")}
                           </p>
                           {lines.slice(1).map((line) => (
-                            <p key={`${chat.chat_id}-${line}`}>{line}</p>
+                            <p key={`${chat.chat_id}-${line}`}>
+                              {renderRichTextLine(line)}
+                            </p>
                           ))}
                         </div>
                       </article>
@@ -466,11 +550,39 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
               </div>
 
               <div className="chat-toolbar" aria-label="Message tools">
-                {["A", "A*", "B", "I", "U", "link", "img", ":)"].map((tool) => (
-                  <button type="button" key={tool}>
-                    {tool}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  aria-label="Bold"
+                  title="Bold"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    applyTextFormat("bold");
+                  }}
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  aria-label="Italic"
+                  title="Italic"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    applyTextFormat("italic");
+                  }}
+                >
+                  I
+                </button>
+                <button
+                  type="button"
+                  aria-label="Underline"
+                  title="Underline"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    applyTextFormat("underline");
+                  }}
+                >
+                  U
+                </button>
               </div>
 
               <form
@@ -481,13 +593,24 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   Message
                 </label>
                 <textarea
+                  ref={composerRef}
                   id="chat-message"
                   className="chat-composer__input"
                   aria-label="Message"
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
+                  onSelect={rememberComposerSelection}
+                  onClick={rememberComposerSelection}
+                  onKeyUp={rememberComposerSelection}
                   placeholder="Send a message to the room..."
                   onKeyDown={(event) => {
+                    const format = getKeyboardFormat(event);
+                    if (format) {
+                      event.preventDefault();
+                      applyTextFormat(format);
+                      return;
+                    }
+
                     if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();
                       if (!isSubmitting && bundle && message.trim()) {
@@ -587,15 +710,31 @@ function isChatRecordWithId(value: unknown): value is Pick<ChatRecord, "chat_id"
   );
 }
 
-const AUTO_AI_SEED_COOLDOWN_MS = 1000 * 60 * 60 * 12;
+const AUTO_AI_SEED_COOLDOWN_MS = 1000 * 60 * 2;
+const AUTO_AI_PULSE_COOLDOWN_MS = 1000 * 22;
+const AUTO_AI_PULSE_DELAY_MS = 1000 * 8;
+const AUTO_AI_MIN_MESSAGES = 3;
+const FORMAT_MARKERS = {
+  bold: { startMarker: "**", endMarker: "**", placeholder: "bold text" },
+  italic: { startMarker: "*", endMarker: "*", placeholder: "italic text" },
+  underline: { startMarker: "__", endMarker: "__", placeholder: "underlined text" },
+} satisfies Record<TextFormat, { startMarker: string; endMarker: string; placeholder: string }>;
 
 function wasAutoAiSeededRecently(seedKey: string) {
+  return wasLocalActionRecent(seedKey, AUTO_AI_SEED_COOLDOWN_MS);
+}
+
+function wasAutoAiPulseRecently(seedKey: string) {
+  return wasLocalActionRecent(seedKey, AUTO_AI_PULSE_COOLDOWN_MS);
+}
+
+function wasLocalActionRecent(seedKey: string, ttlMs: number) {
   if (typeof window === "undefined") {
     return true;
   }
 
   const lastSeededAt = Number(window.localStorage.getItem(seedKey) ?? 0);
-  return Number.isFinite(lastSeededAt) && Date.now() - lastSeededAt < AUTO_AI_SEED_COOLDOWN_MS;
+  return Number.isFinite(lastSeededAt) && Date.now() - lastSeededAt < ttlMs;
 }
 
 function markAutoAiSeeded(seedKey: string) {
@@ -604,6 +743,76 @@ function markAutoAiSeeded(seedKey: string) {
   }
 
   window.localStorage.setItem(seedKey, String(Date.now()));
+}
+
+function isAiFakeUser(user: UserProfileRecord | null | undefined) {
+  const configurations = user?.configurations;
+  return (
+    configurations !== null &&
+    typeof configurations === "object" &&
+    !Array.isArray(configurations) &&
+    configurations.kind === "ai_fake_user"
+  );
+}
+
+function getKeyboardFormat(event: KeyboardEvent<HTMLTextAreaElement>): TextFormat | null {
+  if (!event.metaKey && !event.ctrlKey) {
+    return null;
+  }
+
+  const key = event.key.toLowerCase();
+  if (key === "b") {
+    return "bold";
+  }
+  if (key === "i") {
+    return "italic";
+  }
+  if (key === "u") {
+    return "underline";
+  }
+
+  return null;
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function renderRichTextLine(line: string) {
+  const segments: ReactNode[] = [];
+  const pattern = /(\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|\*([^*\n]+?)\*)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(line)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push(
+        <span key={`${lastIndex}-plain`}>
+          {line.slice(lastIndex, match.index)}
+        </span>,
+      );
+    }
+
+    if (match[2]) {
+      segments.push(<strong key={`${match.index}-bold`}>{match[2]}</strong>);
+    } else if (match[3]) {
+      segments.push(<u key={`${match.index}-underline`}>{match[3]}</u>);
+    } else if (match[4]) {
+      segments.push(<em key={`${match.index}-italic`}>{match[4]}</em>);
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < line.length) {
+    segments.push(
+      <span key={`${lastIndex}-plain-end`}>
+        {line.slice(lastIndex)}
+      </span>,
+    );
+  }
+
+  return segments.length > 0 ? segments : line;
 }
 
 function ChatSceneBackground() {
