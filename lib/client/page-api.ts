@@ -967,6 +967,7 @@ async function postDirectToSupabase<TResponse>(
   if (input === "/api/chat") {
     return (await createChatDirect({
       pageId: readString(body.pageId),
+      roomId: readString(body.roomId),
       body: readString(body.message),
     })) as TResponse;
   }
@@ -1023,7 +1024,7 @@ async function loadOrCreatePageBundle(url: string): Promise<PageBundle> {
     throw chatsResult.error;
   }
 
-  if (routesResult.error) {
+  if (routesResult.error && !isMissingOptionalRouteTable(routesResult.error)) {
     throw routesResult.error;
   }
 
@@ -1055,7 +1056,7 @@ async function loadOrCreatePageBundle(url: string): Promise<PageBundle> {
   return {
     page,
     room,
-    routes: routesResult.data ?? [],
+    routes: routesResult.error ? [] : routesResult.data ?? [],
     chats,
     posts,
     comments,
@@ -1063,6 +1064,11 @@ async function loadOrCreatePageBundle(url: string): Promise<PageBundle> {
     postVotes: [],
     commentVotes: [],
   };
+}
+
+function isMissingOptionalRouteTable(error: { code?: string; message?: string }) {
+  const message = error.message?.toLowerCase() ?? "";
+  return error.code === "42P01" || message.includes("page_routes");
 }
 
 async function withCurrentUserVotes(bundle: PageBundle): Promise<PageBundle> {
@@ -1313,6 +1319,21 @@ async function findOrCreateRoom(pageId: string): Promise<RoomRecord> {
   return createdRooms[0];
 }
 
+async function findPageIdForRoom(roomId: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("rooms")
+    .select("page_id")
+    .eq("id", roomId)
+    .maybeSingle<{ page_id: string }>();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.page_id ?? "";
+}
+
 async function seedPageRoutesDirect(pageId: string, url: string, paths: string[]) {
   const routes = buildRouteSeedRows(pageId, url, paths);
   if (routes.length === 0) {
@@ -1395,20 +1416,23 @@ function normalizeRoutePath(value: string) {
 
 async function createChatDirect({
   pageId,
+  roomId,
   body,
 }: {
   pageId: string;
+  roomId: string;
   body: string;
 }) {
   const trimmedBody = body.trim();
-  if (!pageId || !trimmedBody) {
-    throw new Error("pageId and message are required");
+  const resolvedPageId = pageId || (roomId ? await findPageIdForRoom(roomId) : "");
+  if (!resolvedPageId || !trimmedBody) {
+    throw new Error("pageId or roomId, and message are required");
   }
 
   const supabase = createClient();
-  const currentUser = await ensureCurrentUserProfile();
+  const currentUser = await getCurrentUserProfileForOptionalAttribution();
   const payload: TablesInsert<"chat"> = {
-    room_id: pageId,
+    room_id: resolvedPageId,
     body: trimmedBody,
     user_id: currentUser?.id ?? null,
   };
@@ -1429,6 +1453,15 @@ async function createChatDirect({
   }
 
   return data[0];
+}
+
+async function getCurrentUserProfileForOptionalAttribution() {
+  try {
+    return await ensureCurrentUserProfile();
+  } catch (error) {
+    console.warn("Could not attach a profile to this chat message.", error);
+    return null;
+  }
 }
 
 async function createPostDirect({

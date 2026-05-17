@@ -394,6 +394,39 @@ export type Database = {
           },
         ]
       }
+      page_presence: {
+        Row: {
+          last_seen_at: string
+          page_id: string
+          user_id: string
+        }
+        Insert: {
+          last_seen_at?: string
+          page_id: string
+          user_id: string
+        }
+        Update: {
+          last_seen_at?: string
+          page_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_presence_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "page_presence_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           content: string

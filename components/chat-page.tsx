@@ -50,6 +50,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const seenChatPostIdsRef = useRef<Set<string> | null>(null);
   const sentChatPostIdsRef = useRef<Set<string>>(new Set());
+  const autoAiSeedRef = useRef<string | null>(null);
   const { profile: currentProfile } = useCurrentUserProfile();
   useErrorSfx(error);
   useErrorSfx(submitError);
@@ -173,6 +174,34 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     }
   }, [chatMessages, currentProfile?.id]);
 
+  useEffect(() => {
+    if (!bundle || loading || isGeneratingPeers) {
+      return;
+    }
+
+    const aiAlreadyPresent = bundle.users.some((user) => {
+      const configurations = user.configurations;
+      return (
+        configurations &&
+        typeof configurations === "object" &&
+        !Array.isArray(configurations) &&
+        configurations.kind === "ai_fake_user"
+      );
+    });
+    if (aiAlreadyPresent || chatMessages.length > 0) {
+      return;
+    }
+
+    const seedKey = `pairpod.autoAiChat.${roomScope}.${bundle.page.id}`;
+    if (autoAiSeedRef.current === seedKey || wasAutoAiSeededRecently(seedKey)) {
+      return;
+    }
+
+    autoAiSeedRef.current = seedKey;
+    markAutoAiSeeded(seedKey);
+    void handleGeneratePeers({ silent: true });
+  }, [bundle, chatMessages.length, isGeneratingPeers, loading, roomScope]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -205,13 +234,15 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
     }
   };
 
-  const handleGeneratePeers = async () => {
+  const handleGeneratePeers = async (options?: { silent?: boolean }) => {
     if (!bundle || isGeneratingPeers) {
       return;
     }
 
     setIsGeneratingPeers(true);
-    setSubmitError(null);
+    if (!options?.silent) {
+      setSubmitError(null);
+    }
 
     try {
       if (isExtensionRuntime()) {
@@ -234,11 +265,15 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
 
       await refresh({ silent: true });
     } catch (generateError) {
-      setSubmitError(
-        generateError instanceof Error
-          ? generateError.message
-          : "Failed to create AI peers",
-      );
+      if (!options?.silent) {
+        setSubmitError(
+          generateError instanceof Error
+            ? generateError.message
+            : "Failed to create AI peers",
+        );
+      } else {
+        console.warn("Automatic AI chat seed failed.", generateError);
+      }
     } finally {
       setIsGeneratingPeers(false);
     }
@@ -550,6 +585,25 @@ function isChatRecordWithId(value: unknown): value is Pick<ChatRecord, "chat_id"
     "chat_id" in value &&
     typeof value.chat_id === "string"
   );
+}
+
+const AUTO_AI_SEED_COOLDOWN_MS = 1000 * 60 * 60 * 12;
+
+function wasAutoAiSeededRecently(seedKey: string) {
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  const lastSeededAt = Number(window.localStorage.getItem(seedKey) ?? 0);
+  return Number.isFinite(lastSeededAt) && Date.now() - lastSeededAt < AUTO_AI_SEED_COOLDOWN_MS;
+}
+
+function markAutoAiSeeded(seedKey: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(seedKey, String(Date.now()));
 }
 
 function ChatSceneBackground() {

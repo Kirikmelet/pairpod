@@ -2,12 +2,15 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AI_ASSISTANT_PROFILE,
+  AI_ASSISTANT_THREAD_ID,
   getDmPath,
   getMemberDisplayName,
   getUnopenedDmThreads,
   listDmMessages,
   listDmThreads,
   markDmThreadOpened,
+  sendAiAssistantMessage,
   sendDmMessage,
   type DmMessage,
   type DmThreadSummary,
@@ -36,10 +39,13 @@ export function DmPage({ threadId }: DmPageProps) {
   const [error, setError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const notifiedMessageIds = useRef<Set<string>>(new Set());
+  const isAiAssistantThread = threadId === AI_ASSISTANT_THREAD_ID;
 
   const currentThread = useMemo(
-    () => threads.find((thread) => thread.id === threadId) ?? null,
-    [threadId, threads],
+    () => isAiAssistantThread
+      ? createAiAssistantThreadSummary(profile?.id ?? null)
+      : threads.find((thread) => thread.id === threadId) ?? null,
+    [isAiAssistantThread, profile?.id, threadId, threads],
   );
   const conversationMembers = useMemo(
     () => {
@@ -150,6 +156,15 @@ export function DmPage({ threadId }: DmPageProps) {
       return () => window.clearTimeout(timeout);
     }
 
+    if (isAiAssistantThread) {
+      const timeout = window.setTimeout(() => {
+        setMessages(readAiAssistantMessages());
+        setLoadingMessages(false);
+        setError(null);
+      }, 0);
+      return () => window.clearTimeout(timeout);
+    }
+
     let isMounted = true;
     const activeThreadId = threadId;
 
@@ -198,7 +213,7 @@ export function DmPage({ threadId }: DmPageProps) {
       isMounted = false;
       void supabase.removeChannel(channel);
     };
-  }, [threadId]);
+  }, [isAiAssistantThread, threadId]);
 
   useEffect(() => {
     transcriptRef.current?.scrollTo({
@@ -218,6 +233,27 @@ export function DmPage({ threadId }: DmPageProps) {
     setError(null);
 
     try {
+      if (isAiAssistantThread) {
+        const userMessage = createLocalAiUserMessage(draft.trim(), profile);
+        const history = messages.map((message) => ({
+          role: message.sender?.id === AI_ASSISTANT_PROFILE.id ? "assistant" as const : "user" as const,
+          content: message.content,
+        }));
+        setMessages((current) => {
+          const nextMessages = [...current, userMessage];
+          writeAiAssistantMessages(nextMessages);
+          return nextMessages;
+        });
+        setDraft("");
+        const assistantMessage = await sendAiAssistantMessage(userMessage.content, history);
+        setMessages((current) => {
+          const nextMessages = [...current, assistantMessage];
+          writeAiAssistantMessages(nextMessages);
+          return nextMessages;
+        });
+        return;
+      }
+
       const created = await sendDmMessage(threadId, draft.trim());
       setMessages((current) =>
         current.some((message) => message.id === created.id)
@@ -271,18 +307,26 @@ export function DmPage({ threadId }: DmPageProps) {
             <div className="dm-thread-list">
               {loadingThreads ? (
                 <p className="status-note">Loading conversations...</p>
-              ) : threads.length > 0 ? (
-                threads.map((thread) => (
+              ) : (
+                <>
                   <DmThreadLink
                     currentUserId={profile?.id ?? null}
-                    isActive={thread.id === threadId}
-                    key={thread.id}
-                    hasUnread={unopenedThreadIds.has(thread.id)}
-                    thread={thread}
+                    hasUnread={false}
+                    isActive={isAiAssistantThread}
+                    thread={createAiAssistantThreadSummary(profile?.id ?? null)}
                   />
-                ))
-              ) : (
-                <p className="status-note">No DMs yet. Start one from chat.</p>
+                  {threads.length > 0 ? threads.map((thread) => (
+                    <DmThreadLink
+                      currentUserId={profile?.id ?? null}
+                      isActive={thread.id === threadId}
+                      key={thread.id}
+                      hasUnread={unopenedThreadIds.has(thread.id)}
+                      thread={thread}
+                    />
+                  )) : (
+                    <p className="status-note">No human DMs yet. Start one from chat.</p>
+                  )}
+                </>
               )}
             </div>
           </aside>
@@ -350,7 +394,7 @@ export function DmPage({ threadId }: DmPageProps) {
             ) : (
               <div className="dm-empty-state">
                 <h2>Select a conversation</h2>
-                <p>Open a thread from the left, or click a user in chat to start a new DM.</p>
+                <p>Open the pinned AI assistant, or click a user in chat to start a DM.</p>
               </div>
             )}
           </section>
@@ -443,6 +487,119 @@ function UserProfileLink({
       <strong>{children}</strong>
     </a>
   );
+}
+
+const AI_ASSISTANT_MESSAGES_KEY = "pairpod.aiAssistantMessages";
+
+function createAiAssistantThreadSummary(currentUserId: string | null): DmThreadSummary {
+  const messages = readAiAssistantMessages();
+  const latestMessage = messages.at(-1);
+  return {
+    id: AI_ASSISTANT_THREAD_ID,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: latestMessage?.createdAt ?? new Date().toISOString(),
+    readAt: new Date().toISOString(),
+    members: currentUserId
+      ? [
+          {
+            id: currentUserId,
+            username: null,
+            display_name: "You",
+            avatar_url: DEFAULT_AVATAR_URL,
+          },
+          AI_ASSISTANT_PROFILE,
+        ]
+      : [AI_ASSISTANT_PROFILE],
+    latestMessage: latestMessage
+      ? {
+          id: latestMessage.id,
+          content: latestMessage.content,
+          createdAt: latestMessage.createdAt,
+          senderId: latestMessage.sender?.id ?? null,
+        }
+      : {
+          id: "pairpod-ai-welcome",
+          content: "Ask me about PairPod, this room, or what to build next.",
+          createdAt: new Date().toISOString(),
+          senderId: AI_ASSISTANT_PROFILE.id,
+        },
+  };
+}
+
+function readAiAssistantMessages() {
+  if (typeof window === "undefined") {
+    return getDefaultAiAssistantMessages();
+  }
+
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(AI_ASSISTANT_MESSAGES_KEY) ?? "null",
+    ) as DmMessage[] | null;
+    return Array.isArray(parsed) && parsed.length > 0
+      ? parsed
+          .map(normalizeAiAssistantMessage)
+          .filter((message): message is DmMessage => Boolean(message))
+      : getDefaultAiAssistantMessages();
+  } catch {
+    return getDefaultAiAssistantMessages();
+  }
+}
+
+function writeAiAssistantMessages(messages: DmMessage[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(
+    AI_ASSISTANT_MESSAGES_KEY,
+    JSON.stringify(messages.slice(-24)),
+  );
+}
+
+function normalizeAiAssistantMessage(message: DmMessage): DmMessage | null {
+  if (!message?.id || !message.content || !message.createdAt) {
+    return null;
+  }
+
+  return {
+    ...message,
+    threadId: AI_ASSISTANT_THREAD_ID,
+    sender: message.sender?.id === AI_ASSISTANT_PROFILE.id
+      ? AI_ASSISTANT_PROFILE
+      : message.sender,
+  };
+}
+
+function getDefaultAiAssistantMessages(): DmMessage[] {
+  return [
+    {
+      id: "pairpod-ai-welcome",
+      threadId: AI_ASSISTANT_THREAD_ID,
+      content: "Hey, I am the pinned PairPod assistant. Ask me about the room, posts, schema, or extension flow.",
+      createdAt: new Date().toISOString(),
+      sender: AI_ASSISTANT_PROFILE,
+    },
+  ];
+}
+
+function createLocalAiUserMessage(
+  content: string,
+  profile: ReturnType<typeof useCurrentUserProfile>["profile"],
+): DmMessage {
+  return {
+    id: crypto.randomUUID(),
+    threadId: AI_ASSISTANT_THREAD_ID,
+    content,
+    createdAt: new Date().toISOString(),
+    sender: profile
+      ? {
+          id: profile.id,
+          username: profile.username,
+          display_name: profile.display_name ?? null,
+          avatar_url: profile.avatar_url ?? DEFAULT_AVATAR_URL,
+        }
+      : null,
+  };
 }
 
 function DmBackground() {

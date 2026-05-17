@@ -1,5 +1,7 @@
 import { DmPage } from "@/components/dm-page";
 
+const AI_ASSISTANT_THREAD_ID = "pairpod-ai-assistant";
+
 type PageProps = {
   params: Promise<{
     threadId: string;
@@ -7,7 +9,10 @@ type PageProps = {
 };
 
 export function generateStaticParams(): Array<{ threadId: string }> {
-  return [{ threadId: "__static-placeholder__" }];
+  return [
+    { threadId: "__static-placeholder__" },
+    { threadId: AI_ASSISTANT_THREAD_ID },
+  ];
 }
 
 export default async function Page({ params }: PageProps) {

@@ -81,6 +81,13 @@ create table if not exists page_routes (
   unique (page_id, path)
 );
 
+create table if not exists page_presence (
+  page_id uuid not null references pages(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  last_seen_at timestamptz not null default now(),
+  primary key (page_id, user_id)
+);
+
 create table if not exists chat (
   room_id uuid not null,
   created_at timestamptz not null default now(),
@@ -185,6 +192,7 @@ create table if not exists dm_messages (
 alter table users enable row level security;
 alter table pages enable row level security;
 alter table page_routes enable row level security;
+alter table page_presence enable row level security;
 alter table chat enable row level security;
 alter table rooms enable row level security;
 alter table posts enable row level security;
@@ -199,6 +207,7 @@ alter table dm_messages enable row level security;
 
 create index if not exists idx_chat_room_id on chat(room_id);
 create index if not exists idx_page_routes_page_id on page_routes(page_id);
+create index if not exists idx_page_presence_seen on page_presence(page_id, last_seen_at);
 create index if not exists idx_chat_user_id on chat(user_id);
 create index if not exists idx_chat_created_at on chat(created_at);
 create index if not exists idx_rooms_page_id on rooms(page_id);
@@ -448,6 +457,7 @@ grant select, insert, update, delete on table pages to authenticated;
 grant select, insert, update, delete on table chat to authenticated;
 grant select, insert, update, delete on table rooms to authenticated;
 grant select, insert, update, delete on table page_routes to authenticated;
+grant select, insert, update, delete on table page_presence to authenticated;
 grant select, insert, update, delete on table posts to authenticated;
 grant select, insert, update, delete on table comments to authenticated;
 grant select, insert, update, delete on table post_votes to authenticated;
@@ -464,6 +474,8 @@ drop policy if exists "authenticated users can read pages" on pages;
 drop policy if exists "authenticated users can write pages" on pages;
 drop policy if exists "authenticated users can read page routes" on page_routes;
 drop policy if exists "authenticated users can write page routes" on page_routes;
+drop policy if exists "authenticated users can read page presence" on page_presence;
+drop policy if exists "authenticated users can write page presence" on page_presence;
 drop policy if exists "authenticated users can read chat" on chat;
 drop policy if exists "authenticated users can write chat" on chat;
 drop policy if exists "authenticated users can read rooms" on rooms;
@@ -517,6 +529,17 @@ create policy "authenticated users can read page routes"
 
 create policy "authenticated users can write page routes"
   on page_routes for all
+  to authenticated
+  using (true)
+  with check (true);
+
+create policy "authenticated users can read page presence"
+  on page_presence for select
+  to authenticated
+  using (true);
+
+create policy "authenticated users can write page presence"
+  on page_presence for all
   to authenticated
   using (true)
   with check (true);

@@ -21,6 +21,9 @@ type DmThreadReadRow = Tables<"dm_thread_reads">;
 type DmMessageRow = Tables<"dm_messages">;
 type UserProfileRow = Tables<"users">;
 
+const DEFAULT_AVATAR_URL =
+  "https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png";
+
 export type DmThreadSummary = {
   id: string;
   createdAt: string;
@@ -45,6 +48,14 @@ export type DmMessage = {
   sender: DmMemberProfile | null;
 };
 
+export const AI_ASSISTANT_THREAD_ID = "pairpod-ai-assistant";
+export const AI_ASSISTANT_PROFILE: DmMemberProfile = {
+  id: "pairpod-ai",
+  username: "pairpod_ai",
+  display_name: "PairPod AI",
+  avatar_url: DEFAULT_AVATAR_URL,
+};
+
 export async function listDmThreads() {
   return await listDmThreadsDirect();
 }
@@ -59,6 +70,46 @@ export async function listDmMessages(threadId: string) {
 
 export async function sendDmMessage(threadId: string, content: string) {
   return await sendDmMessageDirect(threadId, content);
+}
+
+export async function sendAiAssistantMessage(
+  content: string,
+  history: Array<{ role: "user" | "assistant"; content: string }> = [],
+) {
+  const trimmedContent = content.trim();
+  if (!trimmedContent) {
+    throw new Error("content is required.");
+  }
+
+  if (isExtensionRuntime()) {
+    return buildLocalAiAssistantReply(trimmedContent);
+  }
+
+  const response = await fetch("/api/ai/dm", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      history,
+      message: trimmedContent,
+    }),
+  });
+  const payload = (await response.json()) as
+    | { ok: true; data: { message: string } }
+    | { ok: false; error: string };
+
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.ok ? "AI assistant failed." : payload.error);
+  }
+
+  return {
+    id: crypto.randomUUID(),
+    threadId: AI_ASSISTANT_THREAD_ID,
+    content: payload.data.message,
+    createdAt: new Date().toISOString(),
+    sender: AI_ASSISTANT_PROFILE,
+  } satisfies DmMessage;
 }
 
 export function getMemberDisplayName(member: DmMemberProfile | null) {
@@ -163,6 +214,23 @@ function isExtensionRuntime() {
   const runtime = globalWithExtensionApis.browser ?? globalWithExtensionApis.chrome;
 
   return Boolean(runtime?.runtime?.id);
+}
+
+function buildLocalAiAssistantReply(message: string) {
+  const lower = message.toLowerCase();
+  const content = lower.includes("schema")
+    ? "For schema work, I would keep chat in public.chat, posts in public.posts, and only add a table when the feature needs durable state."
+    : lower.includes("extension")
+      ? "For the extension, keep the happy path direct-to-Supabase when possible, then use the server only for secret-backed AI calls."
+      : "I can help think through that. My default move would be to make the smallest working version, verify it in the extension, then polish the UI once the data path is solid.";
+
+  return {
+    id: crypto.randomUUID(),
+    threadId: AI_ASSISTANT_THREAD_ID,
+    content,
+    createdAt: new Date().toISOString(),
+    sender: AI_ASSISTANT_PROFILE,
+  } satisfies DmMessage;
 }
 
 async function listDmThreadsDirect() {
@@ -601,8 +669,6 @@ function toLatestMessagePreview(message: DmMessageRow | null) {
 
 const USER_PROFILE_COLUMNS =
   "id,auth_user_id,email,username,configurations,display_name,avatar_url,updated_at,created_at";
-const DEFAULT_AVATAR_URL =
-  "https://xgfgqzveuyeceupfaebh.supabase.co/storage/v1/object/public/profile_pictures/default_user.png";
 
 function readMetadataString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;

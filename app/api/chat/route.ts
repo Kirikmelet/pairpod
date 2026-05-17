@@ -3,6 +3,7 @@ import { jsonError, jsonSuccess } from '@/lib/server/http'
 import { resolveAuthenticatedProfileIdOrFallback } from '@/lib/server/profile'
 import { createChatMessage } from '@/lib/server/discussions'
 import { findOrCreateDefaultRoom } from '@/lib/server/pages'
+import { getSupabaseAdmin } from '@/lib/server/supabaseAdmin'
 
 type ChatRequestBody = {
   roomId?: unknown
@@ -33,11 +34,11 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const resolvedRoomId = roomId || (await findOrCreateDefaultRoom(pageId)).id
-    const resolvedPageId = pageId || ''
-    const resolvedUserId = await resolveAuthenticatedProfileIdOrFallback(requestUserId)
+    const resolvedPageId = pageId || (await findPageIdForRoom(resolvedRoomId))
+    const resolvedUserId = await resolveOptionalChatUserId(requestUserId)
 
     if (!resolvedPageId) {
-      return jsonError('pageId is required for chat messages', 400)
+      return jsonError('Could not resolve pageId for chat messages', 400)
     }
 
     const data = await createChatMessage({
@@ -48,7 +49,7 @@ export async function POST(request: Request): Promise<Response> {
 
     await logEvent({
       eventType: 'chat.message.created',
-      pageId: pageId || null,
+      pageId: resolvedPageId,
       roomId: resolvedRoomId,
       userId: resolvedUserId,
       payload: {
@@ -61,5 +62,33 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     const messageText = error instanceof Error ? error.message : 'Failed to create chat message'
     return jsonError(messageText, 500)
+  }
+}
+
+async function findPageIdForRoom(roomId: string) {
+  if (!roomId) {
+    return ''
+  }
+
+  const supabase = getSupabaseAdmin()
+  const { data, error } = await supabase
+    .from('rooms')
+    .select('page_id')
+    .eq('id', roomId)
+    .maybeSingle<{ page_id: string }>()
+
+  if (error) {
+    throw new Error(`Failed to resolve chat page: ${error.message}`)
+  }
+
+  return data?.page_id ?? ''
+}
+
+async function resolveOptionalChatUserId(requestUserId: string | null) {
+  try {
+    return await resolveAuthenticatedProfileIdOrFallback(requestUserId)
+  } catch (error) {
+    console.warn('Creating chat message without user attribution.', error)
+    return null
   }
 }

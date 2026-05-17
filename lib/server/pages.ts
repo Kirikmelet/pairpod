@@ -88,7 +88,11 @@ const USER_PROFILE_COLUMNS =
 export async function loadOrCreatePageRoom(url: string): Promise<PageBundle> {
   const page = await findOrCreatePage(url)
   const room = await findOrCreateDefaultRoom(page.id)
-  await seedPageRoutes(page.id, url, [])
+  try {
+    await seedPageRoutes(page.id, url, [])
+  } catch (error) {
+    console.warn('Skipping page route seed.', error)
+  }
 
   return getPageBundle(page.id, room.id)
 }
@@ -195,7 +199,7 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
     throw new Error(`Failed to load room: ${roomResult.error.message}`)
   }
 
-  if (routesResult.error) {
+  if (routesResult.error && !isMissingOptionalRouteTable(routesResult.error)) {
     throw new Error(`Failed to load routes: ${routesResult.error.message}`)
   }
 
@@ -254,12 +258,17 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
   return {
     page: pageResult.data,
     room: roomResult.data,
-    routes: routesResult.data ?? [],
+    routes: routesResult.error ? [] : routesResult.data ?? [],
     chats,
     posts: enrichedPosts,
     comments: enrichedComments,
     users,
   }
+}
+
+function isMissingOptionalRouteTable(error: { code?: string; message?: string }) {
+  const message = error.message?.toLowerCase() ?? ''
+  return error.code === '42P01' || message.includes('page_routes')
 }
 
 async function seedPageRoutes(pageId: string, url: string, paths: string[]) {

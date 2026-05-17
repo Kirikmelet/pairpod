@@ -32,9 +32,12 @@ export async function createMistralChatCompletion({
   maxTokens = 900,
   model = readMistralModel(),
 }: MistralChatCompletionInput) {
-  const apiKey = process.env.MISTRAL_API_KEY?.trim();
+  const apiKey =
+    process.env.MISTRAL_API_KEY?.trim() ||
+    process.env.MISTRAY_API_KEY?.trim() ||
+    process.env.MINSTRAL_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error("Missing env var MISTRAL_API_KEY");
+    throw new Error("Missing env var MISTRAL_API_KEY, MISTRAY_API_KEY, or MINSTRAL_API_KEY");
   }
 
   const response = await fetch(readMistralApiUrl(), {

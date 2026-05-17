@@ -10,6 +10,7 @@ import {
   usePageBundle,
 } from "@/lib/client/page-api";
 import type { Json } from "@/utils/database.types";
+import { createClient } from "@/utils/supabase/client";
 
 type PeerNode = {
   id: string;
@@ -56,6 +57,21 @@ type ChatBubble = {
   createdAt: string;
 };
 
+type PlayerAvatar = {
+  character: Character3dConfig;
+  avatarUrl: string | null;
+  clothingUrl: string | null;
+};
+
+type OnlinePeerProfile = {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  configurations: Json;
+  avatar_url: string | null;
+  clothing_url?: string | null;
+};
+
 const COLORS = [0x3b8cf5, 0x44b834, 0xff8c28, 0x7a5cff, 0xe95f9f, 0x14a3a0];
 const DEFAULT_CHARACTER_3D: Character3dConfig = {
   body: "#6ebe44",
@@ -63,12 +79,6 @@ const DEFAULT_CHARACTER_3D: Character3dConfig = {
   head: "#f7ffe8",
   style: "pod",
 };
-const FALLBACK_PEERS: Array<[string, string, string]> = [
-  ["global", "Global", "global chat is open"],
-  ["domain", "Domain", "domain pod loaded"],
-  ["ai", "AI Peer", "thinking up a thread"],
-  ["guide", "Guide", "showing the route doors"],
-];
 const PLAYER_START: PlayerState = {
   x: 0,
   z: 8,
@@ -76,14 +86,21 @@ const PLAYER_START: PlayerState = {
   pitch: 0.12,
   mode: "iso",
 };
+const ONLINE_PEER_WINDOW_MS = 45_000;
+const ONLINE_PEER_HEARTBEAT_MS = 10_000;
 
 export function PeerNetworkPage() {
   const searchParams = useSearchParams();
   const rawWebsiteUrl = searchParams.get("url");
-  const { bundle, usersById, buildScopedHref, currentUrl, domainUrl } = usePageBundle();
+  const { bundle, buildScopedHref, currentUrl, domainUrl } = usePageBundle();
   const { profile } = useCurrentUserProfile();
   const mountRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<PlayerState>({ ...PLAYER_START });
+  const playerAvatarRef = useRef<PlayerAvatar>({
+    character: DEFAULT_CHARACTER_3D,
+    avatarUrl: null,
+    clothingUrl: null,
+  });
   const keysRef = useRef<Set<string>>(new Set());
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const peersRef = useRef<PeerNode[]>([]);
@@ -91,22 +108,24 @@ export function PeerNetworkPage() {
   const activeDoorIdRef = useRef<string | null>(null);
   const [player, setPlayer] = useState<PlayerState>({ ...PLAYER_START });
   const [activeDoor, setActiveDoor] = useState<DoorNode | null>(null);
+  const [onlineProfiles, setOnlineProfiles] = useState<OnlinePeerProfile[]>([]);
+
+  const playerAvatar = useMemo<PlayerAvatar>(() => {
+    const character = readCharacter3d(profile?.configurations);
+    return {
+      character,
+      avatarUrl: profile?.avatar_url ?? null,
+      clothingUrl: profile?.clothing_url ?? character.clothingImageUrl ?? null,
+    };
+  }, [profile]);
 
   const peers = useMemo<PeerNode[]>(() => {
-    const seen = new Map<string, string>();
     const messages = new Map<string, string>();
     const chatBubbles = new Map<string, ChatBubble>();
     const currentUserId = profile?.id ?? null;
 
     for (const chat of bundle?.chats ?? []) {
       if (!chat.user_id || chat.user_id === currentUserId) continue;
-      const profile = usersById[chat.user_id];
-      seen.set(
-        chat.user_id,
-        profile?.display_name?.trim() ||
-          profile?.username?.trim() ||
-          `user_${chat.user_id.slice(0, 8)}`,
-      );
       messages.set(chat.user_id, chat.body?.trim() || "chatting in the room");
       if (chat.body?.trim()) {
         chatBubbles.set(chat.user_id, {
@@ -118,13 +137,6 @@ export function PeerNetworkPage() {
 
     for (const post of bundle?.posts ?? []) {
       if (!post.user_id || post.user_id === currentUserId) continue;
-      const profile = usersById[post.user_id];
-      seen.set(
-        post.user_id,
-        profile?.display_name?.trim() ||
-          profile?.username?.trim() ||
-          `user_${post.user_id.slice(0, 8)}`,
-      );
       messages.set(post.user_id, post.header?.trim() || post.content.trim());
     }
 
@@ -133,21 +145,20 @@ export function PeerNetworkPage() {
       messages.set(comment.user_id, comment.content.trim());
     }
 
-    const names = [...seen.entries()].slice(0, 14);
-    const fallback = names.length > 0
-      ? names
-      : FALLBACK_PEERS.map(([id, label]) => [id, label]);
+    const online = onlineProfiles.slice(0, 14);
 
-    return fallback.map(([id, label], index) => {
-      const angle = (Math.PI * 2 * index) / fallback.length;
-      const radius = index === 0 ? 0 : 5.5 + (index % 3) * 1.4;
-      const fallbackMessage = FALLBACK_PEERS[index % FALLBACK_PEERS.length]?.[2] ?? "hello from the pod";
-      const profileForPeer = usersById[id] ?? null;
+    return online.map((profileForPeer, index) => {
+      const angle = (Math.PI * 2 * index) / Math.max(1, online.length);
+      const radius = 5.5 + (index % 3) * 1.4;
       const character = readCharacter3d(profileForPeer?.configurations);
+      const id = profileForPeer.id;
       return {
         id,
-        label,
-        message: messages.get(id)?.slice(0, 72) || fallbackMessage,
+        label:
+          profileForPeer.display_name?.trim() ||
+          profileForPeer.username?.trim() ||
+          `user_${id.slice(0, 8)}`,
+        message: messages.get(id)?.slice(0, 72) || "online now",
         chatBubble: chatBubbles.get(id) ?? null,
         character,
         avatarUrl: profileForPeer?.avatar_url ?? null,
@@ -157,7 +168,7 @@ export function PeerNetworkPage() {
         z: Math.sin(angle) * radius,
       };
     });
-  }, [bundle?.chats, bundle?.comments, bundle?.posts, profile, usersById]);
+  }, [bundle?.chats, bundle?.comments, bundle?.posts, onlineProfiles, profile?.id]);
 
   const doors = useMemo<DoorNode[]>(() => {
     const appDoors: DoorNode[] = [
@@ -230,6 +241,87 @@ export function PeerNetworkPage() {
   }, [player]);
 
   useEffect(() => {
+    playerAvatarRef.current = playerAvatar;
+  }, [playerAvatar]);
+
+  useEffect(() => {
+    const pageId = bundle?.page.id;
+    const userId = profile?.id;
+    if (!pageId || !userId) {
+      setOnlineProfiles([]);
+      return;
+    }
+
+    let cancelled = false;
+    const supabase = createClient() as any;
+
+    const refreshPresence = async () => {
+      try {
+        await supabase
+          .from("page_presence")
+          .upsert(
+            {
+              page_id: pageId,
+              user_id: userId,
+              last_seen_at: new Date().toISOString(),
+            },
+            { onConflict: "page_id,user_id" },
+          );
+
+        const since = new Date(Date.now() - ONLINE_PEER_WINDOW_MS).toISOString();
+        const { data: presenceRows, error: presenceError } = await supabase
+          .from("page_presence")
+          .select("user_id,last_seen_at")
+          .eq("page_id", pageId)
+          .gte("last_seen_at", since)
+          .neq("user_id", userId)
+          .order("last_seen_at", { ascending: false });
+
+        if (presenceError) {
+          if (!isMissingOptionalPresenceTable(presenceError) && !cancelled) {
+            console.warn("Could not load online peers.", presenceError);
+          }
+          if (!cancelled) setOnlineProfiles([]);
+          return;
+        }
+
+        const userIds = [...new Set((presenceRows ?? []).map((row: any) => row.user_id).filter(Boolean))];
+        if (userIds.length === 0) {
+          if (!cancelled) setOnlineProfiles([]);
+          return;
+        }
+
+        const { data: profiles, error: profilesError } = await supabase
+          .from("users")
+          .select("id,username,display_name,configurations,avatar_url,clothing_url")
+          .in("id", userIds);
+
+        if (profilesError) {
+          throw profilesError;
+        }
+
+        if (!cancelled) {
+          const profileById = new Map((profiles ?? []).map((entry: OnlinePeerProfile) => [entry.id, entry]));
+          setOnlineProfiles(userIds.map((id) => profileById.get(id)).filter(Boolean) as OnlinePeerProfile[]);
+        }
+      } catch (error) {
+        if (!cancelled && !isMissingOptionalPresenceTable(error)) {
+          console.warn("Could not update online peer presence.", error);
+        }
+        if (!cancelled) setOnlineProfiles([]);
+      }
+    };
+
+    void refreshPresence();
+    const interval = window.setInterval(refreshPresence, ONLINE_PEER_HEARTBEAT_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [bundle?.page.id, profile?.id]);
+
+  useEffect(() => {
     peersRef.current = peers;
   }, [peers]);
 
@@ -296,6 +388,8 @@ export function PeerNetworkPage() {
     scene.add(connectionRoot);
     const doorRoot = new THREE.Group();
     scene.add(doorRoot);
+    const playerMarker = new THREE.Group();
+    scene.add(playerMarker);
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
@@ -303,6 +397,7 @@ export function PeerNetworkPage() {
     let animation = 0;
     let currentPeerKey = "";
     let currentDoorKey = "";
+    let currentPlayerKey = "";
     let pointerStart: { x: number; y: number } | null = null;
 
     const resize = () => {
@@ -355,6 +450,20 @@ export function PeerNetworkPage() {
       }
     };
 
+    const refreshPlayerMarker = () => {
+      const playerAvatar = playerAvatarRef.current;
+      const key = `${playerAvatar.avatarUrl ?? ""}:${playerAvatar.clothingUrl ?? ""}:${playerAvatar.character.body}:${playerAvatar.character.accent}:${playerAvatar.character.head}:${playerAvatar.character.style}`;
+      if (key === currentPlayerKey) return;
+      currentPlayerKey = key;
+      playerMarker.clear();
+      playerMarker.add(createCharacterModel(
+        playerAvatar.character,
+        playerAvatar.avatarUrl,
+        playerAvatar.clothingUrl,
+        0,
+      ));
+    };
+
     const pickDoor = (event: PointerEvent) => {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -386,7 +495,10 @@ export function PeerNetworkPage() {
       updatePlayerFromKeys(delta);
       refreshPeers();
       refreshDoors();
+      refreshPlayerMarker();
       positionCamera(camera, playerRef.current);
+      playerMarker.position.set(playerRef.current.x, 0.02, playerRef.current.z);
+      playerMarker.rotation.y = playerRef.current.yaw;
       peerRoot.children.forEach((child: any, index: number) => {
         animatePeer(child, index, performance.now() * 0.001);
       });
@@ -1122,6 +1234,16 @@ function movePlayer(current: PlayerState, forward: number, strafe: number, dista
 
 function isMovementKey(key: string) {
   return ["w", "a", "s", "d", "q", "e", "arrowup", "arrowleft", "arrowdown", "arrowright"].includes(key.toLowerCase());
+}
+
+function isMissingOptionalPresenceTable(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const candidate = error as { code?: string; message?: string };
+  const message = candidate.message?.toLowerCase() ?? "";
+  return candidate.code === "42P01" || message.includes("page_presence");
 }
 
 function truncateCanvasText(value: string, maxLength: number) {

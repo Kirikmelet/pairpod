@@ -22,12 +22,6 @@ type HomePageProps = {
   onOpenApp?: () => void;
 };
 
-type ExtensionRuntime = {
-  runtime?: {
-    getURL?: (path: string) => string;
-  };
-};
-
 export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -117,10 +111,6 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   }
 
   if (!user) {
-    if (isPopup) {
-      return <StaticLoginRedirect isPopup={isPopup} />;
-    }
-
     return (
       <AppShell isPopup={isPopup} title="PairPod - Sign in">
         <AuthForm
@@ -137,42 +127,6 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   }
 
   return <ExtensionPopupApp user={user} onSignOut={() => void handleSignOut()} />;
-}
-
-function StaticLoginRedirect({
-  isPopup,
-}: {
-  isPopup: boolean;
-}) {
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const runtime = getExtensionRuntime();
-    const loginUrl = isPopup
-      ? (runtime?.runtime?.getURL?.("login.html") ?? "login.html")
-      : "/login.html";
-
-    if (!window.location.href.endsWith("/login.html")) {
-      window.location.replace(loginUrl);
-    }
-  }, [isPopup]);
-
-  return (
-    <AppShell isPopup={isPopup} title="Uncommon Hacks - Sign in">
-      <p className="status-note">Opening sign in...</p>
-    </AppShell>
-  );
-}
-
-function getExtensionRuntime() {
-  const globalWithRuntime = globalThis as typeof globalThis & {
-    browser?: ExtensionRuntime;
-    chrome?: ExtensionRuntime;
-  };
-
-  return globalWithRuntime.browser ?? globalWithRuntime.chrome ?? null;
 }
 
 function ExtensionPopupApp({
