@@ -120,9 +120,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
       await refresh();
     } catch (sendError) {
       setSubmitError(
-        sendError instanceof Error
-          ? sendError.message
-          : "Failed to send message",
+        sendError instanceof Error ? sendError.message : "Failed to send message",
       );
     } finally {
       setIsSubmitting(false);
@@ -151,7 +149,9 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
 
           <nav className="chat-menu chat-nav" aria-label="Chat menu">
             <a href={buildScopedHref("/")}>Room</a>
-            <a href={buildScopedHref("/posts")}>Posts</a>
+            <a href={buildScopedHref("/posts")} className="nav-cta">
+              Posts
+            </a>
             <a href={buildScopedHref("/chat")} className="chat-nav__active">
               Chat
             </a>
@@ -176,16 +176,16 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                 {authors.length > 0 ? (
                   authors.map((member, index) => (
                     <article className="chat-member" key={member.name}>
-                      <span
-                        className={`chat-avatar chat-avatar--${(index % 8) + 1}`}
-                      >
+                      <span className={`chat-avatar chat-avatar--${(index % 8) + 1}`}>
                         {member.name.charAt(0).toUpperCase()}
                       </span>
                       <div>
                         <h2>{member.name}</h2>
                         <p>
                           <span
-                            className={`chat-status-dot chat-status-dot--${member.status === "Online" ? "online" : "away"}`}
+                            className={`chat-status-dot chat-status-dot--${
+                              member.status === "Online" ? "online" : "away"
+                            }`}
                           />
                           {member.status}
                         </p>
@@ -195,26 +195,6 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                 ) : (
                   <article className="chat-member">
                     <span className="chat-avatar chat-avatar--1">A</span>
-        </div>
-
-        <nav className="chat-menu chat-nav" aria-label="Chat menu">
-          <a href={buildScopedHref("/")}>Room</a>
-          <a href={buildScopedHref("/posts")} className="nav-cta">→ Posts</a>
-          <a href={buildScopedHref("/chat")} className="chat-nav__active">Chat</a>
-          <a href={buildScopedHref("/posts")}>Questions</a>
-          <a href={buildScopedHref("/")}>Help</a>
-        </nav>
-
-        <div className="chat-layout">
-          <aside className="chat-members" aria-label="Room members">
-            <PanelHeader title={`Members (${authors.length || 1})`} />
-            <div className="chat-members__list">
-              {authors.length > 0 ? (
-                authors.map((member, index) => (
-                  <article className="chat-member" key={member.name}>
-                    <span className={`chat-avatar chat-avatar--${(index % 8) + 1}`}>
-                      {member.name.charAt(0).toUpperCase()}
-                    </span>
                     <div>
                       <h2>Anonymous</h2>
                       <p>
@@ -226,48 +206,15 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                 )}
               </div>
               <div className="chat-member-actions">
-                <a
-                  href={buildScopedHref("/posts")}
-                  className="chat-side-button"
-                >
+                <a href={buildScopedHref("/posts")} className="chat-side-button">
                   <span className="chat-side-icon" aria-hidden="true">
-                    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-                      <rect
-                        x="3"
-                        y="5"
-                        width="14"
-                        height="2"
-                        rx="1"
-                        fill="currentColor"
-                      />
-                      <rect
-                        x="3"
-                        y="9"
-                        width="10"
-                        height="2"
-                        rx="1"
-                        fill="currentColor"
-                      />
-                      <rect
-                        x="3"
-                        y="13"
-                        width="12"
-                        height="2"
-                        rx="1"
-                        fill="currentColor"
-                      />
-                    </svg>
+                    <ListIcon />
                   </span>
                   Open Posts
                 </a>
                 <a href={buildScopedHref("/")} className="chat-side-button">
                   <span className="chat-side-icon" aria-hidden="true">
-                    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-                      <path
-                        d="M10 3L3 9h2v8h4v-5h2v5h4V9h2L10 3z"
-                        fill="currentColor"
-                      />
-                    </svg>
+                    <HomeIcon />
                   </span>
                   Back to Pod
                 </a>
@@ -283,7 +230,9 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   ***{" "}
                   {loading
                     ? "Loading..."
-                    : `${chatPosts.length} messages and ${bundle?.comments.length ?? 0} comments`}
+                    : `${chatPosts.length} messages and ${
+                        bundle?.comments.length ?? 0
+                      } comments`}
                 </p>
               </div>
 
@@ -324,8 +273,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                               className="chat-thread"
                               href={buildScopedHref(`/posts/${post.id}`)}
                             >
-                              -&gt; {relatedComments.length} replies - View
-                              thread
+                              -&gt; {relatedComments.length} replies - View thread
                             </a>
                           ) : null}
                         </div>
@@ -384,32 +332,7 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   className="chat-composer__posts"
                   aria-label="Open post stream"
                 >
-                  <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-                    <rect
-                      x="3"
-                      y="4"
-                      width="14"
-                      height="2"
-                      rx="1"
-                      fill="currentColor"
-                    />
-                    <rect
-                      x="3"
-                      y="9"
-                      width="10"
-                      height="2"
-                      rx="1"
-                      fill="currentColor"
-                    />
-                    <rect
-                      x="3"
-                      y="14"
-                      width="12"
-                      height="2"
-                      rx="1"
-                      fill="currentColor"
-                    />
-                  </svg>
+                  <ListIcon />
                 </a>
               </form>
             </section>
@@ -425,14 +348,11 @@ export function ChatPage({ currentUsername }: ChatPageProps) {
                   </div>
                   <p className="chat-info-card__meta">
                     Created:{" "}
-                    {bundle
-                      ? formatTimestamp(bundle.room.created_at)
-                      : "Loading..."}
+                    {bundle ? formatTimestamp(bundle.room.created_at) : "Loading..."}
                   </p>
                   <p className="chat-info-card__meta">
-                    {chatPosts.length} chat messages{" "}
-                    <span className="live-dot" /> {discussionPosts.length}{" "}
-                    active threads
+                    {chatPosts.length} chat messages <span className="live-dot" />{" "}
+                    {discussionPosts.length} active threads
                   </p>
                 </div>
               </section>
@@ -657,5 +577,23 @@ function PodRoomIcon() {
         />
       </svg>
     </span>
+  );
+}
+
+function ListIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+      <rect x="3" y="4" width="14" height="2" rx="1" fill="currentColor" />
+      <rect x="3" y="9" width="10" height="2" rx="1" fill="currentColor" />
+      <rect x="3" y="14" width="12" height="2" rx="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+      <path d="M10 3L3 9h2v8h4v-5h2v5h4V9h2L10 3z" fill="currentColor" />
+    </svg>
   );
 }
