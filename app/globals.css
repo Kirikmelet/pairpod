@@ -4601,3 +4601,90 @@ textarea.post-compose-input {
     grid-template-columns: 52px minmax(0, 1fr);
   }
 }
+
+
+/* =============================================================================
+   RETRO BUTTON ANIMATIONS — Y2K / Frutiger Aero (site-wide)
+   Applies to every <button> automatically. No per-component changes needed.
+============================================================================= */
+
+/* ── Keyframes ──────────────────────────────────────────────────────────── */
+
+/* Diagonal shimmer sweep — Windows XP Aqua highlight style */
+@keyframes retro-shimmer {
+  0%   { transform: translateX(-115%) skewX(-12deg); opacity: 0 }
+  12%  {                                              opacity: 1 }
+  100% { transform: translateX(275%)  skewX(-12deg); opacity: 0 }
+}
+
+/* Elastic press-bounce — tactile, retro click feel */
+@keyframes retro-press {
+  0%   { transform: translateY(0)    scale(1)    }
+  28%  { transform: translateY(2px)  scale(0.95) }
+  58%  { transform: translateY(-2px) scale(1.03) }
+  80%  { transform: translateY(1px)  scale(0.99) }
+  100% { transform: translateY(0)    scale(1)    }
+}
+
+/* Pixel-style brightness pop on hover (subtle, layered on top of shimmer) */
+@keyframes retro-glow-pop {
+  0%   { filter: brightness(1)    }
+  35%  { filter: brightness(1.12) }
+  100% { filter: brightness(1)    }
+}
+
+/* ── Universal button base ──────────────────────────────────────────────── */
+/* Skip .tab: it already uses ::after for its active-indicator bar          */
+
+button:not(.tab) {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Shimmer layer (animated via ::after so it never clashes with ::before) */
+button:not(.tab)::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 44%;
+  background: linear-gradient(
+    108deg,
+    transparent 15%,
+    rgba(255,255,255,0.62) 50%,
+    transparent 85%
+  );
+  transform: translateX(-115%) skewX(-12deg);
+  pointer-events: none;
+  opacity: 0;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+/* Fire shimmer on hover (enabled buttons only) */
+button:not(.tab):not(:disabled):hover::after {
+  animation: retro-shimmer 0.52s ease-out forwards;
+}
+
+/* Glow pop on hover */
+button:not(.tab):not(:disabled):hover {
+  animation: retro-glow-pop 0.45s ease-out forwards;
+}
+
+/* Elastic press-bounce on click */
+button:not(.tab):not(:disabled):active {
+  animation: retro-press 0.22s var(--ease-bounce) forwards;
+}
+
+/* ── XP window chrome (tiny ×/−/□) — skip shimmer, tiny press only ──────── */
+.xp-title-btn { overflow: visible }
+.xp-title-btn::after { display: none !important }
+.xp-title-btn:hover  { animation: none }
+.xp-title-btn:active { animation: retro-press 0.13s var(--ease-bounce) forwards }
+
+/* ── Tab buttons — already use ::after, add press only ──────────────────── */
+.tab:not(:disabled):hover  { animation: retro-glow-pop 0.40s ease-out forwards }
+.tab:not(:disabled):active { animation: retro-press 0.18s var(--ease-bounce) forwards }
+
+/* ── Disabled buttons — no animations ──────────────────────────────────── */
+button:disabled::after { display: none }
+button:disabled        { animation: none !important }
