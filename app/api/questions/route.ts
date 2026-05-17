@@ -32,10 +32,6 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError('roomId or pageId is required', 400)
   }
 
-  if (!header) {
-    return jsonError('header is required', 400)
-  }
-
   if (!content) {
     return jsonError('content is required', 400)
   }
@@ -48,7 +44,7 @@ export async function POST(request: Request): Promise<Response> {
       userId,
       type: 'question',
       content,
-      title: header,
+      title: header || null,
       sectionId,
     })
 
