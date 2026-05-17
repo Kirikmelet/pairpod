@@ -56,8 +56,8 @@ export type Database = {
           created_at: string
           id: string
           likes: number
+          post_id: string
           reply_id: string | null
-          section_id: string | null
           user_id: string | null
         }
         Insert: {
@@ -65,8 +65,8 @@ export type Database = {
           created_at?: string
           id?: string
           likes?: number
+          post_id: string
           reply_id?: string | null
-          section_id?: string | null
           user_id?: string | null
         }
         Update: {
@@ -74,11 +74,18 @@ export type Database = {
           created_at?: string
           id?: string
           likes?: number
+          post_id?: string
           reply_id?: string | null
-          section_id?: string | null
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "comments_reply_id_fkey"
             columns: ["reply_id"]

@@ -1,7 +1,7 @@
 import { logEvent } from '@/lib/server/helpers/logEvent'
 import { jsonError, jsonSuccess } from '@/lib/server/http'
+import { createPost } from '@/lib/server/discussions'
 import { findOrCreateDefaultRoom } from '@/lib/server/pages'
-import { getSupabaseAdmin } from '@/lib/server/supabaseAdmin'
 
 type ChatRequestBody = {
   roomId?: unknown
@@ -31,25 +31,15 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const supabase = getSupabaseAdmin()
     const resolvedRoomId = roomId || (await findOrCreateDefaultRoom(pageId)).id
 
-    const { data, error } = await supabase
-      .from('posts')
-      .insert({
-        room_id: resolvedRoomId,
-        type: 'chat',
-        section_id: sectionId,
-        header: null,
-        content: message,
-        user_id: userId,
-      })
-      .select('*')
-      .single()
-
-    if (error) {
-      throw new Error(error.message)
-    }
+    const data = await createPost({
+      roomId: resolvedRoomId,
+      userId,
+      type: 'chat',
+      content: message,
+      sectionId,
+    })
 
     await logEvent({
       eventType: 'chat.message.created',

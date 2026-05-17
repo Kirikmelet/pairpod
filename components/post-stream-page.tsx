@@ -305,18 +305,19 @@ export function PostDetailPage({ postId }: { postId: string }) {
             </div>
 
             <form className="post-compose" onSubmit={(event) => void handleSubmit(event)}>
-              <label>
-                <span>Reply</span>
+              <div className="post-compose-field">
+                <span className="post-compose-label">Reply</span>
                 <textarea
+                  className="post-compose-input"
                   value={content}
                   onChange={(event) => setContent(event.target.value)}
                   placeholder="Write an answer or comment..."
                 />
-              </label>
+              </div>
               {submitError ? (
                 <p className="status-note status-note--error">{submitError}</p>
               ) : null}
-              <button type="submit" disabled={isSubmitting}>
+              <button type="submit" className="post-compose-submit" disabled={isSubmitting}>
                 {isSubmitting ? "Posting..." : "Post Reply"}
               </button>
             </form>
@@ -380,26 +381,64 @@ function PostShell({
 }) {
   return (
     <main className="post-shell">
-      <section className="post-window xp-window" aria-labelledby={labelledBy}>
-        <div className="xp-title-bar chat-titlebar">
-          <PodGlyph />
-          <span className="xp-title-text">{title}</span>
-          <div className="xp-title-controls" aria-hidden="true">
-            <span className="xp-title-btn xp-title-btn--min">_</span>
-            <span className="xp-title-btn xp-title-btn--max">[]</span>
-            <span className="xp-title-btn xp-title-btn--close">x</span>
+      <PostSceneBackground />
+      <div className="post-shell__content">
+        <section className="post-window xp-window post-window--animate" aria-labelledby={labelledBy}>
+          <div className="xp-title-bar chat-titlebar">
+            <PodGlyph />
+            <span className="xp-title-text">{title}</span>
+            <div className="xp-title-controls" aria-hidden="true">
+              <span className="xp-title-btn xp-title-btn--min">_</span>
+              <span className="xp-title-btn xp-title-btn--max">[]</span>
+              <span className="xp-title-btn xp-title-btn--close">x</span>
+            </div>
           </div>
-        </div>
-        <nav className="chat-menu" aria-label="Post stream menu">
-          <a href={chatHref}>Chat</a>
-          <a href={podsHref}>Pods</a>
-          <a href={postsHref}>Posts</a>
-          <a href={postsHref}>Sort</a>
-          <a href={podsHref}>Help</a>
-        </nav>
-        {children}
-      </section>
+          <nav className="chat-menu post-nav" aria-label="Post stream menu">
+            <a href={chatHref}>Chat</a>
+            <a href={podsHref}>Pods</a>
+            <a href={postsHref}>Posts</a>
+            <a href={postsHref}>Sort</a>
+            <a href={podsHref}>Help</a>
+          </nav>
+          {children}
+        </section>
+      </div>
     </main>
+  );
+}
+
+function PostSceneBackground() {
+  return (
+    <div className="app-background" aria-hidden="true">
+      <div className="sky" />
+      <div className="clouds">
+        <div className="cloud cloud-1" />
+        <div className="cloud cloud-2" />
+        <div className="cloud cloud-3" />
+        <div className="cloud cloud-4" />
+        <div className="cloud cloud-5" />
+      </div>
+      <svg
+        className="hills-svg"
+        viewBox="0 0 1000 500"
+        preserveAspectRatio="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <ellipse cx="650" cy="520" rx="620" ry="340" fill="#3d8e22" />
+        <ellipse cx="600" cy="540" rx="540" ry="300" fill="#4aa828" />
+        <ellipse cx="560" cy="530" rx="440" ry="260" fill="#5cb838" />
+        <ellipse cx="520" cy="510" rx="320" ry="190" fill="#6ebe44" opacity="0.7" />
+        <ellipse cx="500" cy="500" rx="200" ry="120" fill="#8cd960" opacity="0.45" />
+      </svg>
+      <div className="ground" />
+      <div className="bubbles">
+        <div className="bubble bubble-1" />
+        <div className="bubble bubble-2" />
+        <div className="bubble bubble-3" />
+        <div className="bubble bubble-4" />
+        <div className="bubble bubble-5" />
+      </div>
+    </div>
   );
 }
 
@@ -432,32 +471,38 @@ function ComposePanel({
     <aside className="post-compose-panel">
       <PanelHeader title="Create Post" />
       <form className="post-compose" onSubmit={onSubmit}>
-        <label>
-          <span>Type</span>
-          <select value={mode} onChange={(event) => onModeChange(event.target.value as "question" | "guide")}>
+        <div className="post-compose-field">
+          <span className="post-compose-label">Type</span>
+          <select
+            className="post-compose-input"
+            value={mode}
+            onChange={(event) => onModeChange(event.target.value as "question" | "guide")}
+          >
             <option value="question">Question</option>
             <option value="guide">Guide</option>
           </select>
-        </label>
-        <label>
-          <span>Title</span>
+        </div>
+        <div className="post-compose-field">
+          <span className="post-compose-label">Title</span>
           <input
+            className="post-compose-input"
             type="text"
             value={header}
             onChange={(event) => onHeaderChange(event.target.value)}
             placeholder="Share something with the room"
           />
-        </label>
-        <label>
-          <span>Post</span>
+        </div>
+        <div className="post-compose-field">
+          <span className="post-compose-label">Post</span>
           <textarea
+            className="post-compose-input"
             value={content}
             onChange={(event) => onContentChange(event.target.value)}
             placeholder="Ask a question, share a guide, or start a thread..."
           />
-        </label>
+        </div>
         {error ? <p className="status-note status-note--error">{error}</p> : null}
-        <button type="submit" disabled={isSubmitting}>
+        <button type="submit" className="post-compose-submit" disabled={isSubmitting}>
           {isSubmitting ? "Posting..." : `Post ${mode}`}
         </button>
       </form>

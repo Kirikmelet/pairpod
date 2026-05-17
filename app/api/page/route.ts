@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { findOrCreateDefaultRoom, findOrCreatePage, getPageBundle } from '@/lib/server/pages'
+import { loadOrCreatePageRoom } from '@/lib/server/pages'
 
 export async function GET(request: Request): Promise<Response> {
   const { searchParams } = new URL(request.url)
@@ -14,9 +14,7 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const page = await findOrCreatePage(url)
-    const room = await findOrCreateDefaultRoom(page.id)
-    const bundle = await getPageBundle(page.id, room.id)
+    const bundle = await loadOrCreatePageRoom(url)
 
     return NextResponse.json(
       {
