@@ -1,8 +1,8 @@
 import 'server-only'
 
 import { normalizeUrl } from '@/lib/server/helpers/normalizeUrl'
-import { supabaseAdmin } from '@/lib/server/supabaseAdmin'
 import type { UserProfileRow } from '@/lib/server/profile'
+import { getSupabaseAdmin } from '@/lib/server/supabaseAdmin'
 
 export type PageRow = {
   id: string
@@ -74,8 +74,9 @@ export async function loadOrCreatePageRoom(url: string): Promise<PageBundle> {
 
 export async function findOrCreatePage(url: string): Promise<PageRow> {
   const normalizedUrl = normalizeUrl(url)
+  const supabase = getSupabaseAdmin()
 
-  const { data: existingPage, error: existingPageError } = await supabaseAdmin
+  const { data: existingPage, error: existingPageError } = await supabase
     .from('pages')
     .select('*')
     .eq('normalized_url', normalizedUrl)
@@ -89,7 +90,7 @@ export async function findOrCreatePage(url: string): Promise<PageRow> {
     return existingPage
   }
 
-  const { data: createdPage, error: createError } = await supabaseAdmin
+  const { data: createdPage, error: createError } = await supabase
     .from('pages')
     .insert({
       normalized_url: normalizedUrl,
@@ -105,7 +106,9 @@ export async function findOrCreatePage(url: string): Promise<PageRow> {
 }
 
 export async function findOrCreateDefaultRoom(pageId: string): Promise<RoomRow> {
-  const { data: rooms, error: roomsError } = await supabaseAdmin
+  const supabase = getSupabaseAdmin()
+
+  const { data: rooms, error: roomsError } = await supabase
     .from('rooms')
     .select('*')
     .eq('page_id', pageId)
@@ -122,7 +125,7 @@ export async function findOrCreateDefaultRoom(pageId: string): Promise<RoomRow> 
     return existingRoom
   }
 
-  const { data: createdRoom, error: createError } = await supabaseAdmin
+  const { data: createdRoom, error: createError } = await supabase
     .from('rooms')
     .insert({
       page_id: pageId,
@@ -138,10 +141,12 @@ export async function findOrCreateDefaultRoom(pageId: string): Promise<RoomRow> 
 }
 
 export async function getPageBundle(pageId: string, roomId: string): Promise<PageBundle> {
+  const supabase = getSupabaseAdmin()
+
   const [pageResult, roomResult, postsResult] = await Promise.all([
-    supabaseAdmin.from('pages').select('*').eq('id', pageId).single<PageRow>(),
-    supabaseAdmin.from('rooms').select('*').eq('id', roomId).single<RoomRow>(),
-    supabaseAdmin
+    supabase.from('pages').select('*').eq('id', pageId).single<PageRow>(),
+    supabase.from('rooms').select('*').eq('id', roomId).single<RoomRow>(),
+    supabase
       .from('posts')
       .select('*')
       .eq('room_id', roomId)
@@ -167,7 +172,7 @@ export async function getPageBundle(pageId: string, roomId: string): Promise<Pag
   let comments: CommentRow[] = []
 
   if (postIds.length > 0) {
-    const { data: commentsData, error: commentsError } = await supabaseAdmin
+    const { data: commentsData, error: commentsError } = await supabase
       .from('comments')
       .select('*')
       .in('post_id', postIds)
@@ -219,7 +224,8 @@ async function getAuthorProfilesById(userIds: string[]): Promise<Map<string, Aut
     return new Map<string, AuthorProfile>()
   }
 
-  const { data, error } = await supabaseAdmin
+  const supabase = getSupabaseAdmin()
+  const { data, error } = await supabase
     .from('users')
     .select('id, username, display_name, avatar_url')
     .in('id', uniqueUserIds)
@@ -255,7 +261,8 @@ async function loadProfilesById(userIds: string[]): Promise<UserProfileRow[]> {
     return []
   }
 
-  const { data, error } = await supabaseAdmin
+  const supabase = getSupabaseAdmin()
+  const { data, error } = await supabase
     .from('users')
     .select(USER_PROFILE_COLUMNS)
     .in('id', uniqueUserIds)

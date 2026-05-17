@@ -89,7 +89,7 @@ type UsePageBundleResult = {
   roomScope: "global" | "domain";
   loading: boolean;
   error: string | null;
-  refresh: () => Promise<PageBundle | null>;
+  refresh: (options?: { silent?: boolean }) => Promise<PageBundle | null>;
   buildScopedHref: (pathname: string) => string;
   buildRoomHref: (pathname: string, scope: "global" | "domain") => string;
 };
@@ -108,6 +108,22 @@ type MutableUsersTable = {
     value: Partial<UserProfileRecord> & { id: string },
     options?: { onConflict?: string },
   ): Promise<{ data: unknown; error: Error | null }>;
+};
+
+type VoteRow = {
+  id: string;
+  likes: number;
+};
+
+type VoteRpcClient = {
+  rpc(
+    fn: "increment_post_likes",
+    args: { p_post_id: string; p_delta: number },
+  ): Promise<{ data: VoteRow[] | null; error: Error | null }>;
+  rpc(
+    fn: "increment_comment_likes",
+    args: { p_comment_id: string; p_delta: number },
+  ): Promise<{ data: VoteRow[] | null; error: Error | null }>;
 };
 
 const USER_PROFILE_COLUMNS =
@@ -214,11 +230,6 @@ export async function postJson<TResponse>(
 }
 
 export async function updatePostLikes(post: PostRecord, delta: 1 | -1) {
-  if (!isExtensionRuntime()) {
-    await updateVoteThroughApi("post", post.id, delta);
-    return;
-  }
-
   try {
     await updatePostLikesDirect(post, delta);
   } catch (error) {
@@ -228,28 +239,22 @@ export async function updatePostLikes(post: PostRecord, delta: 1 | -1) {
 
 async function updatePostLikesDirect(post: PostRecord, delta: 1 | -1) {
   const supabase = createClient();
-  const { data: existingPosts, error: loadError } = await supabase
-    .from("posts")
-    .select("id,likes")
-    .eq("id", post.id)
-    .limit(1);
+  await updatePostLikesViaRpc(
+    supabase as unknown as VoteRpcClient,
+    post.id,
+    delta,
+  );
+}
 
-  if (loadError) {
-    throw loadError;
-  }
-
-  const existingPost = existingPosts?.[0];
-  if (!existingPost) {
-    throw new Error("Could not find post to vote on.");
-  }
-
-  const nextLikes = Math.max(0, existingPost.likes + delta);
-  const { data, error } = await supabase
-    .from("posts")
-    .update({ likes: nextLikes })
-    .eq("id", post.id)
-    .select("id,likes")
-    .limit(1);
+async function updatePostLikesViaRpc(
+  supabase: VoteRpcClient,
+  postId: string,
+  delta: 1 | -1,
+) {
+  const { data, error } = await supabase.rpc("increment_post_likes", {
+    p_post_id: postId,
+    p_delta: delta,
+  });
 
   if (error) {
     throw error;
@@ -261,11 +266,6 @@ async function updatePostLikesDirect(post: PostRecord, delta: 1 | -1) {
 }
 
 export async function updateCommentLikes(comment: CommentRecord, delta: 1 | -1) {
-  if (!isExtensionRuntime()) {
-    await updateVoteThroughApi("comment", comment.id, delta);
-    return;
-  }
-
   try {
     await updateCommentLikesDirect(comment, delta);
   } catch (error) {
@@ -275,28 +275,22 @@ export async function updateCommentLikes(comment: CommentRecord, delta: 1 | -1) 
 
 async function updateCommentLikesDirect(comment: CommentRecord, delta: 1 | -1) {
   const supabase = createClient();
-  const { data: existingComments, error: loadError } = await supabase
-    .from("comments")
-    .select("id,likes")
-    .eq("id", comment.id)
-    .limit(1);
+  await updateCommentLikesViaRpc(
+    supabase as unknown as VoteRpcClient,
+    comment.id,
+    delta,
+  );
+}
 
-  if (loadError) {
-    throw loadError;
-  }
-
-  const existingComment = existingComments?.[0];
-  if (!existingComment) {
-    throw new Error("Could not find comment to vote on.");
-  }
-
-  const nextLikes = Math.max(0, existingComment.likes + delta);
-  const { data, error } = await supabase
-    .from("comments")
-    .update({ likes: nextLikes })
-    .eq("id", comment.id)
-    .select("id,likes")
-    .limit(1);
+async function updateCommentLikesViaRpc(
+  supabase: VoteRpcClient,
+  commentId: string,
+  delta: 1 | -1,
+) {
+  const { data, error } = await supabase.rpc("increment_comment_likes", {
+    p_comment_id: commentId,
+    p_delta: delta,
+  });
 
   if (error) {
     throw error;
@@ -313,20 +307,13 @@ async function updateVoteThroughApi(
   delta: 1 | -1,
   directError?: unknown,
 ) {
-  if (!isExtensionRuntime()) {
-    await postJson("/api/votes", {
-      target,
-      id,
-      delta,
-    });
-    return;
-  }
-
-  const remoteVotesUrl = getRemoteApiUrl("/api/votes");
-  if (!remoteVotesUrl) {
-    throw directError instanceof Error
-      ? directError
-      : new Error("Could not update vote.");
+  const votesUrl = isExtensionRuntime() ? getRemoteApiUrl("/api/votes") : "/api/votes";
+  if (!votesUrl) {
+    const directMessage =
+      directError instanceof Error ? ` Supabase said: ${directError.message}` : "";
+    throw new Error(
+      `Could not update vote from the extension. Apply the increment_post_likes and increment_comment_likes functions from supabase/schema.sql to Supabase, or set NEXT_PUBLIC_SITE_URL to your running web app before building the extension.${directMessage}`,
+    );
   }
 
   const supabase = createClient();
@@ -343,7 +330,7 @@ async function updateVoteThroughApi(
     throw new Error("You must be signed in to vote.");
   }
 
-  const response = await fetch(remoteVotesUrl, {
+  const response = await fetch(votesUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${session.access_token}`,
@@ -364,8 +351,7 @@ async function updateVoteThroughApi(
 }
 
 function getRemoteApiUrl(pathname: string) {
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 
   if (!siteUrl) {
     return null;
@@ -373,6 +359,10 @@ function getRemoteApiUrl(pathname: string) {
 
   const url = new URL(pathname, siteUrl.endsWith("/") ? siteUrl : `${siteUrl}/`);
   return url.toString();
+}
+
+function hasConfiguredRemoteApiUrl() {
+  return Boolean(process.env.NEXT_PUBLIC_SITE_URL?.trim());
 }
 
 export function usePageBundle(): UsePageBundleResult {
@@ -400,8 +390,10 @@ export function usePageBundle(): UsePageBundleResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -435,13 +427,70 @@ export function usePageBundle(): UsePageBundleResult {
       setBundle(null);
       return null;
     } finally {
-      setLoading(false);
+      if (!options?.silent) {
+        setLoading(false);
+      }
     }
   }, [currentTitle, currentUrl, roomScope]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const roomId = bundle?.room.id;
+    if (!roomId) {
+      return;
+    }
+
+    const supabase = createClient();
+    let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+
+      refreshTimeout = setTimeout(() => {
+        void refresh({ silent: true });
+      }, 250);
+    };
+
+    const channel = supabase
+      .channel(`page-bundle:${roomId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "posts",
+          filter: `room_id=eq.${roomId}`,
+        },
+        scheduleRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "comments",
+        },
+        scheduleRefresh,
+      )
+      .subscribe();
+
+    const pollInterval = setInterval(() => {
+      void refresh({ silent: true });
+    }, 15000);
+
+    return () => {
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+      clearInterval(pollInterval);
+      void supabase.removeChannel(channel);
+    };
+  }, [bundle?.room.id, refresh]);
 
   const commentsByPost = useMemo(() => {
     const next: Record<string, CommentRecord[]> = {};

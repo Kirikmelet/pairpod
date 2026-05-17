@@ -27,6 +27,7 @@ type ExtensionRuntime = {
 export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const refreshUser = useCallback(async () => {
     const supabase = createClient();
@@ -37,6 +38,7 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
       return;
     }
 
+    setAuthError(null);
     setUser(data.user);
   }, []);
 
@@ -70,6 +72,7 @@ export function HomePage({ variant = "page", onOpenApp }: HomePageProps) {
       .catch(() => {
         if (isMounted) {
           setUser(null);
+          setAuthError("Could not complete sign in. Please try again.");
         }
       })
       .finally(() => {
