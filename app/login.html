@@ -215,8 +215,8 @@
         registerTab.setAttribute('aria-selected', String(isRegistering));
         submitButton.textContent = isRegistering ? 'Create Account' : 'Sign In';
       }
-      signInTab.addEventListener('click', () => setMode('signin'));
-      registerTab.addEventListener('click', () => setMode('register'));
+      signInTab?.addEventListener('click', () => setMode('signin'));
+      registerTab?.addEventListener('click', () => setMode('register'));
  
       // ── Session persistence ──
       function saveSession(session) {
@@ -304,14 +304,14 @@
       }
  
       // ── Google OAuth ──
-      googleBtn.addEventListener('click', (e) => {
+      googleBtn?.addEventListener('click', (e) => {
         e.preventDefault();
         const redirectTo = encodeURIComponent(window.location.origin + window.location.pathname);
         window.location.href = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${redirectTo}`;
       });
  
       // ── Form submit ──
-      authForm.addEventListener('submit', async (e) => {
+      authForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = emailInput.value.trim();
         const password = passwordInput.value;
@@ -363,7 +363,7 @@
       });
  
       // ── Logout button ──
-      logoutBtn.addEventListener('click', () => {
+      logoutBtn?.addEventListener('click', () => {
         const session = loadSession();
         signOut(session?.access_token);
       });
