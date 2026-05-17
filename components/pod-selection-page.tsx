@@ -6,6 +6,7 @@ import {
   type PageBundle,
   usePageBundle,
 } from "@/lib/client/page-api";
+import { createClient } from "@/utils/supabase/client";
 
 type Activity = {
   domain: string;
@@ -16,9 +17,10 @@ type Activity = {
 
 type PodSelectionPageProps = {
   userEmail?: string | null;
+  onSignOut?: () => void;
 };
 
-export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
+export function PodSelectionPage({ userEmail = null, onSignOut }: PodSelectionPageProps) {
   const { bundle, loading, error, buildScopedHref, currentUrl } = usePageBundle();
 
   const posts = bundle?.posts ?? [];
@@ -144,7 +146,7 @@ export function PodSelectionPage({ userEmail = null }: PodSelectionPageProps) {
             </section>
 
             <aside className="pod-sidebar" aria-label="Pod activity">
-              <UserTile email={userEmail} />
+              <UserTile email={userEmail} onSignOut={onSignOut} />
               <ActivityPanel title="Recent Posts" actionLabel="Open posts" href={buildScopedHref("/posts")} items={recentPosts} />
               <ActivityPanel title="Recent Comments" actionLabel="Open chat" href={buildScopedHref("/chat")} items={recentComments} />
               <ActivityPanel title="Past Pod Activity" actionLabel="Refresh context" href={buildScopedHref("/")} items={history} compact />
@@ -243,7 +245,17 @@ function ActivityPanel({
   );
 }
 
-function UserTile({ email }: { email: string | null }) {
+function UserTile({ email, onSignOut }: { email: string | null; onSignOut?: () => void }) {
+  const handleSignOut = async () => {
+    if (onSignOut) {
+      onSignOut();
+      return;
+    }
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  };
+
   return (
     <section className="pod-user-tile" aria-label="Current user">
       <span className="pod-user-avatar" aria-hidden="true">
@@ -255,8 +267,14 @@ function UserTile({ email }: { email: string | null }) {
           <span className="live-dot" /> Online
         </p>
       </div>
-      <button className="pod-user-menu" type="button" aria-label="Open user menu">
-        <span aria-hidden="true">v</span>
+      <button
+        className="pod-user-menu pod-user-signout"
+        type="button"
+        aria-label="Sign out"
+        onClick={() => void handleSignOut()}
+        title="Sign out"
+      >
+        <span aria-hidden="true">↩</span>
       </button>
     </section>
   );
