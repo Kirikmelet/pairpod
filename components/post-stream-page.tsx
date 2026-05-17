@@ -16,6 +16,108 @@ import {
 } from "@/lib/client/page-api";
 
 /* ------------------------------------------------------------------ */
+/*  Supabase config (matches login page)                               */
+/* ------------------------------------------------------------------ */
+
+const SUPABASE_URL = "https://xgfgqzveuyeceupfaebh.supabase.co";
+const SUPABASE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnZmdxenZldXllY2V1cGZhZWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NDQ1OTAsImV4cCI6MjA5NDUyMDU5MH0.FLAZt7GXlRorlOBt-n0uYVAP4Ls_bTWQ8aD4w_hDzYE";
+
+function supabaseHeaders(accessToken?: string) {
+  const h: Record<string, string> = {
+    "Content-Type": "application/json",
+    apikey: SUPABASE_KEY,
+  };
+  if (accessToken) h["Authorization"] = `Bearer ${accessToken}`;
+  return h;
+}
+
+function getSessionToken(): string | null {
+  try {
+    const session = JSON.parse(localStorage.getItem("uh_session") ?? "null");
+    return session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getSessionUserId(): string | null {
+  try {
+    const session = JSON.parse(localStorage.getItem("uh_session") ?? "null");
+    return session?.user?.id ?? session?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function generateUUID(): string {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Direct Supabase insert helpers                                     */
+/* ------------------------------------------------------------------ */
+
+async function insertPost(payload: {
+  id: string;
+  room_id: string;
+  type: string;
+  section_id: string;
+  header: string | null;
+  content: string;
+  likes: number;
+  user_id: string;
+  created_at: string;
+}) {
+  const token = getSessionToken();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/posts`, {
+    method: "POST",
+    headers: {
+      ...supabaseHeaders(token ?? undefined),
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "Failed to create post");
+  }
+
+  return res.json();
+}
+
+async function insertComment(payload: {
+  id: string;
+  post_id: string;
+  content: string;
+  likes: number;
+  user_id: string;
+  reply_id: string | null;
+  created_at: string;
+}) {
+  const token = getSessionToken();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/comments`, {
+    method: "POST",
+    headers: {
+      ...supabaseHeaders(token ?? undefined),
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "Failed to create comment");
+  }
+
+  return res.json();
+}
+
+/* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -88,11 +190,15 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
 
   /* -- handlers ---------------------------------------------------- */
   const handleSubmit = async (event: FormEvent) => {
-    const endpoint = mode === "question" ? "/api/questions" : "/api/guides";
-
     event.preventDefault();
 
     if (!bundle || !content.trim()) {
+      return;
+    }
+
+    const userId = getSessionUserId();
+    if (!userId) {
+      setSubmitError("You must be signed in to post.");
       return;
     }
 
@@ -100,23 +206,18 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
     setSubmitError(null);
 
     try {
+      const now = new Date().toISOString();
 
-      await postJson(endpoint, {
-        /* DB column: room_id (uuid) */
-        roomId: bundle.room.id,
-        /* used by API to resolve room_id / context */
-        pageId: bundle.page.id,
-        /* DB column: type (text) — "question" | "guide" */
+      await insertPost({
+        id: generateUUID(),
+        room_id: bundle.room.id,
         type: mode,
-        /* DB column: section_id (text) */
         section_id: sectionId,
-        /* DB column: header (text) */
         header: header.trim() || null,
-        /* DB column: content (text) */
         content: content.trim(),
-        /* DB column: likes (int4) — default 0 on creation */
         likes: 0,
-        /* DB columns id, user_id, created_at are set server-side */
+        user_id: userId,
+        created_at: now,
       });
 
       setHeader("");
@@ -136,7 +237,7 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
 
   const handlePostVote = async (post: PostRecord, delta: 1 | -1) => {
     setVoteError(null);
-    if (currentPostVotesById[post.id] === delta) {
+    if (currentPostVotesById?.[post.id] === delta) {
       setVoteError(
         delta === 1
           ? "You already upvoted this post."
@@ -273,7 +374,7 @@ export function PostStreamPage({ variant = "page" }: PostStreamPageProps) {
                   key={post.id}
                   post={post}
                   tone={pickTone(index)}
-                  voteValue={currentPostVotesById[post.id] ?? null}
+                  voteValue={currentPostVotesById?.[post.id] ?? null}
                   commentCount={getCommentCount(commentsByPost, post.id)}
                   usersById={usersById}
                   chatHref={buildScopedHref("/chat")}
@@ -399,7 +500,6 @@ export function PostDetailPage({ postId }: { postId: string }) {
   const domainName = getRoomDisplayName(domainUrl);
 
   const [content, setContent] = useState("");
-  const [showReplyComposer, setShowReplyComposer] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
@@ -435,23 +535,29 @@ export function PostDetailPage({ postId }: { postId: string }) {
       return;
     }
 
+    const userId = getSessionUserId();
+    if (!userId) {
+      setSubmitError("You must be signed in to post.");
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
-      await postJson("/api/answers", {
-        /* parent post reference */
-        postId: post.id,
-        /* DB column: content (text) */
+      const now = new Date().toISOString();
+
+      await insertComment({
+        id: generateUUID(),
+        post_id: post.id,
         content: content.trim(),
-        /* DB column: likes (int4) — default 0 */
         likes: 0,
-        /* top-level comment — no parent reply */
+        user_id: userId,
         reply_id: null,
+        created_at: now,
       });
 
       setContent("");
-      setShowReplyComposer(false);
       await refresh({ silent: true });
     } catch (createError) {
       setSubmitError(
@@ -466,7 +572,7 @@ export function PostDetailPage({ postId }: { postId: string }) {
 
   const handlePostVote = async (postToUpdate: PostRecord, delta: 1 | -1) => {
     setVoteError(null);
-    if (currentPostVotesById[postToUpdate.id] === delta) {
+    if (currentPostVotesById?.[postToUpdate.id] === delta) {
       setVoteError(
         delta === 1
           ? "You already upvoted this post."
@@ -530,12 +636,9 @@ export function PostDetailPage({ postId }: { postId: string }) {
       return;
     }
 
-    setShowReplyComposer(true);
-    window.requestAnimationFrame(() => {
-      document.getElementById("post-reply-form")?.scrollIntoView({
-        block: "center",
-        behavior: "smooth",
-      });
+    document.getElementById("post-reply-form")?.scrollIntoView({
+      block: "start",
+      behavior: "smooth",
     });
   };
 
@@ -551,8 +654,8 @@ export function PostDetailPage({ postId }: { postId: string }) {
             <div className="post-votes">
               <button
                 type="button"
-                aria-pressed={currentPostVotesById[post.id] === 1}
-                disabled={currentPostVotesById[post.id] === 1}
+                aria-pressed={currentPostVotesById?.[post.id] === 1}
+                disabled={currentPostVotesById?.[post.id] === 1}
                 onClick={() => void handlePostVote(post, 1)}
               >
                 +
@@ -560,8 +663,8 @@ export function PostDetailPage({ postId }: { postId: string }) {
               <strong>{post.likes}</strong>
               <button
                 type="button"
-                aria-pressed={currentPostVotesById[post.id] === -1}
-                disabled={currentPostVotesById[post.id] === -1}
+                aria-pressed={currentPostVotesById?.[post.id] === -1}
+                disabled={currentPostVotesById?.[post.id] === -1}
                 onClick={() => void handlePostVote(post, -1)}
               >
                 -
@@ -624,72 +727,43 @@ export function PostDetailPage({ postId }: { postId: string }) {
                     <header>
                       <h2>No answers yet</h2>
                     </header>
-                    <p>Be the first to reply to this thread.</p>
-                    <button
-                      className="post-reply-btn post-reply-btn--inline"
-                      type="button"
-                      onClick={scrollToReplyForm}
-                    >
-                      Write reply
-                    </button>
+                    <p>Reply to this thread using the form below.</p>
                   </div>
                 </article>
               )}
             </div>
 
-            {showReplyComposer ? (
-              <form
-                id="post-reply-form"
-                className="post-compose post-compose--reply"
-                onSubmit={(event) => void handleSubmit(event)}
-              >
-                <div className="post-compose-field">
-                  <span className="post-compose-label">Reply to thread</span>
-                  <textarea
-                    className="post-compose-input"
-                    value={content}
-                    onChange={(event) => setContent(event.target.value)}
-                    placeholder="Write an answer or comment..."
-                    rows={4}
-                  />
-                </div>
+            {/* ---------- reply form ---------- */}
+            <form
+              id="post-reply-form"
+              className="post-compose"
+              onSubmit={(event) => void handleSubmit(event)}
+            >
+              <div className="post-compose-field">
+                <span className="post-compose-label">Reply</span>
+                <textarea
+                  className="post-compose-input"
+                  value={content}
+                  onChange={(event) => setContent(event.target.value)}
+                  placeholder="Write an answer or comment..."
+                />
+              </div>
 
-                {submitError ? (
-                  <p className="status-note status-note--error">{submitError}</p>
-                ) : null}
-                {voteError ? (
-                  <p className="status-note status-note--error">{voteError}</p>
-                ) : null}
+              {submitError ? (
+                <p className="status-note status-note--error">{submitError}</p>
+              ) : null}
+              {voteError ? (
+                <p className="status-note status-note--error">{voteError}</p>
+              ) : null}
 
-                <div className="post-reply-actions">
-                  <button
-                    type="button"
-                    className="post-reply-cancel"
-                    onClick={() => {
-                      setShowReplyComposer(false);
-                      setSubmitError(null);
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="post-compose-submit"
-                    disabled={isSubmitting || !content.trim()}
-                  >
-                    {isSubmitting ? "Posting..." : "Post Reply"}
-                  </button>
-                </div>
-              </form>
-            ) : (
               <button
-                type="button"
-                className="post-reply-open"
-                onClick={() => setShowReplyComposer(true)}
+                type="submit"
+                className="post-compose-submit"
+                disabled={isSubmitting || !content.trim()}
               >
-                Write a reply
+                {isSubmitting ? "Posting..." : "Post Reply"}
               </button>
-            )}
+            </form>
           </section>
         </section>
 
@@ -990,15 +1064,26 @@ function CommentCard({
     event.preventDefault();
     if (!replyContent.trim()) return;
 
+    const userId = getSessionUserId();
+    if (!userId) {
+      setReplyError("You must be signed in to reply.");
+      return;
+    }
+
     setIsSubmitting(true);
     setReplyError(null);
 
     try {
-      await postJson("/api/answers", {
-        postId,
+      const now = new Date().toISOString();
+
+      await insertComment({
+        id: generateUUID(),
+        post_id: postId,
         content: replyContent.trim(),
-        replyId: comment.id,
         likes: 0,
+        user_id: userId,
+        reply_id: comment.id,
+        created_at: now,
       });
 
       setReplyContent("");
@@ -1018,7 +1103,7 @@ function CommentCard({
     delta: 1 | -1,
   ) => {
     setVoteError(null);
-    if (currentCommentVotesById[commentToUpdate.id] === delta) {
+    if (currentCommentVotesById?.[commentToUpdate.id] === delta) {
       setVoteError(
         delta === 1
           ? "You already liked this reply."
@@ -1061,8 +1146,8 @@ function CommentCard({
         <div className="post-comment__votes" aria-label="Comment votes">
           <button
             type="button"
-            aria-pressed={currentCommentVotesById[comment.id] === 1}
-            disabled={currentCommentVotesById[comment.id] === 1}
+            aria-pressed={currentCommentVotesById?.[comment.id] === 1}
+            disabled={currentCommentVotesById?.[comment.id] === 1}
             onClick={() => void handleCommentVote(comment, 1)}
           >
             Like
@@ -1070,8 +1155,8 @@ function CommentCard({
           <strong>{comment.likes}</strong>
           <button
             type="button"
-            aria-pressed={currentCommentVotesById[comment.id] === -1}
-            disabled={currentCommentVotesById[comment.id] === -1}
+            aria-pressed={currentCommentVotesById?.[comment.id] === -1}
+            disabled={currentCommentVotesById?.[comment.id] === -1}
             onClick={() => void handleCommentVote(comment, -1)}
           >
             Dislike
@@ -1151,8 +1236,8 @@ function CommentCard({
                   >
                     <button
                       type="button"
-                      aria-pressed={currentCommentVotesById[reply.id] === 1}
-                      disabled={currentCommentVotesById[reply.id] === 1}
+                      aria-pressed={currentCommentVotesById?.[reply.id] === 1}
+                      disabled={currentCommentVotesById?.[reply.id] === 1}
                       onClick={() => void handleCommentVote(reply, 1)}
                     >
                       Like
@@ -1160,8 +1245,8 @@ function CommentCard({
                     <strong>{reply.likes}</strong>
                     <button
                       type="button"
-                      aria-pressed={currentCommentVotesById[reply.id] === -1}
-                      disabled={currentCommentVotesById[reply.id] === -1}
+                      aria-pressed={currentCommentVotesById?.[reply.id] === -1}
+                      disabled={currentCommentVotesById?.[reply.id] === -1}
                       onClick={() => void handleCommentVote(reply, -1)}
                     >
                       Dislike
