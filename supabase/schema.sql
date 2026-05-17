@@ -1,6 +1,9 @@
 create extension if not exists pgcrypto;
 
 drop table if exists events;
+drop table if exists dm_messages;
+drop table if exists dm_thread_members;
+drop table if exists dm_threads;
 drop table if exists comments;
 drop table if exists posts;
 drop table if exists accessibility_notes;
@@ -99,12 +102,37 @@ create table if not exists events (
   created_at timestamptz not null default now()
 );
 
+create table if not exists dm_threads (
+  id uuid primary key default gen_random_uuid(),
+  created_by uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists dm_thread_members (
+  thread_id uuid not null references dm_threads(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (thread_id, user_id)
+);
+
+create table if not exists dm_messages (
+  id uuid primary key default gen_random_uuid(),
+  thread_id uuid not null references dm_threads(id) on delete cascade,
+  sender_id uuid references users(id) on delete set null,
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
 alter table users enable row level security;
 alter table pages enable row level security;
 alter table rooms enable row level security;
 alter table posts enable row level security;
 alter table comments enable row level security;
 alter table events enable row level security;
+alter table dm_threads enable row level security;
+alter table dm_thread_members enable row level security;
+alter table dm_messages enable row level security;
 
 create index if not exists idx_rooms_page_id on rooms(page_id);
 create index if not exists idx_posts_room_id on posts(room_id);
@@ -118,6 +146,10 @@ create index if not exists idx_events_room_id on events(room_id);
 create index if not exists idx_events_post_id on events(post_id);
 create index if not exists idx_events_comment_id on events(comment_id);
 create index if not exists idx_events_event_type on events(event_type);
+create index if not exists idx_dm_thread_members_user_id on dm_thread_members(user_id);
+create index if not exists idx_dm_messages_thread_id on dm_messages(thread_id);
+create index if not exists idx_dm_messages_sender_id on dm_messages(sender_id);
+create index if not exists idx_dm_messages_created_at on dm_messages(created_at);
 create index if not exists idx_users_auth_user_id on users(auth_user_id);
 create index if not exists idx_users_username on users(username);
 create unique index if not exists users_auth_user_id_unique_idx on users(auth_user_id) where auth_user_id is not null;
@@ -211,6 +243,9 @@ grant select, insert, update, delete on table rooms to authenticated;
 grant select, insert, update, delete on table posts to authenticated;
 grant select, insert, update, delete on table comments to authenticated;
 grant select, insert, update, delete on table events to authenticated;
+grant select, insert, update on table dm_threads to authenticated;
+grant select, insert on table dm_thread_members to authenticated;
+grant select, insert on table dm_messages to authenticated;
 
 drop policy if exists "authenticated users can read users" on users;
 drop policy if exists "authenticated users can write users" on users;
@@ -224,6 +259,13 @@ drop policy if exists "authenticated users can read comments" on comments;
 drop policy if exists "authenticated users can write comments" on comments;
 drop policy if exists "authenticated users can read events" on events;
 drop policy if exists "authenticated users can write events" on events;
+drop policy if exists "authenticated members can read dm_threads" on dm_threads;
+drop policy if exists "authenticated users can create dm_threads" on dm_threads;
+drop policy if exists "authenticated members can update dm_threads" on dm_threads;
+drop policy if exists "authenticated members can read dm_thread_members" on dm_thread_members;
+drop policy if exists "thread creators can insert dm_thread_members" on dm_thread_members;
+drop policy if exists "authenticated members can read dm_messages" on dm_messages;
+drop policy if exists "authenticated members can insert dm_messages" on dm_messages;
 
 create policy "authenticated users can read users"
   on users for select
@@ -290,3 +332,103 @@ create policy "authenticated users can write events"
   to authenticated
   using (true)
   with check (true);
+
+create policy "authenticated members can read dm_threads"
+  on dm_threads for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from dm_thread_members m
+      join users u on u.id = m.user_id
+      where m.thread_id = dm_threads.id
+        and u.auth_user_id = auth.uid()
+    )
+  );
+
+create policy "authenticated users can create dm_threads"
+  on dm_threads for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from users u
+      where u.id = dm_threads.created_by
+        and u.auth_user_id = auth.uid()
+    )
+  );
+
+create policy "authenticated members can update dm_threads"
+  on dm_threads for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from dm_thread_members m
+      join users u on u.id = m.user_id
+      where m.thread_id = dm_threads.id
+        and u.auth_user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from dm_thread_members m
+      join users u on u.id = m.user_id
+      where m.thread_id = dm_threads.id
+        and u.auth_user_id = auth.uid()
+    )
+  );
+
+create policy "authenticated members can read dm_thread_members"
+  on dm_thread_members for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from dm_thread_members self_member
+      join users u on u.id = self_member.user_id
+      where self_member.thread_id = dm_thread_members.thread_id
+        and u.auth_user_id = auth.uid()
+    )
+  );
+
+create policy "thread creators can insert dm_thread_members"
+  on dm_thread_members for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from dm_threads t
+      join users u on u.id = t.created_by
+      where t.id = dm_thread_members.thread_id
+        and u.auth_user_id = auth.uid()
+    )
+  );
+
+create policy "authenticated members can read dm_messages"
+  on dm_messages for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from dm_thread_members m
+      join users u on u.id = m.user_id
+      where m.thread_id = dm_messages.thread_id
+        and u.auth_user_id = auth.uid()
+    )
+  );
+
+create policy "authenticated members can insert dm_messages"
+  on dm_messages for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from users sender
+      join dm_thread_members m on m.user_id = sender.id
+      where sender.id = dm_messages.sender_id
+        and sender.auth_user_id = auth.uid()
+        and m.thread_id = dm_messages.thread_id
+    )
+  );
