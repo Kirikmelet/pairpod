@@ -780,3 +780,586 @@ body {
 .extension-app .dm-message {
   max-width: 92%;
 }
+
+/* ═══════════════════════════════════════════════════
+   PAIRPOD EXTENSION — RETRO ANIMATION SUITE
+   Y2K / Frutiger Aero interactive polish
+   ═══════════════════════════════════════════════════ */
+
+/* ── Keyframes ────────────────────────────────────── */
+
+@keyframes ext-card-lift {
+  to { transform: translateY(-5px) scale(1.012); box-shadow: 0 8px 28px rgba(0,90,200,0.22), inset 0 1px 0 rgba(255,255,255,0.92); }
+}
+@keyframes ext-card-settle {
+  to { transform: translateY(0) scale(1); }
+}
+@keyframes ext-card-press {
+  0%   { transform: translateY(0)   scale(1) }
+  40%  { transform: translateY(3px) scale(0.97) }
+  100% { transform: translateY(0)   scale(1) }
+}
+
+@keyframes ext-input-glow {
+  0%, 100% { box-shadow: var(--shadow-inset), 0 0 0   rgba(56,152,255,0); }
+  50%       { box-shadow: var(--shadow-inset), 0 0 10px rgba(56,152,255,0.42); }
+}
+
+@keyframes ext-aqua-pulse {
+  0%, 100% { box-shadow: 0 0 0   4px rgba(56,200,255,0); }
+  50%       { box-shadow: 0 0 0  10px rgba(56,200,255,0.28); }
+}
+
+@keyframes ext-nav-bg-slide {
+  from { background-position: 100% 0; }
+  to   { background-position:   0% 0; }
+}
+
+@keyframes ext-underline-grow {
+  from { transform: scaleX(0); opacity: 0.7; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+
+@keyframes ext-user-bar-in {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ext-badge-jiggle {
+  0%, 100% { transform: rotate(0deg)   scale(1); }
+  20%       { transform: rotate(-12deg) scale(1.18); }
+  40%       { transform: rotate(10deg)  scale(1.12); }
+  60%       { transform: rotate(-6deg)  scale(1.06); }
+  80%       { transform: rotate(4deg)   scale(1.02); }
+}
+
+@keyframes ext-avatar-ring {
+  0%   { box-shadow: 0 0 0 0   rgba(56,152,255,0.72); }
+  70%  { box-shadow: 0 0 0 6px rgba(56,152,255,0); }
+  100% { box-shadow: 0 0 0 0   rgba(56,152,255,0); }
+}
+
+@keyframes ext-dot-breathe {
+  0%, 100% { opacity: 1;    transform: scale(1); }
+  50%       { opacity: 0.55; transform: scale(0.7); }
+}
+
+@keyframes ext-live-dot-glow {
+  0%, 100% { box-shadow: 0 0 0 0   rgba(72,220,80,0.8); }
+  50%       { box-shadow: 0 0 0 5px rgba(72,220,80,0); }
+}
+
+@keyframes ext-xp-close-shake {
+  0%,100% { transform: rotate(0deg) }
+  20%     { transform: rotate(-8deg) scale(1.1) }
+  40%     { transform: rotate(8deg)  scale(1.15) }
+  60%     { transform: rotate(-5deg) }
+  80%     { transform: rotate(4deg) }
+}
+
+@keyframes ext-xp-disabled-tease {
+  0%,100% { opacity: 0.62; filter: grayscale(0.35) brightness(0.92); }
+  50%      { opacity: 0.80; filter: grayscale(0)    brightness(1.05); }
+}
+
+@keyframes ext-arrow-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes ext-rainbow-shift {
+  0%   { filter: hue-rotate(0deg)   brightness(1.05); }
+  50%  { filter: hue-rotate(180deg) brightness(1.12); }
+  100% { filter: hue-rotate(360deg) brightness(1.05); }
+}
+
+@keyframes ext-scanline {
+  from { background-position: 0 0; }
+  to   { background-position: 0 100%; }
+}
+
+@keyframes ext-ripple {
+  from { transform: scale(0); opacity: 0.55; }
+  to   { transform: scale(2.8); opacity: 0; }
+}
+
+@keyframes ext-message-in-right {
+  from { opacity: 0; transform: translateX(18px) scale(0.96); }
+  to   { opacity: 1; transform: translateX(0)    scale(1); }
+}
+@keyframes ext-message-in-left {
+  from { opacity: 0; transform: translateX(-18px) scale(0.96); }
+  to   { opacity: 1; transform: translateX(0)     scale(1); }
+}
+
+@keyframes ext-pop-in {
+  from { opacity: 0; transform: scale(0.88) translateY(6px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+@keyframes ext-logo-float {
+  0%, 100% { transform: translateY(0)   rotate(-1deg); }
+  50%       { transform: translateY(-4px) rotate(1deg); }
+}
+
+@keyframes ext-glow-border-pulse {
+  0%, 100% { border-color: rgba(80,120,190,0.36); }
+  50%       { border-color: rgba(56,152,255,0.72); box-shadow: 0 0 12px rgba(56,152,255,0.22), inset 0 1px 0 rgba(255,255,255,0.92); }
+}
+
+@keyframes ext-tab-select {
+  0%   { transform: scaleX(0.88) scaleY(0.92); }
+  60%  { transform: scaleX(1.06) scaleY(1.04); }
+  100% { transform: scaleX(1)    scaleY(1); }
+}
+
+@keyframes ext-side-btn-bounce {
+  0%,100% { transform: scale(1);    }
+  40%      { transform: scale(1.22) rotate(-6deg); }
+  70%      { transform: scale(0.92) rotate(3deg);  }
+}
+
+@keyframes ext-peer-portal {
+  0%, 100% { box-shadow: 0 0 0   rgba(100,200,255,0),  inset 0 1px 0 rgba(255,255,255,0.72); }
+  50%       { box-shadow: 0 0 16px rgba(100,200,255,0.38), inset 0 1px 0 rgba(255,255,255,0.9); }
+}
+
+@keyframes ext-vote-pop {
+  0%   { transform: scale(1)    rotate(0deg); }
+  40%  { transform: scale(1.35) rotate(-8deg); }
+  70%  { transform: scale(0.90) rotate(4deg); }
+  100% { transform: scale(1)    rotate(0deg); }
+}
+
+@keyframes ext-compose-pulse {
+  0%, 100% { border-color: var(--cube-border); }
+  50%       { border-color: rgba(56,152,255,0.60); box-shadow: 0 0 8px rgba(56,152,255,0.20); }
+}
+
+/* ── Extension user bar entrance ─────────────────── */
+
+.extension-user-bar {
+  animation: ext-user-bar-in 0.32s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) both;
+}
+
+/* ── User bar text buttons ───────────────────────── */
+
+.extension-user-bar__actions .text-button {
+  position: relative;
+  transition: color 0.18s;
+}
+.extension-user-bar__actions .text-button::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0; right: 0;
+  height: 1.5px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  border-radius: 2px;
+  transition: transform 0.22s var(--ease-bounce, cubic-bezier(.34,1.56,.64,1));
+}
+.extension-user-bar__actions .text-button:hover::after { transform: scaleX(1); }
+.extension-user-bar__actions .text-button:active { transform: scale(0.92); }
+
+/* ── Pod cards ───────────────────────────────────── */
+
+.extension-app .pod-card {
+  transition: transform 0.22s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)), box-shadow 0.22s, border-color 0.22s;
+  cursor: pointer;
+  will-change: transform;
+}
+.extension-app .pod-card:hover {
+  animation: ext-card-lift 0.28s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) forwards;
+  border-color: rgba(56,152,255,0.55);
+}
+.extension-app .pod-card:active {
+  animation: ext-card-press 0.18s ease-out forwards;
+}
+.extension-app .pod-card--blue:hover  { border-color: rgba(56,152,255,0.72); }
+.extension-app .pod-card--silver:hover { border-color: rgba(180,200,230,0.90); }
+
+/* ── Pod entry button (arrow) ────────────────────── */
+
+.extension-app .pod-card__button {
+  transition: transform 0.22s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)), filter 0.18s;
+  overflow: hidden;
+}
+.extension-app .pod-card__button:hover {
+  animation: ext-arrow-spin 0.38s cubic-bezier(.34,1.56,.64,1) forwards;
+  filter: brightness(1.18) drop-shadow(0 0 4px rgba(56,152,255,0.6));
+}
+
+/* ── Scope / room tabs ───────────────────────────── */
+
+.extension-app .room-scope-tabs a,
+.extension-app .room-scope-tabs button {
+  position: relative;
+  transition: background 0.18s, color 0.18s, transform 0.14s;
+  overflow: hidden;
+}
+.extension-app .room-scope-tabs a::before,
+.extension-app .room-scope-tabs button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(56,152,255,0.18) 0%, transparent 100%);
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.extension-app .room-scope-tabs a:hover::before,
+.extension-app .room-scope-tabs button:hover::before { transform: translateX(0); }
+.extension-app .room-scope-tabs a.active,
+.extension-app .room-scope-tabs button.active {
+  animation: ext-tab-select 0.22s var(--ease-spring, cubic-bezier(.34,1.56,.64,1));
+}
+.extension-app .room-scope-tabs a:active,
+.extension-app .room-scope-tabs button:active { transform: scale(0.93); }
+
+/* ── Post tabs ───────────────────────────────────── */
+
+.extension-app .post-tab {
+  transition: background 0.16s, color 0.16s, transform 0.14s;
+  position: relative;
+  overflow: hidden;
+}
+.extension-app .post-tab:not(.tab--active):hover {
+  animation: ext-glow-pop 0.32s ease-out forwards;
+}
+.extension-app .post-tab:active { transform: scale(0.90); }
+
+/* ── Chat nav links ──────────────────────────────── */
+
+.extension-app .chat-menu a,
+.extension-app .chat-nav a {
+  position: relative;
+  transition: color 0.16s, filter 0.16s;
+  overflow: hidden;
+}
+.extension-app .chat-menu a::after,
+.extension-app .chat-nav a::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 8px; right: 8px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent-blue), rgba(100,220,255,0.9));
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.22s var(--ease-bounce, cubic-bezier(.34,1.56,.64,1));
+}
+.extension-app .chat-menu a:hover::after,
+.extension-app .chat-nav a:hover::after { transform: scaleX(1); }
+.extension-app .chat-menu a:hover,
+.extension-app .chat-nav a:hover { filter: brightness(1.15); }
+.extension-app .chat-menu a:active,
+.extension-app .chat-nav a:active { transform: scale(0.90); }
+
+/* ── Nav CTA ─────────────────────────────────────── */
+
+.extension-app .nav-cta {
+  position: relative;
+  overflow: hidden;
+  transition: filter 0.16s, transform 0.14s;
+}
+.extension-app .nav-cta:hover { filter: brightness(1.12) saturate(1.2); transform: translateY(-1px); }
+.extension-app .nav-cta:active { transform: scale(0.93); }
+
+/* ── Badge/notification jiggle ───────────────────── */
+
+.nav-with-badge:hover .badge,
+.extension-app a:hover .badge {
+  animation: ext-badge-jiggle 0.45s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) forwards;
+}
+
+/* ── Chat sidebar buttons ────────────────────────── */
+
+.extension-app .chat-side-button {
+  position: relative;
+  transition: background 0.16s, transform 0.16s;
+  overflow: hidden;
+}
+.extension-app .chat-side-button:hover {
+  background: rgba(56,152,255,0.14);
+  transform: scale(1.06);
+}
+.extension-app .chat-side-button:hover .chat-side-icon {
+  animation: ext-side-btn-bounce 0.38s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) forwards;
+}
+.extension-app .chat-side-button:active { transform: scale(0.92); }
+
+/* ── Chat member hover ───────────────────────────── */
+
+.extension-app .chat-member {
+  transition: background 0.16s, transform 0.16s;
+  border-radius: var(--radius-sm);
+}
+.extension-app .chat-member:hover {
+  background: rgba(56,152,255,0.08);
+  transform: translateX(3px);
+}
+
+/* ── Chat avatars ────────────────────────────────── */
+
+.extension-app .chat-avatar {
+  transition: transform 0.18s var(--ease-spring, cubic-bezier(.34,1.56,.64,1));
+  position: relative;
+}
+.extension-app .chat-member:hover .chat-avatar {
+  transform: scale(1.15);
+  animation: ext-avatar-ring 0.6s ease-out;
+}
+
+/* ── Status / live dots ──────────────────────────── */
+
+.extension-app .chat-status-dot--online,
+.live-dot {
+  animation: ext-live-dot-glow 1.6s ease-in-out infinite;
+}
+.extension-app .chat-status-dot--away {
+  animation: ext-dot-breathe 2.4s ease-in-out infinite;
+}
+
+/* ── XP title bar buttons ────────────────────────── */
+
+.extension-app .xp-title-btn--close:hover {
+  animation: ext-xp-close-shake 0.32s var(--ease-bounce, cubic-bezier(.34,1.56,.64,1)) forwards;
+  background: rgba(220,40,40,0.82) !important;
+  color: #fff !important;
+}
+.extension-app .xp-title-btn--close:active { transform: scale(0.82); }
+
+.extension-app .xp-title-btn--min:hover,
+.extension-app .xp-title-btn--max:hover {
+  animation: ext-xp-disabled-tease 0.5s ease-in-out forwards;
+}
+
+/* ── Post cards ──────────────────────────────────── */
+
+.extension-app .post-card {
+  transition: transform 0.20s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)), box-shadow 0.20s, border-color 0.20s;
+  will-change: transform;
+}
+.extension-app .post-card:hover {
+  transform: translateY(-3px) scale(1.008);
+  box-shadow: 0 6px 20px rgba(0,80,180,0.16), inset 0 1px 0 rgba(255,255,255,0.95);
+  border-color: rgba(56,152,255,0.50);
+}
+.extension-app .post-card:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+/* ── Post card reply link ────────────────────────── */
+
+.extension-app .post-reply-btn {
+  position: relative;
+  overflow: hidden;
+  transition: background 0.18s, border-color 0.18s, transform 0.14s, filter 0.16s;
+}
+.extension-app .post-reply-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(56,152,255,0.28) 0%, transparent 70%);
+  border-radius: inherit;
+  transform: scale(0);
+  opacity: 0;
+  transition: transform 0.32s ease, opacity 0.32s;
+  pointer-events: none;
+}
+.extension-app .post-reply-btn:hover::after { transform: scale(1); opacity: 1; }
+.extension-app .post-reply-btn:hover { filter: brightness(1.08) saturate(1.15); transform: translateY(-1px); }
+.extension-app .post-reply-btn:active { transform: scale(0.93); }
+
+/* ── Vote buttons ────────────────────────────────── */
+
+.extension-app .post-votes button {
+  transition: transform 0.18s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)), filter 0.16s;
+}
+.extension-app .post-votes button:hover {
+  animation: ext-vote-pop 0.28s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) forwards;
+  filter: brightness(1.15) drop-shadow(0 0 3px rgba(56,152,255,0.5));
+}
+
+/* ── Compose strip inputs ────────────────────────── */
+
+.extension-app .post-compose-strip input:focus,
+.extension-app .post-compose-strip select:focus,
+.extension-app .post-compose-strip textarea:focus,
+.extension-app .post-mobile-composer__input textarea:focus,
+.extension-app .profile-field input:focus,
+.extension-app .domain-picker input:focus,
+.extension-app .pod-create-form input:focus {
+  animation: ext-input-glow 1.8s ease-in-out infinite;
+  border-color: rgba(56,152,255,0.72);
+  outline: none;
+}
+
+/* ── Domain picker & pod create buttons ─────────── */
+
+.extension-app .domain-picker button:hover,
+.extension-app .pod-create-form button:hover {
+  filter: brightness(1.10) saturate(1.15);
+  transform: translateY(-1px);
+}
+.extension-app .domain-picker button:active,
+.extension-app .pod-create-form button:active { transform: scale(0.93); }
+
+/* ── Compose strip post button rainbow ───────────── */
+
+.extension-app .post-compose-strip button:not(:disabled):hover {
+  animation: ext-rainbow-shift 1.2s linear infinite, retro-glow-pop 0.45s ease-out forwards;
+}
+
+/* ── DM messages pop-in ──────────────────────────── */
+
+.extension-app .dm-message {
+  animation: ext-message-in-right 0.24s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) both;
+}
+.extension-app .dm-message--theirs {
+  animation-name: ext-message-in-left;
+}
+
+/* ── DM thread list items ────────────────────────── */
+
+.extension-app .dm-thread-item,
+.extension-app [class*="dm-thread"] > * {
+  transition: background 0.16s, transform 0.16s;
+  border-radius: var(--radius-sm);
+}
+.extension-app .dm-thread-item:hover,
+.extension-app [class*="dm-thread"] > *:hover {
+  background: rgba(56,152,255,0.10);
+  transform: translateX(4px);
+}
+
+/* ── Peer map door links ─────────────────────────── */
+
+.extension-app .peer-map-door-link {
+  transition: filter 0.22s, transform 0.18s;
+  animation: ext-peer-portal 2.8s ease-in-out infinite;
+}
+.extension-app .peer-map-door-link:hover {
+  filter: brightness(1.14) saturate(1.25);
+  transform: scale(1.04);
+  animation: ext-aqua-pulse 1s ease-in-out infinite;
+}
+.extension-app .peer-map-door-link:active { transform: scale(0.94); }
+
+/* ── Peer map control buttons ────────────────────── */
+
+.extension-app .peer-map-controls button {
+  transition: filter 0.16s, transform 0.14s;
+}
+.extension-app .peer-map-controls button:hover {
+  filter: brightness(1.12) saturate(1.2);
+  transform: scale(1.08);
+  animation: ext-aqua-pulse 0.9s ease-in-out infinite;
+}
+.extension-app .peer-map-controls button:active { transform: scale(0.88); }
+
+/* ── Profile form inputs ─────────────────────────── */
+
+.extension-app .form-input:focus,
+.app-window--popup .form-input:focus {
+  animation: ext-input-glow 1.8s ease-in-out infinite;
+  border-color: rgba(56,152,255,0.72);
+}
+
+/* ── Auth form — btn-primary rainbow glow ────────── */
+
+.app-window--popup .btn-primary:not(:disabled):hover {
+  animation: ext-rainbow-shift 1.4s linear infinite, retro-glow-pop 0.45s ease-out forwards;
+}
+
+/* ── Google sign-in button rainbow ──────────────────*/
+
+.btn-social:not(:disabled):hover {
+  animation: ext-rainbow-shift 1.4s linear infinite, retro-glow-pop 0.45s ease-out forwards;
+}
+
+/* ── Logo float ──────────────────────────────────── */
+
+.logo-pod {
+  animation: ext-logo-float 3.6s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+/* ── Pop-in for windows/cards on entry ───────────── */
+
+.extension-app .pod-window,
+.extension-app .chat-window,
+.extension-app .post-window,
+.extension-app .profile-window,
+.extension-app .peer-map-window,
+.extension-app .user-profile-window,
+.extension-app .dm-window {
+  animation: ext-pop-in 0.30s var(--ease-spring, cubic-bezier(.34,1.56,.64,1)) both;
+}
+
+/* ── Post card glow border pulse on active section ── */
+
+.extension-app .post-card:focus-within {
+  animation: ext-glow-border-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Post comment hover ──────────────────────────── */
+
+.extension-app .post-comment {
+  transition: background 0.16s, transform 0.16s;
+  border-radius: var(--radius-sm);
+}
+.extension-app .post-comment:hover {
+  background: rgba(56,152,255,0.06);
+  transform: translateX(2px);
+}
+
+/* ── Comment avatar ring on hover ────────────────── */
+
+.extension-app .post-comment:hover .post-comment__avatar {
+  animation: ext-avatar-ring 0.55s ease-out forwards;
+  transform: scale(1.1);
+  transition: transform 0.18s var(--ease-spring, cubic-bezier(.34,1.56,.64,1));
+}
+
+/* ── Profile avatar breathe ──────────────────────── */
+
+.extension-app .profile-avatar,
+.extension-app .user-profile-avatar {
+  animation: ext-aqua-pulse 2.8s ease-in-out infinite;
+  transition: transform 0.22s var(--ease-spring, cubic-bezier(.34,1.56,.64,1));
+}
+.extension-app .profile-avatar:hover,
+.extension-app .user-profile-avatar:hover { transform: scale(1.08); }
+
+/* ── Pod user tile + activity panel hover ────────── */
+
+.extension-app .pod-user-tile:hover,
+.extension-app .activity-panel:hover {
+  box-shadow: 0 4px 16px rgba(0,90,200,0.14);
+  transform: translateY(-2px);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+/* ── General anchor/link hover transition ────────── */
+
+.extension-app a:not(.text-button):not(.nav-cta):not(.chat-side-button) {
+  transition: color 0.15s, filter 0.15s;
+}
+.extension-app a:not(.text-button):not(.nav-cta):not(.chat-side-button):hover {
+  filter: brightness(1.14);
+}
+
+/* ── Global respect for reduced-motion ──────────── */
+@media (prefers-reduced-motion: reduce) {
+  .extension-app *,
+  .extension-app *::before,
+  .extension-app *::after,
+  .extension-user-bar,
+  .logo-pod {
+    animation: none !important;
+    transition: none !important;
+  }
+}
